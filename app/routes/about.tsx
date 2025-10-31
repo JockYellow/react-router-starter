@@ -1,8 +1,10 @@
-export default function About() {
+// app/routes/about.tsx
+export default function AboutPage() {
   return (
-    <main className="p-6">
-      <h1 className="text-3xl font-bold">About — Local Edit OK</h1>
-      <p>這是我在本機新增的路由頁面。</p>
-    </main>
+    <section>
+      <h1>關於我</h1>
+      <p>我從 HTML/CSS 入門，現在正用 React Router 蓋 SPA！</p>
+    </section>
   );
 }
+
