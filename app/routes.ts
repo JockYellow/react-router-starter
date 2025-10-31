@@ -1,6 +1,7 @@
-import { type RouteConfig, index, route } from "@react-router/dev/routes"; // 1. 匯入 route
+// app/routes.ts
+import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
 export default [
-  index("routes/home.tsx"),
-  route("about", "routes/about.tsx") // 2. 加入這行來定義 /about 路由
+  index("routes/_index.tsx"), // <--- 修正這行
+  route("about", "routes/about.tsx")
 ] satisfies RouteConfig;

@@ -1,7 +1,7 @@
 // app/root.tsx
 import { Link, Outlet, useLocation } from "react-router";
 import { useEffect, useRef, useState } from "react";
-import "./styles/global.css"; // 確保有引入全域樣式（下面第3點）
+import "./app.css"; 
 
 function AutoHideHeader() {
   const [hidden, setHidden] = useState(false);
