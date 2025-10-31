@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 平滑捲動、可讀排版 */
+html { scroll-behavior: smooth; }
+
+/* 區塊統一間距 */
+.section { @apply py-14 md:py-20; }
+.section-title { @apply text-2xl md:text-3xl font-semibold mb-6; }
+
+/* 卡片與輸入樣式 */
+@layer components {
+  .card {
+    @apply bg-white rounded-xl border shadow-sm p-6;
+  }
+  .input {
+    @apply w-full rounded-md border border-neutral-300 bg-white px-3 py-2 outline-none
+           focus:ring-2 focus:ring-neutral-800 focus:border-neutral-800;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-md bg-neutral-900 px-4 py-2 text-white
+           hover:bg-neutral-800 active:bg-neutral-900 transition;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-neutral-800
+           hover:bg-neutral-200/60 transition;
+  }
+}
