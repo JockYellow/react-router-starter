@@ -1,8 +1,15 @@
 // app/root.tsx
-import { Link, Outlet, useLocation } from "react-router";
+import { 
+  Link, 
+  Links, // <--- 1. 匯入 Links
+  Outlet, 
+  Scripts, // <--- 2. 匯入 Scripts
+  useLocation 
+} from "react-router";
 import { useEffect, useRef, useState } from "react";
 import "./app.css"; 
 
+// 你原本的 AutoHideHeader 元件 (保持不變)
 function AutoHideHeader() {
   const [hidden, setHidden] = useState(false);
   const lastY = useRef(0);
@@ -13,7 +20,6 @@ function AutoHideHeader() {
       const y = window.scrollY || 0;
       if (!ticking.current) {
         window.requestAnimationFrame(() => {
-          // 向下快速捲動時隱藏、向上或接近頂端時顯示
           const goingDown = y > lastY.current;
           const delta = Math.abs(y - lastY.current);
           if (y < 24 || !goingDown || delta > 10) {
@@ -31,7 +37,6 @@ function AutoHideHeader() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // 你要的「頁簽」：錨點導向到首頁各區塊
   const tabs = [
     { id: "about", label: "關於我" },
     { id: "skills", label: "技能" },
@@ -39,7 +44,6 @@ function AutoHideHeader() {
     { id: "contact", label: "聯絡" },
   ];
 
-  // 監聽目前區塊，設定活躍 tab（IntersectionObserver）
   const [active, setActive] = useState("about");
   useEffect(() => {
     const sections = tabs.map(t => document.getElementById(t.id)).filter(Boolean) as HTMLElement[];
@@ -77,7 +81,6 @@ function AutoHideHeader() {
               </a>
             ))}
           </nav>
-          {/* 行動裝置快速按鈕：回頂端 */}
           <a href="#about" className="md:hidden text-sm text-gray-600">目錄</a>
         </div>
       </div>
@@ -85,10 +88,10 @@ function AutoHideHeader() {
   );
 }
 
-export default function Root() {
+// 3. 把你原本的 Root 元件重新命名為 App
+function App() {
   const { pathname } = useLocation();
   useEffect(() => {
-    // 切換路由時回頂端
     window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
   }, [pathname]);
 
@@ -107,3 +110,23 @@ export default function Root() {
   );
 }
 
+// 4. 匯出一個 Layout 元件來定義 HTML 骨架
+export function Layout() {
+  return (
+    <html lang="zh-Hant">
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>個人網站</title>
+        <Links /> {/* <--- 5. 插入 CSS 連結 */}
+      </head>
+      <body>
+        <App /> {/* <--- 6. 渲染你原本的 App 內容 */}
+        <Scripts /> {/* <--- 7. 插入 JavaScript 腳本 (關鍵！) */}
+      </body>
+    </html>
+  );
+}
+
+// 8. 預設匯出 App (也就是你原本的 Root)
+export default App;
