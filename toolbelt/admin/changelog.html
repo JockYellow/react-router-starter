@@ -1,0 +1,164 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Dev Admin – Changelog</title>
+<link rel="stylesheet" href="/admin/admin.css" />
+<header>
+  <div class="wrap" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+    <strong>Changelog 管理</strong>
+    <nav><a class="btn ghost" href="/admin/">返回選單</a></nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="row">
+    <div class="card">
+      <h3>建立 / 編輯</h3>
+      <div class="row">
+        <label><span>日期</span><input type="date" id="cl-date" /></label>
+        <label><span>標籤</span>
+          <select id="cl-tag">
+            <option value="add">add</option><option value="fix">fix</option>
+            <option value="change">change</option><option value="docs">docs</option>
+          </select>
+        </label>
+      </div>
+      <label><span>標題</span><input id="cl-title" placeholder="這次更新的標題" /></label>
+      <label><span>內容（每行一條，可留空）</span>
+        <textarea id="cl-notes" rows="6" placeholder="- 調整導覽列&#10;- 新增 RSS"></textarea>
+      </label>
+      <label><span>檔名 slug（自動由標題生成，可覆寫）</span>
+        <input id="cl-slug" placeholder="auto-from-title" />
+      </label>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="cl-create" class="btn">新增</button>
+        <button id="cl-save" class="btn ghost" disabled>儲存變更</button>
+        <button id="cl-cancel" class="btn ghost" disabled>取消</button>
+      </div>
+      <p class="muted" id="cl-msg"></p>
+    </div>
+
+    <div class="card">
+      <h3>列表</h3>
+      <div class="list" id="cl-list"></div>
+    </div>
+  </div>
+</main>
+
+<script src="/admin/admin.js"></script>
+<script>
+  // 使用 window.Admin
+  const $ = (s, c = document) => c.querySelector(s);
+  const state = { editFilename: null };
+
+  function dataFromForm() {
+    const date = $("#cl-date").value || Admin.today();
+    const title = $("#cl-title").value.trim();
+    const tag = $("#cl-tag").value || "add";
+    const notes = $("#cl-notes").value
+      .split("\n").map(s => s.trim()).filter(Boolean);
+    const data = { date, title, tag };
+    if (notes.length) data.notes = notes;
+    return data;
+  }
+
+  async function listItems() {
+    try {
+      const items = await Admin.api("/fs/changelog/list");
+      const box = $("#cl-list"); box.innerHTML = "";
+      items.forEach(it => {
+        const el = document.createElement("div");
+        el.className = "item";
+        el.innerHTML = `
+          <div>
+            <div><strong>${it.title}</strong></div>
+            <div class="muted">${it.date} ${it.tag ? "· " + it.tag : ""}</div>
+            ${it.notes?.length ? `<ul>${it.notes.map(n=>`<li>${n}</li>`).join("")}</ul>` : ""}
+            <div class="muted">${it.filename}</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn ghost" data-act="edit">編輯</button>
+            <button class="btn ghost" data-act="del">刪除</button>
+          </div>`;
+        el.querySelector('[data-act="edit"]').onclick = () => loadForEdit(it);
+        el.querySelector('[data-act="del"]').onclick = () => delItem(it.filename);
+        box.appendChild(el);
+      });
+    } catch (e) {
+      console.error(e);
+      $("#cl-msg").textContent = "讀取失敗：" + e.message;
+    }
+  }
+
+  async function createItem() {
+    const data = dataFromForm();
+    if (!data.title) { $("#cl-msg").textContent = "請輸入標題"; return; }
+    const slug = $("#cl-slug").value || Admin.slugify(data.title) || "update";
+    try {
+      await Admin.api("/fs/changelog/create", { method: "POST", body: { data, slug } });
+      $("#cl-msg").textContent = "已新增";
+      resetForm(); await listItems();
+    } catch (e) {
+      console.error(e); $("#cl-msg").textContent = "新增失敗：" + e.message;
+    }
+  }
+
+  function loadForEdit(it) {
+    state.editFilename = it.filename;
+    $("#cl-date").value = it.date;
+    $("#cl-tag").value = it.tag || "add";
+    $("#cl-title").value = it.title || "";
+    $("#cl-notes").value = (it.notes || []).join("\n");
+    $("#cl-slug").value = it.filename.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/\.json$/, "");
+    $("#cl-create").disabled = true;
+    $("#cl-save").disabled = false;
+    $("#cl-cancel").disabled = false;
+    $("#cl-msg").textContent = `編輯 ${it.filename}`;
+  }
+
+  async function saveItem() {
+    if (!state.editFilename) return;
+    const data = dataFromForm();
+    try {
+      await Admin.api("/fs/changelog/update", { method: "PUT", body: { filename: state.editFilename, data } });
+      $("#cl-msg").textContent = "已儲存";
+      resetForm(); await listItems();
+    } catch (e) {
+      console.error(e); $("#cl-msg").textContent = "儲存失敗：" + e.message;
+    }
+  }
+
+  async function delItem(filename) {
+    if (!confirm(`刪除 ${filename} ?`)) return;
+    try {
+      await Admin.api("/fs/changelog/delete", { method: "DELETE", body: { filename } });
+      $("#cl-msg").textContent = "已刪除";
+      await listItems();
+    } catch (e) {
+      console.error(e); $("#cl-msg").textContent = "刪除失敗：" + e.message;
+    }
+  }
+
+  function resetForm() {
+    state.editFilename = null;
+    $("#cl-date").value = Admin.today();
+    $("#cl-tag").value = "add";
+    $("#cl-title").value = "";
+    $("#cl-notes").value = "";
+    $("#cl-slug").value = "";
+    $("#cl-create").disabled = false;
+    $("#cl-save").disabled = true;
+    $("#cl-cancel").disabled = true;
+    $("#cl-msg").textContent = "";
+  }
+
+  $("#cl-create").onclick = createItem;
+  $("#cl-save").onclick = saveItem;
+  $("#cl-cancel").onclick = resetForm;
+
+  (async function boot() {
+    resetForm();
+    await listItems();
+  })();
+</script>
+

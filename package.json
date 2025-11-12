@@ -27,7 +27,12 @@
     "@types/node": "24.0.4",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "concurrently": "^9.2.1",
+    "execa": "^9.6.0",
+    "express": "^5.1.0",
+    "simple-git": "^3.30.0",
     "tailwindcss": "4.1.1",
+    "tsx": "^4.20.6",
     "typescript": "5.8.3",
     "vite": "^6.0.0",
     "vite-tsconfig-paths": "5.1.4",
@@ -40,7 +45,10 @@
     "deploy": "wrangler deploy",
     "dev": "react-router dev",
     "preview": "npm run build && vite preview",
-    "typecheck": "npm run typegen && tsc -b"
+    "typecheck": "npm run typegen && tsc -b",
+    "dump:routes": "pwsh ./dump-routes.ps1",
+    "toolbelt": "tsx toolbelt/index.ts",
+    "dev:ui": "concurrently -k -n APP,TB \"npm:dev\" \"npm:toolbelt\""
   },
   "type": "module"
 }

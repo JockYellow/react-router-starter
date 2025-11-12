@@ -1,45 +1,98 @@
 /* app/app.css */
 @import "tailwindcss" source(".");
 
+/* === Design Tokens === */
 @theme {
   --font-sans:
     "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
     "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  /* brand colors */
+  --color-brand-50:  #FFF7E1;
+  --color-brand-100: #FBEFC8;
+  --color-brand-200: #F1E2A4;
+  --color-brand-300: #E8C872; /* 主黃 */
+  --color-brand-400: #D9B45A;
+  --color-brand-500: #B9923E;
+
+  --color-accent-50:  #F8F5FF;
+  --color-accent-100: #EDE8FE;
+  --color-accent-200: #DAD3FA;
+  --color-accent-300: #BFB4EE;
+  --color-accent-400: #7A6AAE; /* 主紫 */
+  --color-accent-500: #6B5CA0;
+
+  --color-warm-0:   #FFFFFF;
+  --color-warm-25:  #FDFCFB;
+  --color-warm-50:  #F6F5F2; /* 背景暖白 */
+  --color-warm-100: #EEECE6;
+
+  /* radii / shadow */
+  --radius-card: 1rem;     /* 16px */
+  --shadow-soft: 0 6px 18px rgba(20, 10, 0, 0.06);
+  --shadow-hover: 0 10px 26px rgba(20, 10, 0, 0.08);
 }
 
-html,
-body {
-  @apply bg-white dark:bg-gray-950;
-
+/* === Base === */
+html, body {
+  @apply bg-[--color-warm-50] text-neutral-900;
+  font-family: var(--font-sans);
   @media (prefers-color-scheme: dark) {
     color-scheme: dark;
   }
 }
-
-/* --- 以下是從 global.css 搬過來的 --- */
-
-/* 平滑捲動、可讀排版 */
 html { scroll-behavior: smooth; }
 
-/* 區塊統一間距 */
+/* 區塊統一間距與標題 */
 .section { @apply py-14 md:py-20; }
-.section-title { @apply text-2xl md:text-3xl font-semibold mb-6; }
+.section-title { @apply text-2xl md:text-3xl font-semibold mb-6 tracking-tight; }
 
-/* 卡片與輸入樣式 */
+/* === Components === */
 @layer components {
   .card {
-    @apply bg-white rounded-xl border shadow-sm p-6;
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-soft);
+    @apply bg-white border border-neutral-200 p-6 transition-shadow;
   }
+  .card:hover { box-shadow: var(--shadow-hover); }
+
   .input {
     @apply w-full rounded-md border border-neutral-300 bg-white px-3 py-2 outline-none
-           focus:ring-2 focus:ring-neutral-800 focus:border-neutral-800;
+           focus:ring-2 focus:ring-[--color-accent-200] focus:border-[--color-accent-400];
   }
+
+  /* 移除 @apply btn，直接展開 utility（這樣 Tailwind 才不會報 unknown utility） */
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-md bg-neutral-900 px-4 py-2 text-white
-           hover:bg-neutral-800 active:bg-neutral-900 transition;
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition text-neutral-900;
+    background: linear-gradient(180deg, var(--color-brand-200), var(--color-brand-300));
+    box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 6px 16px rgba(185,146,62,.18);
   }
+  .btn-primary:hover {
+    background: linear-gradient(180deg, var(--color-brand-200), var(--color-brand-400));
+  }
+
   .btn-ghost {
-    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-neutral-800
-           hover:bg-neutral-200/60 transition;
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition text-[--color-accent-500] bg-[color:transparent] hover:bg-[--color-accent-50];
+    border: 1px solid var(--color-accent-200);
   }
+
+  .link-soft {
+    @apply text-[--color-accent-500] hover:text-[--color-accent-400] underline-offset-4 hover:underline;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs;
+    background: color-mix(in oklab, var(--color-accent-50) 70%, white);
+    border: 1px solid var(--color-accent-200);
+    color: var(--color-accent-500);
+  }
+
+  /* 細分隔線：比實線更柔和 */
+  .divider {
+    background: linear-gradient(90deg, transparent, rgba(0,0,0,.08), transparent);
+    height: 1px;
+  }
+
+  .hover-raise { transform: translateY(0); transition: transform .2s ease, box-shadow .2s ease; }
+  .hover-raise:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
 }

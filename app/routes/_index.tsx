@@ -2,22 +2,27 @@
 export default function HomePage() {
   return (
     <div className="mx-auto max-w-6xl px-4">
-      {/* Hero 區 */}
-      <section className="py-14 md:py-20">
+      {/* Hero 區：淡漸層薄霧背景 */}
+      <section className="py-14 md:py-20 relative">
+        <div
+          className="absolute inset-0 -z-10 opacity-[0.06]"
+          style={{ background: "linear-gradient(180deg,#FFF7E1 0%,#F8F5FF 100%)" }}
+        />
         <div className="grid md:grid-cols-[1.2fr_1fr] gap-8 items-center">
           <div>
             <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
               前端開發者的個人網站
             </h1>
             <p className="mt-4 text-lg text-neutral-700">
-              這裡是我的開發筆記與作品集。網站運行於 Cloudflare Workers，前端使用 React Router 與 Tailwind CSS，透過 Notion 與 D1 打通資料流。
+              這裡是我的開發筆記與作品集。網站運行於 Cloudflare Workers，前端使用 React Router 與 Tailwind CSS，
+              透過 Notion 與 D1 打通資料流。
             </p>
             <div className="mt-6 flex gap-3">
               <a href="#projects" className="btn-primary">查看作品</a>
               <a href="#contact" className="btn-ghost">聯絡我</a>
             </div>
           </div>
-          <div className="rounded-2xl bg-white shadow-md p-6 md:p-8">
+          <div className="card hover-raise p-6 md:p-8">
             <div className="text-sm text-neutral-500">目前進度</div>
             <ul className="mt-3 space-y-2 text-sm">
               <li>· 首頁與關於頁完成</li>
@@ -29,7 +34,7 @@ export default function HomePage() {
       </section>
 
       {/* 關於我 */}
-      <section id="about" className="section">
+      <section id="about" className="section bg-[--color-warm-25]">
         <h2 className="section-title">關於我</h2>
         <div className="prose max-w-none">
           <p>
@@ -50,7 +55,7 @@ export default function HomePage() {
             { title: "D1 / Notion API", desc: "內容管理與資料庫整合。" },
             { title: "部署與監控", desc: "CI/CD、快取與效能優化。" },
           ].map((item) => (
-            <article key={item.title} className="card">
+            <article key={item.title} className="card hover-raise">
               <h3 className="font-semibold">{item.title}</h3>
               <p className="mt-1 text-sm text-neutral-700">{item.desc}</p>
             </article>
@@ -59,24 +64,24 @@ export default function HomePage() {
       </section>
 
       {/* 作品 */}
-      <section id="projects" className="section">
+      <section id="projects" className="section bg-[--color-brand-50]/40">
         <h2 className="section-title">作品</h2>
         <div className="grid md:grid-cols-2 gap-6">
-          <article className="card hover:shadow-lg transition">
+          <article className="card hover-raise transition">
             <h3 className="font-semibold">個人部落格系統</h3>
             <p className="mt-1 text-sm text-neutral-700">
               React Router + Workers + Notion，支援 SSR 與 RSS。
             </p>
-            <a href="/blog" className="mt-3 inline-block text-sm text-blue-700 hover:underline">
+            <a href="/blog" className="mt-3 inline-block text-sm link-soft">
               前往部落格
             </a>
           </article>
-          <article className="card hover:shadow-lg transition">
+          <article className="card hover-raise transition">
             <h3 className="font-semibold">留言板</h3>
             <p className="mt-1 text-sm text-neutral-700">
               Cloudflare D1 寫入與查詢，具備表單驗證與錯誤處理。
             </p>
-            <a href="/guestbook" className="mt-3 inline-block text-sm text-blue-700 hover:underline">
+            <a href="/guestbook" className="mt-3 inline-block text-sm link-soft">
               前往留言板
             </a>
           </article>

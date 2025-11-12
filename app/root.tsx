@@ -1,15 +1,19 @@
 // app/root.tsx
-import { 
-  Link, 
-  Links, // <--- 1. 匯入 Links
-  Outlet, 
-  Scripts, // <--- 2. 匯入 Scripts
-  useLocation 
+import {
+  Link,
+  Links,
+  Outlet,
+  Scripts,
+  useLocation,
 } from "react-router";
 import { useEffect, useRef, useState } from "react";
-import "./app.css"; 
+import "./app.css";
 
-// 你原本的 AutoHideHeader 元件 (保持不變)
+import DevMenu from "./components/DevMenu";
+
+
+
+/** 自動隱藏 Header，向下捲動隱藏、向上顯示 */
 function AutoHideHeader() {
   const [hidden, setHidden] = useState(false);
   const lastY = useRef(0);
@@ -65,7 +69,7 @@ function AutoHideHeader() {
       className={`fixed inset-x-0 top-0 z-50 transition-transform duration-300 will-change-transform
       ${hidden ? "-translate-y-full" : "translate-y-0"}`}
     >
-      <div className="backdrop-blur bg-white/75 border-b">
+      <div className="backdrop-blur-md bg-[--color-warm-25]/80 border-b border-[--color-warm-100]">
         <div className="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between">
           <Link to="/" className="font-semibold tracking-wide">個人網站</Link>
           <nav className="hidden md:flex items-center gap-6 text-sm">
@@ -74,21 +78,24 @@ function AutoHideHeader() {
                 key={t.id}
                 href={`/#${t.id}`}
                 className={`py-1 border-b-2 -mb-[2px] transition-colors ${
-                  active === t.id ? "border-gray-900 text-gray-900" : "border-transparent hover:border-gray-400 text-gray-600"
+                  active === t.id
+                    ? "border-[--color-accent-400] text-neutral-900"
+                    : "border-transparent text-neutral-600 hover:text-neutral-800 hover:border-[--color-accent-200]"
                 }`}
               >
                 {t.label}
               </a>
             ))}
           </nav>
-          <a href="#about" className="md:hidden text-sm text-gray-600">目錄</a>
+          <Link to="/changelog" className="text-sm link-soft hidden md:inline">更新日誌</Link>
+          <a href="#about" className="md:hidden text-sm text-neutral-600">目錄</a>
         </div>
       </div>
     </header>
   );
 }
 
-// 3. 把你原本的 Root 元件重新命名為 App
+/** 頁面框架 */
 function App() {
   const { pathname } = useLocation();
   useEffect(() => {
@@ -96,11 +103,12 @@ function App() {
   }, [pathname]);
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900">
+    <div className="min-h-screen bg-[--color-warm-50] text-neutral-900">
       <AutoHideHeader />
       <main className="pt-16">
         <Outlet />
       </main>
+      <DevMenu />
       <footer className="mt-16 border-t">
         <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-neutral-600">
           © {new Date().getFullYear()} 個人網站
@@ -110,7 +118,7 @@ function App() {
   );
 }
 
-// 4. 匯出一個 Layout 元件來定義 HTML 骨架
+/** HTML 骨架 */
 export function Layout() {
   return (
     <html lang="zh-Hant">
@@ -118,15 +126,14 @@ export function Layout() {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>個人網站</title>
-        <Links /> {/* <--- 5. 插入 CSS 連結 */}
+        <Links />
       </head>
       <body>
-        <App /> {/* <--- 6. 渲染你原本的 App 內容 */}
-        <Scripts /> {/* <--- 7. 插入 JavaScript 腳本 (關鍵！) */}
+        <App />
+        <Scripts />
       </body>
     </html>
   );
 }
 
-// 8. 預設匯出 App (也就是你原本的 Root)
 export default App;

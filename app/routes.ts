@@ -2,6 +2,7 @@
 import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
 export default [
-  index("routes/_index.tsx"), // <--- 修正這行
-  route("about", "routes/about.tsx")
+  index("routes/_index.tsx"), 
+  route("about", "routes/about.tsx"),
+  route("changelog", "routes/changelog.tsx"),
 ] satisfies RouteConfig;
