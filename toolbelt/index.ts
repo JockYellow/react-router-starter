@@ -3,11 +3,26 @@ import express from "express";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process"; // for git use
 
 const app = express();
 const PORT = 43210;
 const HOST = "127.0.0.1";
 const TOOLBELT_KEY = Math.random().toString(36).slice(2);
+
+function runCmd(cmd: string, args: string[] = []) {
+  const result = spawnSync(cmd, args, {
+    cwd: REPO,
+    shell: process.platform === "win32",
+    encoding: "utf8",
+  });
+  return {
+    code: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
+}
+
 
 app.use(express.json({ limit: "2mb" }));
 
@@ -37,6 +52,65 @@ app.use((req, res, next) => {
   if (req.path.startsWith("/admin") || req.path === "/key" || req.path === "/") return next();
   if (req.headers["x-toolbelt-key"] !== TOOLBELT_KEY) return res.status(401).send("Unauthorized");
   next();
+});
+// ── Git 操作 API ──
+app.post("/ops/git/commit-push", (req, res) => {
+  const { message } = req.body as { message?: string };
+
+  if (!message || !message.trim()) {
+    return res.status(400).json({ ok: false, error: "commit message 必填" });
+  }
+
+  // 1) 看一下目前變更狀態（純資訊用）
+  const status = runCmd("git", ["status", "--short"]);
+
+  // 2) git add -A
+  const add = runCmd("git", ["add", "-A"]);
+  if (add.code !== 0) {
+    return res.status(500).json({
+      ok: false,
+      step: "add",
+      stdout: add.stdout,
+      stderr: add.stderr,
+    });
+  }
+
+  // 3) git commit -m "msg"
+  console.log("DEBUG commit args =", ["commit", "-m", message]);
+  const commit = spawnSync("git", ["commit", "-m", message], {
+  cwd: REPO,
+  shell: false,   
+  encoding: "utf8",
+});
+
+  if (commit.code !== 0) {
+    // 最常見是「nothing to commit」：也沒壞事，就把資訊丟回前端看
+    return res.status(200).json({
+      ok: false,
+      step: "commit",
+      stdout: commit.stdout,
+      stderr: commit.stderr,
+      note: "可能沒有變更，或 commit 有問題，請看 stdout/stderr",
+    });
+  }
+
+  // 4) git push（Cloudflare Pages 之後就會自動觸發 deploy）
+  const push = runCmd("git", ["push"]);
+  if (push.code !== 0) {
+    return res.status(500).json({
+      ok: false,
+      step: "push",
+      stdout: push.stdout,
+      stderr: push.stderr,
+    });
+  }
+
+  res.json({
+    ok: true,
+    status: status.stdout,
+    commit: commit.stdout,
+    push: push.stdout,
+  });
 });
 
 // ── Changelog 檔案式 CRUD ──

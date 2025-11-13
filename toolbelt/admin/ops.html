@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>Git 更新助手</title>
+    <link rel="stylesheet" href="./admin.css" />
+    <script src="./admin.js" defer></script>
+    <script defer>
+      document.addEventListener("DOMContentLoaded", () => {
+        const out = document.getElementById("out");
+        const msgInput = /** @type {HTMLInputElement} */ (
+          document.getElementById("git-msg")
+        );
+        const btn = document.getElementById("btn-git");
+
+        function print(obj) {
+          out.textContent =
+            typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
+        }
+
+        btn.addEventListener("click", async () => {
+          const msg = msgInput.value;
+          if (!msg.trim()) {
+            alert("請輸入 commit message");
+            return;
+          }
+          print("執行中：git add / commit / push ...");
+          try {
+            const res = await window.Admin.api("/ops/git/commit-push", {
+              method: "POST",
+              body: { message: msg },
+            });
+            print(res);
+          } catch (e) {
+            print("錯誤：" + e);
+          }
+        });
+      });
+    </script>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <h1>Git 更新助手</h1>
+        <nav>
+          <a href="./" class="btn ghost">回後台首頁</a>
+          <a href="./changelog.html" class="btn ghost">Changelog 管理</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="card">
+        <h2>更新流程說明</h2>
+        <p class="muted">
+          這個按鈕會在專案根目錄依序執行：
+        </p>
+        <ul>
+          <li><code>git add -A</code></li>
+          <li><code>git commit -m "你的訊息"</code></li>
+          <li><code>git push</code>（Cloudflare Pages 會自動佈署）</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>執行 Git 更新</h2>
+        <label>
+          <span>Commit 訊息</span>
+          <input id="git-msg" placeholder="例如：chore: 更新 changelog 與內容" />
+        </label>
+        <button id="btn-git" class="btn" style="margin-top: 8px">
+          Commit + Push
+        </button>
+      </section>
+
+      <section class="card" style="margin-top: 16px">
+        <h2>輸出紀錄</h2>
+        <pre id="out" class="muted" style="white-space: pre-wrap"></pre>
+      </section>
+    </main>
+  </body>
+</html>
