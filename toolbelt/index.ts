@@ -13,7 +13,7 @@ const TOOLBELT_KEY = Math.random().toString(36).slice(2);
 function runCmd(cmd: string, args: string[] = []) {
   const result = spawnSync(cmd, args, {
     cwd: REPO,
-    shell: process.platform === "win32",
+    shell: false,          // for git use
     encoding: "utf8",
   });
   return {
@@ -22,6 +22,7 @@ function runCmd(cmd: string, args: string[] = []) {
     stderr: result.stderr,
   };
 }
+
 
 
 app.use(express.json({ limit: "2mb" }));
