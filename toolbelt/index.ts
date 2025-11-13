@@ -61,10 +61,8 @@ app.post("/ops/git/commit-push", (req, res) => {
     return res.status(400).json({ ok: false, error: "commit message 必填" });
   }
 
-  // 1) 看一下目前變更狀態（純資訊用）
-  const status = runCmd("git", ["status", "--short"]);
+  const statusBefore = runCmd("git", ["status", "--short"]);
 
-  // 2) git add -A
   const add = runCmd("git", ["add", "-A"]);
   if (add.code !== 0) {
     return res.status(500).json({
@@ -75,27 +73,26 @@ app.post("/ops/git/commit-push", (req, res) => {
     });
   }
 
-  // 3) git commit -m "msg"
-  console.log("DEBUG commit args =", ["commit", "-m", message]);
-  const commit = spawnSync("git", ["commit", "-m", message], {
-  cwd: REPO,
-  shell: false,   
-  encoding: "utf8",
-});
+  const commit = runCmd("git", ["commit", "-m", `"${message}"`]);
+  const out = (commit.stdout || "") + (commit.stderr || "");
 
-  if (commit.code !== 0) {
-    // 最常見是「nothing to commit」：也沒壞事，就把資訊丟回前端看
-    return res.status(200).json({
+  const committed =
+    commit.code === 0 &&
+    /files changed|file changed|insertions?|deletions?/i.test(commit.stdout);
+
+  const nothingToCommit = /nothing to commit/i.test(out);
+
+  if (!committed && !nothingToCommit) {
+    return res.status(500).json({
       ok: false,
       step: "commit",
       stdout: commit.stdout,
       stderr: commit.stderr,
-      note: "可能沒有變更，或 commit 有問題，請看 stdout/stderr",
     });
   }
 
-  // 4) git push（Cloudflare Pages 之後就會自動觸發 deploy）
   const push = runCmd("git", ["push"]);
+
   if (push.code !== 0) {
     return res.status(500).json({
       ok: false,
@@ -105,13 +102,16 @@ app.post("/ops/git/commit-push", (req, res) => {
     });
   }
 
-  res.json({
+  return res.json({
     ok: true,
-    status: status.stdout,
+    committed,
+    nothingToCommit,
+    statusBefore: statusBefore.stdout,
     commit: commit.stdout,
     push: push.stdout,
   });
 });
+
 
 // ── Changelog 檔案式 CRUD ──
 const NAME_RE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9\-]+\.json$/i;
