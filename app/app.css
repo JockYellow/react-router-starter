@@ -14,6 +14,7 @@
   --color-brand-300: #E8C872; /* 主黃 */
   --color-brand-400: #D9B45A;
   --color-brand-500: #B9923E;
+  --color-brand-600: #8B6C26;
 
   --color-accent-50:  #F8F5FF;
   --color-accent-100: #EDE8FE;
@@ -21,6 +22,13 @@
   --color-accent-300: #BFB4EE;
   --color-accent-400: #7A6AAE; /* 主紫 */
   --color-accent-500: #6B5CA0;
+  --color-accent-600: #4C3D81;
+
+  --color-module-hero:     #FFEAC5;
+  --color-module-about:    #F6DFFF;
+  --color-module-skills:   #DDEBFF;
+  --color-module-projects: #DDF8EF;
+  --color-module-contact:  #FFE0D9;
 
   --color-warm-0:   #FFFFFF;
   --color-warm-25:  #FDFCFB;
@@ -35,7 +43,11 @@
 
 /* === Base === */
 html, body {
-  @apply bg-[--color-warm-50] text-neutral-900;
+  color: #1E1B16;
+  background:
+    radial-gradient(circle at top left, rgba(255, 244, 209, 0.8), rgba(255, 244, 209, 0) 55%),
+    radial-gradient(circle at 80% 20%, rgba(219, 208, 253, 0.7), rgba(219, 208, 253, 0) 60%),
+    var(--color-warm-50);
   font-family: var(--font-sans);
   @media (prefers-color-scheme: dark) {
     color-scheme: dark;
@@ -45,14 +57,71 @@ html { scroll-behavior: smooth; }
 
 /* 區塊統一間距與標題 */
 .section { @apply py-14 md:py-20; }
-.section-title { @apply text-2xl md:text-3xl font-semibold mb-6 tracking-tight; }
+.section-title {
+  @apply text-2xl md:text-3xl font-semibold tracking-tight text-neutral-900 flex items-center gap-3;
+}
+.section-title::before {
+  content: "";
+  width: 40px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-accent-500), var(--color-brand-400));
+  display: inline-block;
+}
+.eyebrow {
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-accent-600);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.eyebrow::before {
+  content: "";
+  width: 18px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+.module-panel {
+  --module-color: var(--color-warm-0);
+  position: relative;
+  border-radius: 1.75rem;
+  padding: clamp(1.75rem, 4vw, 3rem);
+  background: color-mix(in oklab, var(--module-color) 85%, white);
+  border: 1px solid color-mix(in oklab, var(--module-color) 50%, #6B5CA0 8%);
+  box-shadow: 0 30px 70px rgba(17, 12, 5, 0.08);
+  overflow: hidden;
+}
+.module-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 80% 0%, rgba(255,255,255,0.9), transparent 45%);
+  mix-blend-mode: screen;
+  opacity: 0.4;
+}
+.module-panel > * { position: relative; z-index: 1; }
+.module-hero { --module-color: var(--color-module-hero); }
+.module-about { --module-color: var(--color-module-about); }
+.module-skills { --module-color: var(--color-module-skills); }
+.module-projects { --module-color: var(--color-module-projects); }
+.module-contact { --module-color: var(--color-module-contact); }
+.module-meta {
+  @apply text-sm text-neutral-600;
+  opacity: 0.9;
+}
 
 /* === Components === */
 @layer components {
   .card {
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-soft);
-    @apply bg-white border border-neutral-200 p-6 transition-shadow;
+    border-radius: calc(var(--radius-card) * 1.1);
+    box-shadow: 0 18px 38px rgba(26, 19, 6, 0.08);
+    @apply bg-white/95 border border-[color:rgba(0,0,0,0.08)] p-6 transition-shadow;
   }
   .card:hover { box-shadow: var(--shadow-hover); }
 
@@ -91,6 +160,26 @@ html { scroll-behavior: smooth; }
   .divider {
     background: linear-gradient(90deg, transparent, rgba(0,0,0,.08), transparent);
     height: 1px;
+  }
+
+  .stat-pill {
+    @apply inline-flex flex-col rounded-2xl px-4 py-3 text-xs uppercase tracking-[0.25em] font-semibold text-neutral-800;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: rgba(255,255,255,0.45);
+    backdrop-filter: blur(6px);
+  }
+
+  .skill-card {
+    border-radius: 1.25rem;
+    padding: 1.5rem;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(123,106,174,0.15);
+    box-shadow: 0 10px 25px rgba(17, 14, 12, 0.08);
+    transition: transform .2s ease, box-shadow .2s ease;
+  }
+  .skill-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 38px rgba(17, 14, 12, 0.12);
   }
 
   .hover-raise { transform: translateY(0); transition: transform .2s ease, box-shadow .2s ease; }

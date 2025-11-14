@@ -42,13 +42,13 @@ function AutoHideHeader() {
   }, []);
 
   const tabs = [
-    { id: "about", label: "關於我" },
-    { id: "skills", label: "技能" },
-    { id: "projects", label: "作品" },
-    { id: "contact", label: "聯絡" },
+    { id: "blog", label: "Blog" },
+    { id: "guestbook", label: "Guestbook" },
+    { id: "changelog", label: "Changelog" },
+    { id: "lab", label: "Lab" },
   ];
 
-  const [active, setActive] = useState("about");
+  const [active, setActive] = useState("blog");
   useEffect(() => {
     const sections = tabs.map(t => document.getElementById(t.id)).filter(Boolean) as HTMLElement[];
     const io = new IntersectionObserver(
@@ -88,7 +88,7 @@ function AutoHideHeader() {
             ))}
           </nav>
           <Link to="/changelog" className="text-sm link-soft hidden md:inline">更新日誌</Link>
-          <a href="#about" className="md:hidden text-sm text-neutral-600">目錄</a>
+          <a href="#blog" className="md:hidden text-sm text-neutral-600">目錄</a>
         </div>
       </div>
     </header>

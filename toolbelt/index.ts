@@ -62,8 +62,10 @@ app.post("/ops/git/commit-push", (req, res) => {
     return res.status(400).json({ ok: false, error: "commit message 必填" });
   }
 
+  // 先記錄現在狀態（純資訊用）
   const statusBefore = runCmd("git", ["status", "--short"]);
 
+  // 1) git add -A
   const add = runCmd("git", ["add", "-A"]);
   if (add.code !== 0) {
     return res.status(500).json({
@@ -74,42 +76,61 @@ app.post("/ops/git/commit-push", (req, res) => {
     });
   }
 
-  const commit = runCmd("git", ["commit", "-m", `"${message}"`]);
-  const out = (commit.stdout || "") + (commit.stderr || "");
+  // 2) git commit -m "<message>"
+  const commit = runCmd("git", ["commit", "-m", message]);
+  const commitOut = (commit.stdout || "") + (commit.stderr || "");
+  const nothingToCommit = /nothing to commit/i.test(commitOut);
 
-  const committed =
-    commit.code === 0 &&
-    /files changed|file changed|insertions?|deletions?/i.test(commit.stdout);
+  // 如果真的「完全沒東西可以 commit」，這不是錯誤，可以照樣回 ok:true
+  // 只是之後 push 多半也沒東西
+  let pushResult: { code: number; stdout: string; stderr: string } | null = null;
+  let pushed = false;
 
-  const nothingToCommit = /nothing to commit/i.test(out);
+  if (!nothingToCommit) {
+    // 有東西要 commit，結果 code 不是 0 → 真正錯誤，直接回
+    if (commit.code !== 0) {
+      return res.status(500).json({
+        ok: false,
+        step: "commit",
+        stdout: commit.stdout,
+        stderr: commit.stderr,
+      });
+    }
 
-  if (!committed && !nothingToCommit) {
-    return res.status(500).json({
-      ok: false,
-      step: "commit",
-      stdout: commit.stdout,
-      stderr: commit.stderr,
-    });
+    // 3) git push（只有在有新 commit 的時候才推）
+    const push = runCmd("git", ["push"]);
+    pushResult = push;
+
+    if (push.code !== 0) {
+      return res.status(500).json({
+        ok: false,
+        step: "push",
+        stdout: push.stdout,
+        stderr: push.stderr,
+      });
+    }
+
+    pushed = true;
   }
 
-  const push = runCmd("git", ["push"]);
-
-  if (push.code !== 0) {
-    return res.status(500).json({
-      ok: false,
-      step: "push",
-      stdout: push.stdout,
-      stderr: push.stderr,
-    });
-  }
+  const statusAfter = runCmd("git", ["status", "--short"]);
 
   return res.json({
     ok: true,
-    committed,
     nothingToCommit,
+    pushed,
     statusBefore: statusBefore.stdout,
-    commit: commit.stdout,
-    push: push.stdout,
+    statusAfter: statusAfter.stdout,
+    commit: {
+      code: commit.code,
+      stdout: commit.stdout,
+      stderr: commit.stderr,
+    },
+    push: pushResult && {
+      code: pushResult.code,
+      stdout: pushResult.stdout,
+      stderr: pushResult.stderr,
+    },
   });
 });
 
