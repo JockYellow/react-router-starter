@@ -1,0 +1,560 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Dev Admin – Blog</title>
+<link rel="stylesheet" href="/admin/admin.css" />
+<header>
+  <div class="wrap" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+    <strong>Blog 管理</strong>
+    <nav><a class="btn ghost" href="/admin/">返回選單</a></nav>
+  </div>
+</header>
+
+<main class="wrap cms-layout">
+  <aside class="sidebar card">
+    <div class="sidebar-section">
+      <div class="section-header">
+        <h3>分類</h3>
+        <button class="btn ghost small" id="cat-parent-add">+ 新增主分類</button>
+      </div>
+      <div id="category-tree" class="category-tree"></div>
+      <p class="muted" id="cat-msg"></p>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-header">
+        <h3>搜尋與排序</h3>
+      </div>
+      <label>
+        <span>關鍵字</span>
+        <input id="post-filter-query" placeholder="標題 / 內容" />
+      </label>
+      <label>
+        <span>排序欄位</span>
+        <select id="post-sort-key">
+          <option value="publishedAt">發佈時間</option>
+          <option value="createdAt">建立時間</option>
+          <option value="updatedAt">編輯時間</option>
+          <option value="title">標題</option>
+        </select>
+      </label>
+      <label>
+        <span>排序方向</span>
+        <select id="post-sort-order">
+          <option value="desc">新 → 舊</option>
+          <option value="asc">舊 → 新</option>
+        </select>
+      </label>
+      <button class="btn ghost" id="post-filter-reset">清除條件</button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-header">
+        <h3>文章列表</h3>
+        <button class="btn small" id="post-new">+ 新增文章</button>
+      </div>
+      <p class="muted" id="post-filter-summary"></p>
+      <div class="list list-scroll" id="post-list"></div>
+    </div>
+  </aside>
+
+  <section class="card editor-panel" id="post-editor">
+    <div class="editor-section">
+      <div class="row">
+        <label><span>標題</span><input id="post-title" placeholder="文章標題" /></label>
+        <label><span>Slug（自動產生）</span><input id="post-slug" readonly placeholder="自動產生" /></label>
+      </div>
+      <div class="row">
+        <label><span>主分類</span>
+          <select id="post-category"></select>
+        </label>
+        <label><span>子分類</span>
+          <select id="post-subcategory"></select>
+        </label>
+      </div>
+      <label><span>發佈時間</span>
+        <input type="datetime-local" id="post-published-at" step="1" />
+      </label>
+    </div>
+
+    <div class="editor-section">
+      <label><span>內容（多段純文字）</span>
+        <textarea id="post-body" rows="14" placeholder="每段換行"></textarea>
+      </label>
+    </div>
+
+    <div class="editor-actions">
+      <button class="btn" id="post-create">儲存新增</button>
+      <button class="btn ghost" id="post-save" disabled>儲存變更</button>
+      <button class="btn ghost" id="post-cancel" disabled>取消編輯</button>
+    </div>
+    <p class="muted" id="post-msg"></p>
+  </section>
+</main>
+
+<script src="/admin/admin.js"></script>
+<script>
+  const $ = (s, scope = document) => scope.querySelector(s);
+  const state = {
+    categories: [],
+    posts: [],
+    editPost: null,
+    filter: { categoryId: "", subcategoryId: "", query: "" },
+    sort: { key: "publishedAt", order: "desc" },
+    slugLocked: false,
+  };
+  const escapeHtml = (str = "") =>
+    str
+      .toString()
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  const pad = (n) => String(n).padStart(2, "0");
+  const toLocalInputValue = (date = new Date()) =>
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
+      date.getMinutes(),
+    )}:${pad(date.getSeconds())}`;
+  const isoToLocalInputValue = (iso) => {
+    if (!iso) return "";
+    const date = new Date(iso);
+    if (Number.isNaN(date.valueOf())) return "";
+    return toLocalInputValue(date);
+  };
+  const setPublishedNow = () => {
+    const input = $("#post-published-at");
+    if (input) input.value = toLocalInputValue(new Date());
+  };
+
+  function setMsg(target, msg) {
+    const el = $(target);
+    if (el) el.textContent = msg || "";
+  }
+
+  function refreshCategorySelects() {
+    const select = $("#post-category");
+    if (!state.categories.length) {
+      select.innerHTML = '<option value="">請先建立分類</option>';
+      $("#post-subcategory").innerHTML = '<option value="">未指定</option>';
+      return;
+    }
+    select.innerHTML = state.categories
+      .map((cat) => `<option value="${cat.id}">${escapeHtml(cat.title)}</option>`)
+      .join("");
+    updateSubcategorySelect();
+  }
+
+  function updateSubcategorySelect() {
+    const categoryId = $("#post-category").value;
+    const select = $("#post-subcategory");
+    const category = state.categories.find((cat) => cat.id === categoryId);
+    if (!category) {
+      select.innerHTML = '<option value="">未指定</option>';
+      return;
+    }
+    const options = ['<option value="">未指定</option>']
+      .concat(category.children.map((child) => `<option value="${child.id}">${escapeHtml(child.title)}</option>`));
+    select.innerHTML = options.join("");
+  }
+
+  function slugifyTitle(title) {
+    const field = $("#post-slug");
+    if (!title || !title.trim()) {
+      field.value = "";
+      return;
+    }
+    const slug = Admin.slugify(title) || `post-${Date.now().toString(36)}`;
+    field.value = slug;
+  }
+
+  function renderCategoryTree() {
+    const container = $("#category-tree");
+    const activeCat = state.filter.categoryId;
+    const activeSub = state.filter.subcategoryId;
+    const fragments = [];
+    fragments.push(
+      `<button class="category-pill ${!activeCat ? "active" : ""}" data-cat="" data-sub="">全部文章</button>`,
+    );
+    state.categories.forEach((cat) => {
+      fragments.push(`
+        <div class="category-group" data-cat-group="${cat.id}">
+          <div class="category-header">
+            <button class="category-pill ${activeCat === cat.id && !activeSub ? "active" : ""}" data-cat="${cat.id}" data-sub="">${escapeHtml(cat.title)}</button>
+            <div class="category-actions">
+              <button class="icon-btn" data-cat-edit="${cat.id}">編輯</button>
+              <button class="icon-btn" data-cat-delete="${cat.id}">刪除</button>
+              <button class="icon-btn" data-cat-add-sub="${cat.id}">+ 子分類</button>
+            </div>
+          </div>
+          <div class="subcategory-list">
+            ${
+              cat.children.length
+                ? cat.children
+                    .map(
+                      (child) => `<div class="subcategory-row">
+                        <button class="subcategory-pill ${
+                          activeCat === cat.id && activeSub === child.id ? "active" : ""
+                        }" data-cat="${cat.id}" data-sub="${child.id}">
+                          ${escapeHtml(child.title)}
+                        </button>
+                        <div class="category-actions">
+                          <button class="icon-btn" data-sub-edit="${child.id}" data-parent="${cat.id}">編輯</button>
+                          <button class="icon-btn" data-sub-delete="${child.id}" data-parent="${cat.id}">刪除</button>
+                        </div>
+                      </div>`,
+                    )
+                    .join("")
+                : '<span class="muted">尚無子分類</span>'
+            }
+          </div>
+        </div>`);
+    });
+    container.innerHTML = fragments.join("");
+
+    container.querySelectorAll("[data-cat]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const cat = btn.getAttribute("data-cat") || "";
+        const sub = btn.getAttribute("data-sub") || "";
+        state.filter.categoryId = cat;
+        state.filter.subcategoryId = sub;
+        renderCategoryTree();
+        renderPostList();
+      });
+    });
+    container.querySelectorAll("[data-cat-add-sub]").forEach((btn) =>
+      btn.addEventListener("click", () => addSubcategory(btn.getAttribute("data-cat-add-sub"))),
+    );
+    container.querySelectorAll("[data-cat-edit]").forEach((btn) =>
+      btn.addEventListener("click", () => editCategory(btn.getAttribute("data-cat-edit"))),
+    );
+    container.querySelectorAll("[data-cat-delete]").forEach((btn) =>
+      btn.addEventListener("click", () => deleteCategory(btn.getAttribute("data-cat-delete"))),
+    );
+    container.querySelectorAll("[data-sub-edit]").forEach((btn) =>
+      btn.addEventListener("click", () => editSubcategory(btn.dataset.parent, btn.getAttribute("data-sub-edit"))),
+    );
+    container.querySelectorAll("[data-sub-delete]").forEach((btn) =>
+      btn.addEventListener("click", () => deleteSubcategory(btn.dataset.parent, btn.getAttribute("data-sub-delete"))),
+    );
+  }
+
+  async function loadCategories() {
+    const { categories } = await Admin.api("/fs/blog/categories");
+    state.categories = categories;
+    refreshCategorySelects();
+    renderCategoryTree();
+  }
+
+  async function addParentCategory() {
+    const title = prompt("主分類名稱");
+    if (!title || !title.trim()) return;
+    const description = prompt("描述（可留空）") || "";
+    try {
+      await Admin.api("/fs/blog/category", { method: "POST", body: { title: title.trim(), description } });
+      await loadCategories();
+      setMsg("#cat-msg", "已新增主分類");
+    } catch (e) {
+      setMsg("#cat-msg", e.message || "新增失敗");
+    }
+  }
+
+  async function addSubcategory(parentId) {
+    if (!parentId) return;
+    const title = prompt("子分類名稱");
+    if (!title || !title.trim()) return;
+    const description = prompt("描述（可留空）") || "";
+    try {
+      await Admin.api("/fs/blog/category", { method: "POST", body: { parentId, title: title.trim(), description } });
+      await loadCategories();
+      setMsg("#cat-msg", "已新增子分類");
+    } catch (e) {
+      setMsg("#cat-msg", e.message || "新增失敗");
+    }
+  }
+
+  async function editCategory(id) {
+    if (!id) return;
+    const category = state.categories.find((cat) => cat.id === id);
+    if (!category) return;
+    const title = prompt("更新主分類名稱", category.title) || "";
+    if (!title.trim()) return;
+    const description = prompt("描述", category.description || "") || "";
+    try {
+      await Admin.api("/fs/blog/category", {
+        method: "PUT",
+        body: { id, title: title.trim(), description },
+      });
+      await loadCategories();
+      setMsg("#cat-msg", "已更新分類");
+    } catch (e) {
+      setMsg("#cat-msg", e.message || "更新失敗");
+    }
+  }
+
+  async function deleteCategory(id) {
+    if (!id || !confirm("刪除主分類?")) return;
+    try {
+      await Admin.api("/fs/blog/category", { method: "DELETE", body: { id } });
+      await loadCategories();
+      setMsg("#cat-msg", "已刪除分類");
+    } catch (e) {
+      setMsg("#cat-msg", e.message || "刪除失敗");
+    }
+  }
+
+  async function editSubcategory(parentId, id) {
+    if (!parentId || !id) return;
+    const parent = state.categories.find((cat) => cat.id === parentId);
+    const target = parent?.children.find((child) => child.id === id);
+    if (!target) return;
+    const title = prompt("更新子分類名稱", target.title) || "";
+    if (!title.trim()) return;
+    const description = prompt("描述", target.description || "") || "";
+    try {
+      await Admin.api("/fs/blog/category", {
+        method: "PUT",
+        body: { id, parentId, title: title.trim(), description },
+      });
+      await loadCategories();
+      setMsg("#cat-msg", "已更新子分類");
+    } catch (e) {
+      setMsg("#cat-msg", e.message || "更新失敗");
+    }
+  }
+
+  async function deleteSubcategory(parentId, id) {
+    if (!parentId || !id || !confirm("刪除子分類?")) return;
+    try {
+      await Admin.api("/fs/blog/category", { method: "DELETE", body: { id, parentId } });
+      await loadCategories();
+      setMsg("#cat-msg", "已刪除子分類");
+    } catch (e) {
+      setMsg("#cat-msg", e.message || "刪除失敗");
+    }
+  }
+
+  function collectPostForm() {
+    const title = $("#post-title").value.trim();
+    const body = $("#post-body").value.trim();
+    const categoryId = $("#post-category").value;
+    const subcategoryId = $("#post-subcategory").value || undefined;
+    let slug = $("#post-slug").value.trim();
+    if (!slug) slug = Admin.slugify(title) || `post-${Date.now().toString(36)}`;
+    const publishedInput = $("#post-published-at").value;
+    let publishedAt;
+    if (publishedInput) {
+      const date = new Date(publishedInput);
+      if (!Number.isNaN(date.valueOf())) publishedAt = date.toISOString();
+    }
+    const payload = { title, body, categoryId, slug };
+    if (subcategoryId) payload.subcategoryId = subcategoryId;
+    if (publishedAt) payload.publishedAt = publishedAt;
+    return payload;
+  }
+
+  function fillPostForm(post) {
+    state.slugLocked = true;
+    $("#post-title").value = post.title || "";
+    $("#post-body").value = post.body || "";
+    $("#post-slug").value = post.slug || "";
+    if (post.categoryId && state.categories.some((cat) => cat.id === post.categoryId)) {
+      $("#post-category").value = post.categoryId;
+    }
+    updateSubcategorySelect();
+    if (post.subcategoryId) $("#post-subcategory").value = post.subcategoryId;
+    if (post.publishedAt) {
+      $("#post-published-at").value = isoToLocalInputValue(post.publishedAt);
+    } else {
+      setPublishedNow();
+    }
+  }
+
+  function resetPostForm() {
+    state.editPost = null;
+    state.slugLocked = false;
+    $("#post-title").value = "";
+    $("#post-body").value = "";
+    $("#post-slug").value = "";
+    if (state.categories[0]) {
+      $("#post-category").value = state.categories[0].id;
+    }
+    updateSubcategorySelect();
+    $("#post-subcategory").value = "";
+    setPublishedNow();
+    $("#post-save").disabled = true;
+    $("#post-cancel").disabled = true;
+    $("#post-create").disabled = false;
+    setMsg("#post-msg", "");
+  }
+
+  async function loadPosts() {
+    const { posts } = await Admin.api("/fs/blog/posts");
+    state.posts = posts;
+    renderPostList();
+  }
+
+  function parseDate(value) {
+    if (!value) return 0;
+    const ts = Date.parse(value);
+    return Number.isNaN(ts) ? 0 : ts;
+  }
+
+  function renderPostList() {
+    const box = $("#post-list");
+    box.innerHTML = "";
+    const query = state.filter.query.toLowerCase();
+    const { categoryId, subcategoryId } = state.filter;
+    const filtered = state.posts.filter((post) => {
+      if (categoryId && post.categoryId !== categoryId) return false;
+      if (subcategoryId && post.subcategoryId !== subcategoryId) return false;
+      if (query) {
+        const haystack = `${post.title || ""}\n${post.body || ""}`.toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      return true;
+    });
+    const sorted = [...filtered].sort((a, b) => {
+      const { key, order } = state.sort;
+      if (key === "title") {
+        const cmp = (a.title || "").localeCompare(b.title || "");
+        return order === "asc" ? cmp : -cmp;
+      }
+      const getKeyValue = (post) => {
+        switch (key) {
+          case "createdAt":
+            return parseDate(post.createdAt || post.publishedAt);
+          case "updatedAt":
+            return parseDate(post.updatedAt || post.publishedAt);
+          default:
+            return parseDate(post.publishedAt);
+        }
+      };
+      const diff = getKeyValue(a) - getKeyValue(b);
+      return order === "asc" ? diff : -diff;
+    });
+
+    $("#post-filter-summary").textContent = `顯示 ${sorted.length} 筆 / 全部 ${state.posts.length} 筆`;
+
+    if (!sorted.length) {
+      const empty = document.createElement("div");
+      empty.className = "muted";
+      empty.textContent = "沒有符合條件的文章。";
+      box.appendChild(empty);
+      return;
+    }
+
+    sorted.forEach((post) => {
+      const item = document.createElement("div");
+      item.className = "item list-card";
+      item.innerHTML = `
+        <div>
+          <div class="list-title">${escapeHtml(post.title || "(未命名)")}</div>
+          <div class="muted">${escapeHtml(new Date(post.publishedAt || post.createdAt || Date.now()).toLocaleString())}</div>
+          <div class="muted">${escapeHtml(post.filename || "")}</div>
+        </div>
+        <div class="list-actions">
+          <button class="btn ghost" data-edit="1">編輯</button>
+          <button class="btn danger" data-del="1">刪除</button>
+        </div>`;
+      item.querySelector('[data-edit]')?.addEventListener('click', () => startEditPost(post));
+      item.querySelector('[data-del]')?.addEventListener('click', () => deletePost(post));
+      box.appendChild(item);
+    });
+  }
+
+  async function createPost() {
+    const payload = collectPostForm();
+    if (!payload.title || !payload.body || !payload.categoryId) {
+      setMsg('#post-msg', '標題、分類與內容為必填');
+      return;
+    }
+    try {
+      await Admin.api('/fs/blog/post', { method: 'POST', body: { post: payload } });
+      setMsg('#post-msg', '已新增文章');
+      await loadPosts();
+      resetPostForm();
+    } catch (e) {
+      setMsg('#post-msg', e.message || '新增失敗');
+    }
+  }
+
+  function startEditPost(post) {
+    state.editPost = post;
+    fillPostForm(post);
+    $('#post-save').disabled = false;
+    $('#post-cancel').disabled = false;
+    $('#post-create').disabled = true;
+    setMsg('#post-msg', `編輯 ${post.filename || ''}`);
+    document.getElementById('post-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('#post-title').focus();
+  }
+
+  async function savePost() {
+    if (!state.editPost) return;
+    const payload = collectPostForm();
+    try {
+      await Admin.api('/fs/blog/post', { method: 'PUT', body: { filename: state.editPost.filename, post: payload } });
+      setMsg('#post-msg', '已儲存');
+      state.editPost = null;
+      await loadPosts();
+      resetPostForm();
+    } catch (e) {
+      setMsg('#post-msg', e.message || '儲存失敗');
+    }
+  }
+
+  async function deletePost(post) {
+    if (!confirm(`刪除文章 ${post.title}?`)) return;
+    try {
+      await Admin.api('/fs/blog/post', { method: 'DELETE', body: { filename: post.filename } });
+      setMsg('#post-msg', '已刪除文章');
+      await loadPosts();
+      if (state.editPost && state.editPost.filename === post.filename) resetPostForm();
+    } catch (e) {
+      setMsg('#post-msg', e.message || '刪除失敗');
+    }
+  }
+
+  $('#cat-parent-add').addEventListener('click', addParentCategory);
+  $('#post-category').addEventListener('change', () => {
+    updateSubcategorySelect();
+  });
+  $('#post-title').addEventListener('input', () => {
+    if (!state.slugLocked) slugifyTitle($('#post-title').value);
+  });
+  $('#post-new').addEventListener('click', () => {
+    resetPostForm();
+    slugifyTitle('');
+  });
+  $('#post-filter-query').addEventListener('input', (e) => {
+    state.filter.query = e.target.value.trim();
+    renderPostList();
+  });
+  $('#post-sort-key').addEventListener('change', (e) => {
+    state.sort.key = e.target.value;
+    renderPostList();
+  });
+  $('#post-sort-order').addEventListener('change', (e) => {
+    state.sort.order = e.target.value;
+    renderPostList();
+  });
+  $('#post-filter-reset').addEventListener('click', () => {
+    state.filter = { categoryId: '', subcategoryId: '', query: '' };
+    $('#post-filter-query').value = '';
+    renderCategoryTree();
+    renderPostList();
+  });
+  $('#post-create').addEventListener('click', createPost);
+  $('#post-save').addEventListener('click', savePost);
+  $('#post-cancel').addEventListener('click', resetPostForm);
+
+  (async function init() {
+    await loadCategories();
+    await loadPosts();
+    resetPostForm();
+  })().catch((err) => {
+    console.error(err);
+    alert('Blog 後台載入失敗: ' + err.message);
+  });
+</script>

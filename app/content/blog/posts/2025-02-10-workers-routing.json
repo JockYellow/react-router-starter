@@ -1,0 +1,8 @@
+{
+  "title": "Workers x React Router Routing 策略",
+  "body": "這次把 React Router v7 loader 與 Workers KV 快取重新整理，\n從 Route Manifest 到 Edge 服務端渲染都記錄下來。\n也練習在 DevTools 觀察 WSS streaming 的效能。",
+  "categoryId": "edge",
+  "subcategoryId": "edge-routing",
+  "publishedAt": "2025-02-09T19:00:00.000Z",
+  "slug": "workers-routing"
+}

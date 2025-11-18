@@ -4,6 +4,7 @@ import { useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
 import { loadChangelogItems, type ChangelogItem } from "../lib/changelog.server";
+import { loadBlogPosts, loadBlogCategories, type BlogPost, type BlogCategory } from "../lib/blog.server";
 
 const SECTION_DATA = {
   blog: {
@@ -222,32 +223,63 @@ function TagBadge({ tag }: { tag?: ChangelogItem["tag"] }) {
   return <span className="chip">{TAG_LABELS[tag]}</span>;
 }
 
-function renderSectionBody(sectionKey: SectionKey, options: { changelogItems: ChangelogItem[] }) {
+function formatDate(date: string) {
+  try {
+    return new Intl.DateTimeFormat("zh-Hant", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    }).format(new Date(date));
+  } catch {
+    return date;
+  }
+}
+
+function renderSectionBody(
+  sectionKey: SectionKey,
+  options: { changelogItems: ChangelogItem[]; blogPosts: BlogPost[]; blogCategories: BlogCategory[] },
+) {
   switch (sectionKey) {
     case "blog": {
-      const { articles } = SECTION_DATA.blog.section;
+      const posts = options.blogPosts.slice(0, 3);
+      const categories = options.blogCategories;
+      const categoryLabel = (post: BlogPost) => {
+        const cat = categories.find((c) => c.id === post.categoryId);
+        if (!cat) return "";
+        const sub = cat.children.find((child) => child.id === post.subcategoryId);
+        return sub ? `${cat.title} · ${sub.title}` : cat.title;
+      };
+
+      if (!posts.length) {
+        return <p className="text-sm text-neutral-600">目前還沒有文章，從後台新增第一篇吧。</p>;
+      }
+
+      const excerpt = (body: string) => {
+        const firstParagraph = body.split(/\n+/).map((line) => line.trim()).filter(Boolean)[0];
+        if (!firstParagraph) return body.slice(0, 120);
+        return firstParagraph.length > 180 ? `${firstParagraph.slice(0, 177)}…` : firstParagraph;
+      };
+
       return (
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {articles.map((article) => (
+          {posts.map((post) => (
             <article
-              key={article.title}
+              key={(post.filename ?? post.slug ?? post.title) + post.publishedAt}
               className="card hover-raise h-full bg-white/90 flex flex-col"
             >
               <p className="text-xs uppercase tracking-[0.25em] text-neutral-500">
-                {article.meta}
+                {formatDate(post.publishedAt)}
               </p>
-              <h3 className="mt-3 text-lg font-semibold text-neutral-900">
-                {article.title}
-              </h3>
-              <p className="mt-3 text-sm text-neutral-700 leading-relaxed flex-1">
-                {article.excerpt}
-              </p>
-              <div className="flex flex-wrap gap-2 mt-4">
-                {article.tags.map((tag) => (
-                  <span key={tag} className="chip">
-                    {tag}
-                  </span>
-                ))}
+              <h3 className="mt-3 text-lg font-semibold text-neutral-900">{post.title}</h3>
+              {categoryLabel(post) ? (
+                <p className="text-xs text-neutral-500 mt-1">{categoryLabel(post)}</p>
+              ) : null}
+              <p className="mt-3 text-sm text-neutral-700 leading-relaxed flex-1">{excerpt(post.body)}</p>
+              <div className="flex items-center justify-between pt-4 text-sm text-[--color-accent-600]">
+                <span className="font-medium">純文字筆記</span>
+                <a href="/blog" className="link-soft">
+                  查看全部
+                </a>
               </div>
             </article>
           ))}
@@ -356,8 +388,12 @@ type ModuleButtonsProps = {
 };
 
 export async function loader(args: LoaderFunctionArgs) {
-  const changelog = await loadChangelogItems(args);
-  return { changelog };
+  const [changelog, blogPosts, blogCategories] = await Promise.all([
+    loadChangelogItems(args),
+    loadBlogPosts(),
+    loadBlogCategories(),
+  ]);
+  return { changelog, blogPosts, blogCategories };
 }
 
 type LoaderData = Awaited<ReturnType<typeof loader>>;
@@ -392,7 +428,7 @@ function ModuleButtons({ activeSection, onHover, onSelect, className }: ModuleBu
 
 export default function HomePage() {
   const [activeSection, setActiveSection] = useState<SectionKey>("blog");
-  const { changelog } = useLoaderData() as LoaderData;
+  const { changelog, blogPosts, blogCategories } = useLoaderData() as LoaderData;
   const changelogItems = changelog.slice(0, 4);
   const heroModule = SECTION_DATA[activeSection].hero;
 
@@ -495,7 +531,7 @@ export default function HomePage() {
                 <p className="text-lg text-neutral-700 leading-relaxed max-w-3xl">
                   {section.intro}
                 </p>
-                {renderSectionBody(sectionKey, { changelogItems })}
+                {renderSectionBody(sectionKey, { changelogItems, blogPosts, blogCategories })}
               </div>
             </div>
           </section>

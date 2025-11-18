@@ -1,0 +1,8 @@
+{
+  "title": "Token 化的色彩混合",
+  "body": "將 UI token 與 CSS variables 調校成兩組色盤，\n在深色背景也能維持柔和節奏。\n同步記錄了 Figma plugin 的測試心得。\n以上都是假的 並沒有",
+  "categoryId": "design",
+  "subcategoryId": "design-color",
+  "publishedAt": "2025-02-05T06:00:00.000Z",
+  "slug": "color-palette"
+}

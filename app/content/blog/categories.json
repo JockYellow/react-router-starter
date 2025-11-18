@@ -1,0 +1,56 @@
+{
+  "categories": [
+    {
+      "id": "edge",
+      "title": "Edge 筆記",
+      "description": "Workers 與邊緣部署心得。",
+      "children": [
+        {
+          "id": "edge-routing",
+          "title": "Routing"
+        },
+        {
+          "id": "edge-observability",
+          "title": "Observability"
+        }
+      ]
+    },
+    {
+      "id": "design",
+      "title": "Design System",
+      "description": "色彩、Token 與 UI 演進。",
+      "children": [
+        {
+          "id": "design-color",
+          "title": "Color"
+        },
+        {
+          "id": "design-system",
+          "title": "System"
+        }
+      ]
+    },
+    {
+      "id": "cat-mi4akefj-9chrlz",
+      "title": "旅行",
+      "description": "想成為興趣 但現實不允",
+      "children": [
+        {
+          "id": "2024",
+          "title": "2024美國行"
+        }
+      ]
+    },
+    {
+      "id": "cat-mi4f0f4z-urks8l",
+      "title": "日記",
+      "description": "純純的文字欲",
+      "children": [
+        {
+          "id": "subcat-mi4f100p-htiheo",
+          "title": "樹洞"
+        }
+      ]
+    }
+  ]
+}
