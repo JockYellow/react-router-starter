@@ -1,14 +1,24 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "react-router-starter",
-  "main": "./workers/app.ts",
-  "compatibility_date": "2025-10-08",
-  "compatibility_flags": ["nodejs_compat"],
-  "observability": {
-    "enabled": true
-  },
-  "upload_source_maps": true,
-  "vars": {
-    "VALUE_FROM_CLOUDFLARE": "Hello from Cloudflare"
-  }
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "react-router-starter",
+	"main": "./workers/app.ts",
+	"compatibility_date": "2025-10-08",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"observability": {
+		"enabled": true
+	},
+	"upload_source_maps": true,
+	"vars": {
+		"VALUE_FROM_CLOUDFLARE": "Hello from Cloudflare",
+		"ADMIN_PASS": "change-me-admin-pass"
+	},
+	"d1_databases": [
+		{
+			"binding": "BLOG_DB",
+			"database_name": "blog-db",
+			"database_id": "9e8e276a-fd1f-4385-ac56-706970486025"
+		}
+	]
 }

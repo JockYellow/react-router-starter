@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.7.5",
+    "@cloudflare/workers-types": "^4.20251120.0",
     "@react-router/dev": "7.6.3",
     "@tailwindcss/vite": "4.1.4",
     "@types/node": "24.0.4",
@@ -36,7 +37,7 @@
     "typescript": "5.8.3",
     "vite": "^6.0.0",
     "vite-tsconfig-paths": "5.1.4",
-    "wrangler": "4.21.x"
+    "wrangler": "4.49.0"
   },
   "scripts": {
     "build": "react-router build",
@@ -44,6 +45,10 @@
     "check": "tsc && react-router build && wrangler deploy --dry-run",
     "deploy": "wrangler deploy",
     "dev": "react-router dev",
+    "dev:remote:ui": "concurrently -k -n APP,TB \"npm run dev\" \"npm:toolbelt\"",
+    "dev:local:admin": "npm run build && concurrently -k -n WRANGLER,TB \"wrangler dev\" \"npm:toolbelt\"",
+    "dev:remote:admin": "npm run build && concurrently -k -n WRANGLER,TB \"wrangler dev --remote\" \"npm:toolbelt\"",
+    "sync:d1:remote-to-local": "node -e \"require('fs').mkdirSync('dumps',{recursive:true})\" && npx wrangler d1 execute blog-db --remote --command \".dump\" > dumps/d1-remote.sql && npx wrangler d1 execute blog-db --local --file=dumps/d1-remote.sql",
     "preview": "npm run build && vite preview",
     "typecheck": "npm run typegen && tsc -b",
     "dump:routes": "pwsh ./dump-routes.ps1",

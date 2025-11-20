@@ -1,27 +1,5 @@
-export type BlogSubcategory = {
-  id: string;
-  title: string;
-  description?: string;
-};
-
-export type BlogCategory = {
-  id: string;
-  title: string;
-  description?: string;
-  children: BlogSubcategory[];
-};
-
-export type BlogPost = {
-  title: string;
-  body: string;
-  categoryId: string;
-  subcategoryId?: string;
-  publishedAt: string;
-  createdAt?: string;
-  updatedAt?: string;
-  slug?: string;
-  filename?: string;
-};
+import type { BlogCategory, BlogPost } from "./blog.types";
+export type { BlogCategory, BlogSubcategory, BlogPost } from "./blog.types";
 
 const BLOG_POST_RE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9\-]+\.json$/i;
 
@@ -53,6 +31,16 @@ export async function loadBlogCategories() {
   const mod: any = await import("../content/blog/categories.json");
   const data = mod.default ?? mod;
   return (data.categories || []) as BlogCategory[];
+}
+
+function deriveSummary(body: string) {
+  const firstParagraph =
+    body
+      ?.split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean)[0] ?? "";
+  if (!firstParagraph) return "";
+  return firstParagraph.length > 200 ? `${firstParagraph.slice(0, 197)}…` : firstParagraph;
 }
 
 export async function loadBlogPosts() {
@@ -104,9 +92,20 @@ export async function loadBlogPosts() {
     }
   }
   const normalized = posts.map((post) => {
+    const body = typeof post.body === "string" ? post.body : "";
     const createdAt = post.createdAt ?? post.publishedAt ?? new Date().toISOString();
     const updatedAt = post.updatedAt ?? createdAt;
-    return { ...post, createdAt, updatedAt };
+    const summary = post.summary ?? deriveSummary(body);
+    const tags = Array.isArray(post.tags) ? post.tags.map((tag) => tag.toString()) : [];
+    return {
+      ...post,
+      body,
+      summary,
+      tags,
+      createdAt,
+      updatedAt,
+      slug: post.slug ?? (post as any).filename?.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/\.json$/, ""),
+    };
   });
   normalized.sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
   return normalized;

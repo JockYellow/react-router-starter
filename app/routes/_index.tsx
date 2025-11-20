@@ -4,7 +4,10 @@ import { useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
 import { loadChangelogItems, type ChangelogItem } from "../lib/changelog.server";
-import { loadBlogPosts, loadBlogCategories, type BlogPost, type BlogCategory } from "../lib/blog.server";
+import { loadBlogCategories } from "../lib/blog.server";
+import type { BlogPost, BlogCategory } from "../lib/blog.types";
+import { getAllBlogPosts } from "../lib/blog.d1.server";
+import { requireBlogDb } from "../lib/d1.server";
 
 const SECTION_DATA = {
   blog: {
@@ -388,11 +391,12 @@ type ModuleButtonsProps = {
 };
 
 export async function loader(args: LoaderFunctionArgs) {
-  const [changelog, blogPosts, blogCategories] = await Promise.all([
+  const [changelog, blogCategories] = await Promise.all([
     loadChangelogItems(args),
-    loadBlogPosts(),
     loadBlogCategories(),
   ]);
+  const db = requireBlogDb(args.context);
+  const blogPosts: BlogPost[] = await getAllBlogPosts(db);
   return { changelog, blogPosts, blogCategories };
 }
 

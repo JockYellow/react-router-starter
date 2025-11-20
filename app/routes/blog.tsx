@@ -1,12 +1,10 @@
 import { Link, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
-import {
-  loadBlogCategories,
-  loadBlogPosts,
-  type BlogCategory,
-  type BlogPost,
-} from "../lib/blog.server";
+import { loadBlogCategories } from "../lib/blog.server";
+import type { BlogCategory, BlogPost } from "../lib/blog.types";
+import { getAllBlogPosts } from "../lib/blog.d1.server";
+import { requireBlogDb } from "../lib/d1.server";
 
 function formatDate(date: string) {
   try {
@@ -35,12 +33,15 @@ function buildLink(categoryId?: string | null, subcategoryId?: string | null) {
   return query ? `?${query}` : "";
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request, context }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const categoryId = url.searchParams.get("category");
   const subcategoryId = url.searchParams.get("subcategory");
 
-  const [categories, posts] = await Promise.all([loadBlogCategories(), loadBlogPosts()]);
+  const categories = await loadBlogCategories();
+
+  const db = requireBlogDb(context);
+  const posts: BlogPost[] = await getAllBlogPosts(db);
 
   const selectedCategory = categories.find((cat) => cat.id === categoryId) ?? null;
   const selectedSubcategory = selectedCategory?.children.find((child) => child.id === subcategoryId) ?? null;
