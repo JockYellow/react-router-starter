@@ -12,8 +12,8 @@
 	"upload_source_maps": true,
 	"vars": {
 		"VALUE_FROM_CLOUDFLARE": "Hello from Cloudflare",
-		"ADMIN_PASS": "change-me-admin-pass",
-		"BLOG_IMAGES_PUBLIC_BASE_URL": "https://your-public-r2-domain.example.com/"
+		"ADMIN_PASS": "jock0701QQ@cf",
+		"BLOG_IMAGES_PUBLIC_BASE_URL": "https://pub-dced73b40e724469990adfef043fc5b2.r2.dev"
 	},
 	"d1_databases": [
 		{
@@ -30,7 +30,6 @@
 		{
 			"bucket_name": "blog-images",
 			"binding": "blog_images",
-			"remote": true
 		}
 	]
 }
