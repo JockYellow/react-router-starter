@@ -12,13 +12,25 @@
 	"upload_source_maps": true,
 	"vars": {
 		"VALUE_FROM_CLOUDFLARE": "Hello from Cloudflare",
-		"ADMIN_PASS": "change-me-admin-pass"
+		"ADMIN_PASS": "change-me-admin-pass",
+		"BLOG_IMAGES_PUBLIC_BASE_URL": "https://your-public-r2-domain.example.com/"
 	},
 	"d1_databases": [
 		{
 			"binding": "BLOG_DB",
 			"database_name": "blog-db",
 			"database_id": "9e8e276a-fd1f-4385-ac56-706970486025"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "BLOG_IMAGES",
+			"bucket_name": "blog-images"
+		},
+		{
+			"bucket_name": "blog-images",
+			"binding": "blog_images",
+			"remote": true
 		}
 	]
 }

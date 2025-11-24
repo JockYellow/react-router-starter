@@ -9,6 +9,12 @@ const app = express();
 const PORT = 43210;
 const HOST = "127.0.0.1";
 const TOOLBELT_KEY = Math.random().toString(36).slice(2);
+const FRONTEND_URL =
+  process.env.FRONTEND_URL ||
+  process.env.FRONT_URL ||
+  process.env.PUBLIC_FRONTEND_URL ||
+  "";
+const FRONTEND_API_BASE = process.env.FRONTEND_API_BASE || FRONTEND_URL || "";
 
 function runCmd(cmd: string, args: string[] = []) {
   const result = spawnSync(cmd, args, {
@@ -63,6 +69,12 @@ const BLOG_POST_NAME_RE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9\-]+\.json$/i;
 // 基礎
 app.get("/", (_req, res) => res.json({ ok: true, message: "Toolbelt is running!" }));
 app.get("/key", (_req, res) => res.json({ key: TOOLBELT_KEY }));
+app.get("/config", (_req, res) =>
+  res.json({
+    frontendUrl: FRONTEND_URL || null,
+    apiBase: FRONTEND_API_BASE || null,
+  }),
+);
 
 // Admin 靜態站（本機後台）
 app.use("/admin", express.static(join(__dirname, "admin"), { extensions: ["html"] }));
@@ -234,6 +246,7 @@ function normalizeBlogPostInput(input: any, categories: any[], existing?: any) {
   const body = (input.body ?? "").toString().trim();
   const categoryId = (input.categoryId ?? "").toString().trim();
   const subcategoryId = (input.subcategoryId ?? "").toString().trim();
+  const imageUrl = (input.imageUrl ?? existing?.imageUrl ?? "").toString().trim();
   const publishedAtInput = input.publishedAt ?? new Date().toISOString();
   if (!title) throw new Error("title required");
   if (!body) throw new Error("body required");
@@ -262,6 +275,7 @@ function normalizeBlogPostInput(input: any, categories: any[], existing?: any) {
     slug,
     createdAt,
     updatedAt,
+    imageUrl: imageUrl || undefined,
   };
 }
 
@@ -467,6 +481,55 @@ app.delete("/fs/blog/post", (req, res) => {
     if (!existsSync(full)) return res.status(404).send("找不到文章");
     rmSync(full);
     res.json({ ok: true, filename });
+  } catch (e: any) {
+    res.status(400).send(e.message || String(e));
+  }
+});
+
+app.post("/proxy/blog-post", async (req, res) => {
+  if (!FRONTEND_API_BASE) return res.status(400).send("缺少 FRONTEND_API_BASE");
+  try {
+    const { method, post, file } = req.body as {
+      method?: string;
+      post?: any;
+      file?: { name: string; type?: string; data: string };
+    };
+    if (!post) throw new Error("post payload required");
+    const verb = (method ?? "POST").toUpperCase() === "PUT" ? "PUT" : "POST";
+    const form = new FormData();
+    form.append("title", (post.title ?? "").toString());
+    form.append("body", (post.body ?? "").toString());
+    if (post.summary) form.append("summary", post.summary.toString());
+    if (post.slug) form.append("slug", post.slug.toString());
+    if (post.categoryId) form.append("categoryId", post.categoryId.toString());
+    if (post.subcategoryId) form.append("subcategoryId", post.subcategoryId.toString());
+    if (post.publishedAt) form.append("publishedAt", post.publishedAt.toString());
+    if (post.updatedAtBase && verb === "PUT") form.append("updatedAtBase", post.updatedAtBase.toString());
+    if (Array.isArray(post.tags)) {
+      form.append("tags", post.tags.join(","));
+    }
+    if (file?.data) {
+      const buffer = Buffer.from(file.data, "base64");
+      const mime = file.type || "application/octet-stream";
+      const name = file.name || "upload.bin";
+      const f = new File([buffer], name, { type: mime });
+      form.append("image", f);
+    }
+    const target =
+      verb === "PUT" && post.slug
+        ? `${FRONTEND_API_BASE.replace(/\/$/, "")}/api/blog-post?slug=${encodeURIComponent(post.slug)}`
+        : `${FRONTEND_API_BASE.replace(/\/$/, "")}/api/blog-post`;
+    const resp = await fetch(target, {
+      method: verb,
+      headers: { cookie: "admin_session=1" },
+      body: form,
+    });
+    const text = await resp.text();
+    if (!resp.ok) {
+      return res.status(resp.status).send(text);
+    }
+    const data = text ? JSON.parse(text) : {};
+    res.json(data);
   } catch (e: any) {
     res.status(400).send(e.message || String(e));
   }

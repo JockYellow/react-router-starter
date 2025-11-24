@@ -19,6 +19,7 @@ function mapRowToPost(row: Record<string, any>): BlogPost {
     title: row.title,
     summary: row.summary ?? "",
     body: row.body ?? "",
+    imageUrl: row.image_url ?? null,
     tags: parseTags(row.tags),
     categoryId: row.category_id ?? undefined,
     subcategoryId: row.subcategory_id ?? undefined,
@@ -30,7 +31,7 @@ function mapRowToPost(row: Record<string, any>): BlogPost {
 
 export async function getAllBlogPosts(db: D1Database): Promise<BlogPost[]> {
   const statement = db.prepare(
-    `SELECT slug, title, summary, body, tags, category_id, subcategory_id, published_at, created_at, updated_at
+    `SELECT slug, title, summary, body, image_url, tags, category_id, subcategory_id, published_at, created_at, updated_at
      FROM blog_posts
      ORDER BY datetime(published_at) DESC, id DESC`,
   );
@@ -40,7 +41,7 @@ export async function getAllBlogPosts(db: D1Database): Promise<BlogPost[]> {
 
 export async function getBlogPostBySlug(db: D1Database, slug: string): Promise<BlogPost | null> {
   const statement = db.prepare(
-    `SELECT slug, title, summary, body, tags, category_id, subcategory_id, published_at, created_at, updated_at
+    `SELECT slug, title, summary, body, image_url, tags, category_id, subcategory_id, published_at, created_at, updated_at
      FROM blog_posts WHERE slug = ? LIMIT 1`,
   );
   const row = await statement.bind(slug).first<Record<string, any>>();

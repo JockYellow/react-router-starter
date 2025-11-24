@@ -6,7 +6,10 @@
 <header>
   <div class="wrap" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
     <strong>Blog 管理</strong>
-    <nav><a class="btn ghost" href="/admin/">返回選單</a></nav>
+    <nav style="display:flex;gap:8px">
+      <a class="btn ghost js-frontend-link" href="#">← 返回前台</a>
+      <a class="btn ghost" href="/admin/">返回選單</a>
+    </nav>
   </div>
 </header>
 
@@ -72,6 +75,23 @@
           <select id="post-subcategory"></select>
         </label>
       </div>
+      <div class="row">
+        <label><span>封面圖片 URL</span>
+          <input id="post-image-url" placeholder="https://..." />
+        </label>
+        <label><span>封面預覽</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <img id="post-image-preview" alt="封面預覽" style="width:140px;height:80px;object-fit:cover;border:1px solid #ddd;border-radius:8px;background:#f7f7f7" />
+            <button class="btn ghost small" type="button" id="post-image-clear">清空</button>
+          </div>
+        </label>
+      </div>
+      <div class="row">
+        <label><span>上傳封面檔案</span>
+          <input id="post-image-file" type="file" accept="image/*" />
+        </label>
+        <p class="muted" style="margin:0">會透過 API 上傳到 R2，並自動將 URL 寫入欄位。</p>
+      </div>
       <label><span>發佈時間</span>
         <input type="datetime-local" id="post-published-at" step="1" />
       </label>
@@ -102,6 +122,7 @@
     filter: { categoryId: "", subcategoryId: "", query: "" },
     sort: { key: "publishedAt", order: "desc" },
     slugLocked: false,
+    imageFile: null,
   };
   const escapeHtml = (str = "") =>
     str
@@ -126,10 +147,33 @@
     const input = $("#post-published-at");
     if (input) input.value = toLocalInputValue(new Date());
   };
+  const setImageFile = (file) => {
+    state.imageFile = file;
+    updateImagePreview();
+  };
 
   function setMsg(target, msg) {
     const el = $(target);
     if (el) el.textContent = msg || "";
+  }
+
+  function updateImagePreview() {
+    const urlInput = $("#post-image-url").value.trim();
+    const img = $("#post-image-preview");
+    if (!img) return;
+    const file = state.imageFile;
+    if (file) {
+      img.src = URL.createObjectURL(file);
+      img.style.opacity = "1";
+      return;
+    }
+    if (urlInput) {
+      img.src = urlInput;
+      img.style.opacity = "1";
+      return;
+    }
+    img.removeAttribute("src");
+    img.style.opacity = "0.4";
   }
 
   function refreshCategorySelects() {
@@ -166,6 +210,23 @@
     }
     const slug = Admin.slugify(title) || `post-${Date.now().toString(36)}`;
     field.value = slug;
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const res = reader.result;
+        if (typeof res === "string") {
+          const base64 = res.split(",").pop() || "";
+          resolve(base64);
+        } else {
+          reject(new Error("無法讀取檔案"));
+        }
+      };
+      reader.onerror = () => reject(reader.error || new Error("讀取檔案失敗"));
+      reader.readAsDataURL(file);
+    });
   }
 
   function renderCategoryTree() {
@@ -339,6 +400,7 @@
     const body = $("#post-body").value.trim();
     const categoryId = $("#post-category").value;
     const subcategoryId = $("#post-subcategory").value || undefined;
+    const imageUrl = $("#post-image-url").value.trim();
     let slug = $("#post-slug").value.trim();
     if (!slug) slug = Admin.slugify(title) || `post-${Date.now().toString(36)}`;
     const publishedInput = $("#post-published-at").value;
@@ -350,6 +412,7 @@
     const payload = { title, body, categoryId, slug };
     if (subcategoryId) payload.subcategoryId = subcategoryId;
     if (publishedAt) payload.publishedAt = publishedAt;
+    if (imageUrl) payload.imageUrl = imageUrl;
     return payload;
   }
 
@@ -358,6 +421,9 @@
     $("#post-title").value = post.title || "";
     $("#post-body").value = post.body || "";
     $("#post-slug").value = post.slug || "";
+    $("#post-image-url").value = post.imageUrl || "";
+    setImageFile(null);
+    updateImagePreview();
     if (post.categoryId && state.categories.some((cat) => cat.id === post.categoryId)) {
       $("#post-category").value = post.categoryId;
     }
@@ -376,6 +442,9 @@
     $("#post-title").value = "";
     $("#post-body").value = "";
     $("#post-slug").value = "";
+    $("#post-image-url").value = "";
+    setImageFile(null);
+    updateImagePreview();
     if (state.categories[0]) {
       $("#post-category").value = state.categories[0].id;
     }
@@ -392,6 +461,26 @@
     const { posts } = await Admin.api("/fs/blog/posts");
     state.posts = posts;
     renderPostList();
+  }
+
+  async function syncToCloudflare(method, payload) {
+    const config = Admin.getConfig?.() || {};
+    if (!config.apiBase) return null;
+    const body = {
+      method,
+      post: { ...payload },
+    };
+    if (state.imageFile) {
+      const data = await fileToBase64(state.imageFile);
+      body.file = { name: state.imageFile.name, type: state.imageFile.type, data };
+    }
+    const res = await fetch("/proxy/blog-post", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
   }
 
   function parseDate(value) {
@@ -470,8 +559,10 @@
       return;
     }
     try {
+      const remote = await syncToCloudflare('POST', payload);
+      if (remote?.imageUrl) payload.imageUrl = remote.imageUrl;
       await Admin.api('/fs/blog/post', { method: 'POST', body: { post: payload } });
-      setMsg('#post-msg', '已新增文章');
+      setMsg('#post-msg', '已新增文章（已同步 Cloudflare）');
       await loadPosts();
       resetPostForm();
     } catch (e) {
@@ -494,8 +585,11 @@
     if (!state.editPost) return;
     const payload = collectPostForm();
     try {
+      payload.updatedAtBase = state.editPost.updatedAt || state.editPost.publishedAt;
+      const remote = await syncToCloudflare('PUT', { ...payload, slug: state.editPost.slug });
+      if (remote?.post?.imageUrl) payload.imageUrl = remote.post.imageUrl;
       await Admin.api('/fs/blog/post', { method: 'PUT', body: { filename: state.editPost.filename, post: payload } });
-      setMsg('#post-msg', '已儲存');
+      setMsg('#post-msg', '已儲存（已同步 Cloudflare）');
       state.editPost = null;
       await loadPosts();
       resetPostForm();
@@ -538,6 +632,16 @@
   $('#post-sort-order').addEventListener('change', (e) => {
     state.sort.order = e.target.value;
     renderPostList();
+  });
+  $('#post-image-url').addEventListener('input', updateImagePreview);
+  $('#post-image-clear').addEventListener('click', () => {
+    $('#post-image-url').value = '';
+    setImageFile(null);
+    updateImagePreview();
+  });
+  $('#post-image-file').addEventListener('change', (e) => {
+    const file = e.target.files?.[0] || null;
+    setImageFile(file);
   });
   $('#post-filter-reset').addEventListener('click', () => {
     state.filter = { categoryId: '', subcategoryId: '', query: '' };

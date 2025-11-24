@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLoaderData, json } from "react-router";
+import { useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { loadBlogCategories } from "../lib/blog.server";
 import type { BlogCategory, BlogPost } from "../lib/blog.types";
@@ -12,7 +12,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const slug = url.searchParams.get("slug") ?? "";
   const categories = await loadBlogCategories();
-  return json({ slug, categories });
+  return Response.json({ slug, categories });
 }
 
 type FormState = {
@@ -26,6 +26,8 @@ type FormState = {
   publishedAtInput: string;
   updatedAtBase: string;
   isExisting: boolean;
+  imageUrl: string;
+  imageFile: File | null;
 };
 
 function defaultFormState(initialSlug: string): FormState {
@@ -40,6 +42,8 @@ function defaultFormState(initialSlug: string): FormState {
     publishedAtInput: formatDatetimeLocal(new Date().toISOString()),
     updatedAtBase: "",
     isExisting: false,
+    imageUrl: "",
+    imageFile: null,
   };
 }
 
@@ -67,6 +71,7 @@ export default function AdminBlogEditPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const availableSubcategories = useMemo(() => {
     return categories.find((cat) => cat.id === formState.categoryId)?.children ?? [];
@@ -78,6 +83,21 @@ export default function AdminBlogEditPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSlug]);
+
+  useEffect(() => {
+    let nextObjectUrl: string | null = null;
+    if (formState.imageFile) {
+      nextObjectUrl = URL.createObjectURL(formState.imageFile);
+      setImagePreview(nextObjectUrl);
+    } else {
+      setImagePreview(formState.imageUrl || null);
+    }
+    return () => {
+      if (nextObjectUrl) {
+        URL.revokeObjectURL(nextObjectUrl);
+      }
+    };
+  }, [formState.imageFile, formState.imageUrl]);
 
   async function fetchPost(slug: string) {
     if (!slug) return;
@@ -102,6 +122,8 @@ export default function AdminBlogEditPage() {
         publishedAtInput: formatDatetimeLocal(post.publishedAt),
         updatedAtBase: post.updatedAt ?? "",
         isExisting: true,
+        imageUrl: post.imageUrl ?? "",
+        imageFile: null,
       }));
       setMessage("已載入最新內容");
     } catch (err: any) {
@@ -125,32 +147,35 @@ export default function AdminBlogEditPage() {
     setError(null);
     setMessage(null);
 
-    const payload: any = {
-      title: formState.title,
-      summary: formState.summary,
-      body: formState.body,
-      tags: parseTags(formState.tagsInput),
-      categoryId: formState.categoryId || undefined,
-      subcategoryId: formState.subcategoryId || undefined,
-      publishedAt: formState.publishedAtInput ? new Date(formState.publishedAtInput).toISOString() : undefined,
-    };
-
     let endpoint = "/api/blog-post";
     let method: "POST" | "PUT" = "POST";
+
+    const formData = new FormData();
+    formData.append("title", formState.title);
+    formData.append("summary", formState.summary);
+    formData.append("body", formState.body);
+    formData.append("tags", formState.tagsInput);
+    if (formState.categoryId) formData.append("categoryId", formState.categoryId);
+    if (formState.subcategoryId) formData.append("subcategoryId", formState.subcategoryId);
+    if (formState.publishedAtInput) {
+      formData.append("publishedAt", new Date(formState.publishedAtInput).toISOString());
+    }
+    if (formState.imageFile) {
+      formData.append("image", formState.imageFile);
+    }
 
     if (formState.isExisting) {
       method = "PUT";
       endpoint = `/api/blog-post?slug=${encodeURIComponent(formState.slug)}`;
-      payload.updatedAtBase = formState.updatedAtBase;
+      formData.append("updatedAtBase", formState.updatedAtBase);
     } else if (formState.slug) {
-      payload.slug = formState.slug;
+      formData.append("slug", formState.slug);
     }
 
     try {
       const res = await fetch(endpoint, {
         method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       if (res.status === 409) {
@@ -173,6 +198,8 @@ export default function AdminBlogEditPage() {
         const refreshed = data.post as any;
         setFormState((prev) => ({
           ...prev,
+          imageFile: null,
+          imageUrl: refreshed?.imageUrl ?? prev.imageUrl,
           updatedAtBase: refreshed?.updatedAt ?? prev.updatedAtBase,
         }));
         setMessage("已儲存最新內容");
@@ -186,6 +213,10 @@ export default function AdminBlogEditPage() {
 
   function handleInputChange<T extends keyof FormState>(key: T, value: FormState[T]) {
     setFormState((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleImageChange(file: File | null) {
+    setFormState((prev) => ({ ...prev, imageFile: file }));
   }
 
   function handleCategoryChange(value: string) {
@@ -254,6 +285,39 @@ export default function AdminBlogEditPage() {
             placeholder="文章簡短說明，會用於列表與 meta。"
           />
         </label>
+
+        <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
+            封面圖片
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleImageChange(e.target.files?.[0] ?? null)}
+              className="input file:mr-2 file:rounded-md file:border-0 file:bg-[--color-accent-50] file:px-3 file:py-2 file:text-sm"
+            />
+            <span className="text-xs font-normal text-neutral-500">
+              新增或更新時若未選擇圖片，會沿用目前封面。
+            </span>
+          </label>
+          <div className="flex flex-col items-start gap-2">
+            {imagePreview ? (
+              <img
+                src={imagePreview}
+                alt="文章封面預覽"
+                className="h-24 w-36 rounded-lg border border-neutral-200 object-cover"
+              />
+            ) : (
+              <div className="flex h-24 w-36 items-center justify-center rounded-lg border border-dashed border-neutral-300 text-xs text-neutral-500">
+                尚未設定封面
+              </div>
+            )}
+            {formState.imageFile ? (
+              <button type="button" className="btn-ghost text-xs px-3 py-1" onClick={() => handleImageChange(null)}>
+                清除新圖片
+              </button>
+            ) : null}
+          </div>
+        </div>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700">
           內文

@@ -1,3 +1,4 @@
+import { type CSSProperties } from "react";
 import { Link, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -5,6 +6,7 @@ import { loadBlogCategories } from "../lib/blog.server";
 import type { BlogCategory, BlogPost } from "../lib/blog.types";
 import { getAllBlogPosts } from "../lib/blog.d1.server";
 import { requireBlogDb } from "../lib/d1.server";
+import { deriveAccentColor } from "../lib/blog-accent";
 
 function formatDate(date: string) {
   try {
@@ -23,6 +25,20 @@ function paragraphize(body: string) {
     .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+function formatCategory(post: BlogPost, categories: BlogCategory[]) {
+  const category = categories.find((c) => c.id === post.categoryId);
+  const sub = category?.children.find((child) => child.id === post.subcategoryId);
+  if (category && sub) return `${category.title} / ${sub.title}`;
+  if (category) return category.title;
+  return "未分類";
+}
+
+function buildExcerpt(post: BlogPost) {
+  const paragraph = post.summary || paragraphize(post.body)[0] || "";
+  if (!paragraph) return "";
+  return paragraph.length > 160 ? `${paragraph.slice(0, 157)}…` : paragraph;
 }
 
 function buildLink(categoryId?: string | null, subcategoryId?: string | null) {
@@ -130,34 +146,81 @@ export default function BlogPage() {
           </div>
         </aside>
 
-        <div className="space-y-4">
-          {posts.length ? (
-            posts.map((post) => (
-              <article key={(post.filename ?? post.slug ?? post.title) + post.publishedAt} className="card bg-white/95">
-                <div className="text-xs uppercase tracking-[0.25em] text-neutral-500">
-                  {formatDate(post.publishedAt)}
-                </div>
-                <h2 className="mt-2 text-2xl font-semibold text-neutral-900">{post.title}</h2>
-                <div className="mt-2 text-xs text-neutral-500">
-                  {(() => {
-                    const category = categories.find((c) => c.id === post.categoryId);
-                    const sub = category?.children.find((child) => child.id === post.subcategoryId);
-                    if (category && sub) return `${category.title} / ${sub.title}`;
-                    if (category) return category.title;
-                    return "未分類";
-                  })()}
-                </div>
-                <div className="mt-4 space-y-3 text-neutral-800 leading-relaxed">
-                  {paragraphize(post.body).map((paragraph, index) => (
-                    <p key={index}>{paragraph}</p>
-                  ))}
-                </div>
-              </article>
-            ))
-          ) : (
-            <p className="text-sm text-neutral-600">目前沒有符合條件的文章。</p>
-          )}
-        </div>
+        {posts.length ? (
+          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            {posts.map((post) => {
+              const accent = deriveAccentColor(post, categories);
+              const excerpt = buildExcerpt(post);
+              const categoryLabel = formatCategory(post, categories);
+              return (
+                <Link
+                  key={(post.filename ?? post.slug ?? post.title) + post.publishedAt}
+                  to={`/blog/${post.slug}`}
+                  className="group h-full"
+                  style={{ "--post-accent": accent } as CSSProperties}
+                >
+                  <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-[color:rgba(0,0,0,0.08)] bg-white/95 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+                    <div className="relative h-48 w-full overflow-hidden">
+                      {post.imageUrl ? (
+                        <img
+                          src={post.imageUrl}
+                          alt={post.title}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-[color:var(--post-accent)]/15 text-xs font-medium text-neutral-600">
+                          封面待補
+                        </div>
+                      )}
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white/95 via-white/40 to-transparent" />
+                    </div>
+
+                    <div className="flex flex-1 flex-col gap-3 p-6">
+                      <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.24em] text-neutral-500">
+                        <span>{formatDate(post.publishedAt)}</span>
+                        <span className="rounded-full bg-[color:var(--post-accent)]/15 px-3 py-1 text-[10px] font-semibold text-[color:var(--post-accent)]">
+                          {categoryLabel}
+                        </span>
+                      </div>
+                      <h2 className="text-xl font-semibold text-neutral-900 transition group-hover:text-neutral-700">
+                        {post.title}
+                      </h2>
+                      {excerpt ? (
+                        <p
+                          className="text-sm leading-relaxed text-neutral-700"
+                          style={{
+                            display: "-webkit-box",
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {excerpt}
+                        </p>
+                      ) : null}
+                      {post.tags?.length ? (
+                        <div className="mt-auto flex flex-wrap gap-2 pt-2">
+                          {post.tags.slice(0, 4).map((tag) => (
+                            <span
+                              key={tag}
+                              className="chip border-[color:var(--post-accent)]/60 bg-[color:var(--post-accent)]/10 text-[color:var(--post-accent)]"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="h-1 bg-[color:var(--post-accent)]/60" />
+                  </article>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-neutral-600">目前沒有符合條件的文章。</p>
+        )}
       </section>
     </div>
   );

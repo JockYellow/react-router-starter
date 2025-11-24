@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS blog_posts (
   title TEXT NOT NULL,
   summary TEXT,
   body TEXT NOT NULL,
+  image_url TEXT,
   tags TEXT,
   category_id TEXT,
   subcategory_id TEXT,

@@ -1,9 +1,36 @@
 // toolbelt/admin/admin.js
 window.Admin = (function () {
-  const state = { key: "" };
+  const state = { key: "", config: { frontendUrl: null, apiBase: null }, configLoaded: false };
+
+  async function initConfig() {
+    if (state.configLoaded) return state.config;
+    try {
+      const res = await fetch("/config");
+      if (res.ok) {
+        const cfg = await res.json();
+        state.config = cfg || {};
+      }
+    } catch (e) {
+      console.warn("load config failed", e);
+    } finally {
+      state.configLoaded = true;
+      applyFrontendLinks();
+    }
+    return state.config;
+  }
+
+  function applyFrontendLinks() {
+    const href = state.config.frontendUrl || "/";
+    document.querySelectorAll(".js-frontend-link").forEach((el) => {
+      if (el instanceof HTMLAnchorElement) {
+        el.href = href;
+      }
+    });
+  }
 
   async function initKey() {
     if (state.key) return state.key;
+    await initConfig();
     const res = await fetch("/key");
     if (!res.ok) throw new Error("no key");
     const { key } = await res.json();
@@ -39,6 +66,13 @@ window.Admin = (function () {
       .replace(/^-+|-+$/g, "");
   }
 
-  return { api, today, slugify };
-})();
+  (async () => {
+    try {
+      await initConfig();
+    } catch {
+      // ignore
+    }
+  })();
 
+  return { api, today, slugify, initConfig, getConfig: () => state.config };
+})();

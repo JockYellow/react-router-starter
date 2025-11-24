@@ -111,6 +111,46 @@ html { scroll-behavior: smooth; }
 .module-skills { --module-color: var(--color-module-skills); }
 .module-projects { --module-color: var(--color-module-projects); }
 .module-contact { --module-color: var(--color-module-contact); }
+.animate-room-in {
+  animation: room-in 420ms ease both;
+  transform-origin: center;
+}
+/* Sticky tab shell for homepage */
+.sticky-tabs-shell {
+  background:
+    radial-gradient(circle at 20% 40%, rgba(255,244,209,0.6), transparent 45%),
+    radial-gradient(circle at 80% 0%, rgba(216,201,255,0.55), transparent 40%),
+    linear-gradient(180deg, rgba(255,255,255,0.88), rgba(255,255,255,0.6));
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  box-shadow: 0 12px 32px rgba(50,35,15,0.08);
+  border-radius: 0 0 24px 24px;
+  position: relative;
+}
+@media (prefers-color-scheme: dark) {
+  .sticky-tabs-shell {
+    background:
+      radial-gradient(circle at 20% 40%, rgba(124,96,180,0.22), transparent 38%),
+      radial-gradient(circle at 80% 0%, rgba(114,168,220,0.22), transparent 32%),
+      linear-gradient(180deg, rgba(26,26,30,0.9), rgba(26,26,30,0.8)),
+      rgba(26,26,30,0.82);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+}
+.sticky-tabs {
+  gap: 0.6rem;
+  justify-content: flex-start;
+}
+@keyframes room-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
 .module-meta {
   @apply text-sm text-neutral-600;
   opacity: 0.9;

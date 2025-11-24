@@ -69,6 +69,7 @@ function normalizePost(raw: Record<string, any>): BlogPost {
     publishedAt: publishedAt.toISOString(),
     createdAt,
     updatedAt,
+    imageUrl: typeof raw.imageUrl === "string" ? raw.imageUrl : null,
   };
 }
 
@@ -111,10 +112,11 @@ async function run() {
       toSql(post.publishedAt),
       toSql(post.createdAt),
       toSql(post.updatedAt),
+      toSql(post.imageUrl ?? null),
     ];
 
     return `INSERT OR IGNORE INTO blog_posts
-(slug, title, summary, body, tags, category_id, subcategory_id, published_at, created_at, updated_at)
+(slug, title, summary, body, tags, category_id, subcategory_id, published_at, created_at, updated_at, image_url)
 VALUES (${values.join(", ")});`;
   });
 

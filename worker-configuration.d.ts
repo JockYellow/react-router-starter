@@ -9,6 +9,10 @@ declare namespace Cloudflare {
 		VALUE_FROM_CLOUDFLARE: "Hello from Cloudflare";
 		BLOG_DB: D1Database;
 		blog_db: D1Database;
+		BLOG_IMAGES: R2Bucket;
+		blog_images: R2Bucket;
+		BLOG_IMAGES_PUBLIC_BASE_URL: string;
+		blog_images_public_base_url: string;
 	}
 }
 interface Env extends Cloudflare.Env {}
@@ -16,7 +20,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "VALUE_FROM_CLOUDFLARE">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "VALUE_FROM_CLOUDFLARE" | "BLOG_IMAGES_PUBLIC_BASE_URL">> {}
 }
 
 // Begin runtime types

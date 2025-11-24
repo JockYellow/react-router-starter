@@ -16,6 +16,7 @@ export type BlogPost = {
   title: string;
   summary: string;
   body: string;
+  imageUrl: string | null;
   tags: string[];
   publishedAt: string; // ISO string
   createdAt: string;

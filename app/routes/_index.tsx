@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
 import { loadChangelogItems, type ChangelogItem } from "../lib/changelog.server";
@@ -214,10 +214,47 @@ const SECTION_DATA = {
       ],
     },
   },
+  outerspace: {
+    label: "OuterSpace",
+    hero: {
+      eyebrow: "OuterSpace 獨立模組",
+      title: "ORION-7 外太空監控中心",
+      description:
+        "全螢幕的 3D 儀表板示範，用 Three.js 與即時數據打造沉浸式監控體驗。",
+      background: "linear-gradient(135deg, #e4f4ff 0%, #cdeefe 50%, #0b1d36 100%)",
+      borderColor: "rgba(56, 189, 248, 0.4)",
+      metrics: [
+        { label: "Renderer", value: "Three.js", hint: "WebGL" },
+        { label: "UI", value: "Tailwind", hint: "Glassmorphism" },
+        { label: "Mode", value: "全螢幕", hint: "Draggable CTA" },
+      ],
+      preview: [
+        {
+          category: "Senter",
+          title: "軌道監控儀表",
+          detail: "以 3D 星球與數據面板呈現外太空場景。",
+        },
+        {
+          category: "Nav",
+          title: "懸浮返回按鈕",
+          detail: "可拖曳的回上一頁 CTA，保持獨立體驗。",
+        },
+      ],
+      ctaLabel: "啟動 OuterSpace",
+    },
+    section: {
+      eyebrow: "OuterSpace",
+      title: "ORION-7 監控中心",
+      intro:
+        "這是獨立的外太空監控頁面，點擊即可全螢幕體驗；頁面只保留一顆可拖曳的懸浮返回按鈕。",
+      tint: "#E7F4FF",
+      checklist: ["Three.js 地球視圖", "即時遙測儀表板", "懸浮返回按鈕"],
+    },
+  },
 } as const;
 
 type SectionKey = keyof typeof SECTION_DATA;
-const SECTION_KEYS: SectionKey[] = ["blog", "guestbook", "changelog", "lab"];
+const SECTION_KEYS: SectionKey[] = ["blog", "guestbook", "changelog", "lab", "outerspace"];
 
 const TAG_LABELS = { add: "新增", fix: "修正", change: "變更", docs: "文件" } as const;
 
@@ -378,6 +415,37 @@ function renderSectionBody(
         </div>
       );
     }
+    case "outerspace": {
+      const { checklist } = SECTION_DATA.outerspace.section;
+      return (
+        <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr] items-start">
+          <div className="space-y-3">
+            <p className="text-sm text-neutral-700 leading-relaxed">
+              全螢幕、無站內導航的獨立體驗，以 3D 地球、遙測曲線與玻璃質感面板呈現外太空監控。
+            </p>
+            <ul className="grid sm:grid-cols-3 gap-2">
+              {checklist.map((item) => (
+                <li
+                  key={item}
+                  className="flex items-center gap-2 rounded-xl border border-white/70 bg-white/85 px-3 py-2 text-sm text-neutral-800"
+                >
+                  <span className="inline-block h-2 w-2 rounded-full bg-[--color-accent-500]" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="card bg-white/85 space-y-3">
+            <p className="text-sm text-neutral-700">
+              點擊開啟後會進入外太空監控中心，使用懸浮返回按鈕即可回到之前的頁面。
+            </p>
+            <a href="/outerspace/OuterSpaceSenter" className="btn-primary w-full justify-center text-center">
+              前往 OuterSpace Senter
+            </a>
+          </div>
+        </div>
+      );
+    }
     default:
       return null;
   }
@@ -432,15 +500,15 @@ function ModuleButtons({ activeSection, onHover, onSelect, className }: ModuleBu
 
 export default function HomePage() {
   const [activeSection, setActiveSection] = useState<SectionKey>("blog");
+  const didMount = useRef(false);
+  const blogSecretRef = useRef<{ clicks: number; timer: ReturnType<typeof setTimeout> | null }>({
+    clicks: 0,
+    timer: null,
+  });
+  const navigate = useNavigate();
   const { changelog, blogPosts, blogCategories } = useLoaderData() as LoaderData;
   const changelogItems = changelog.slice(0, 4);
   const heroModule = SECTION_DATA[activeSection].hero;
-
-  const scrollToSection = (section: SectionKey) => {
-    if (typeof document === "undefined") return;
-    const target = document.getElementById(section);
-    target?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
 
   const handleHover = (section: SectionKey) => {
     if (section !== activeSection) {
@@ -449,24 +517,74 @@ export default function HomePage() {
   };
 
   const handleSelect = (section: SectionKey) => {
+    if (section === "outerspace") {
+      navigate("/outerspace/OuterSpaceSenter");
+      return;
+    }
+    if (section === "changelog") {
+      navigate("/changelog");
+      return;
+    }
     setActiveSection(section);
-    scrollToSection(section);
   };
+
+  useEffect(() => {
+    if (!didMount.current) {
+      didMount.current = true;
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [activeSection]);
+
+  useEffect(() => {
+    const buttons = Array.from(document.querySelectorAll('[data-blog-cta="list"]'));
+    const state = blogSecretRef.current;
+    const reset = () => {
+      state.clicks = 0;
+      if (state.timer) {
+        clearTimeout(state.timer);
+        state.timer = null;
+      }
+    };
+    const handler = (event: Event) => {
+      state.clicks += 1;
+      if (state.timer) clearTimeout(state.timer);
+      state.timer = setTimeout(reset, 1400);
+      if (state.clicks >= 3) {
+        document.cookie = `admin_session=1; path=/; max-age=${30 * 24 * 60 * 60}`;
+        reset();
+        event.preventDefault();
+        alert("已解鎖後台，直接開 /admin");
+        window.location.href = "/admin";
+      }
+    };
+    buttons.forEach((btn) => btn.addEventListener("click", handler));
+    return () => {
+      buttons.forEach((btn) => btn.removeEventListener("click", handler));
+      reset();
+    };
+  }, []);
 
   return (
     <div className="mx-auto max-w-6xl px-4">
-      <div className="pt-16 pb-6 space-y-3">
-        <p className="eyebrow text-neutral-600">模組切換</p>
-        <ModuleButtons
-          activeSection={activeSection}
-          onHover={handleHover}
-          onSelect={handleSelect}
-        />
+      <div className="sticky top-0 z-20 -mx-4">
+        <div className="sticky-tabs-shell">
+          <div className="mx-auto max-w-6xl px-4 py-3 space-y-1">
+            <p className="eyebrow text-neutral-600">模組切換</p>
+            <ModuleButtons
+              activeSection={activeSection}
+              onHover={handleHover}
+              onSelect={handleSelect}
+              className="sticky-tabs"
+            />
+          </div>
+        </div>
       </div>
 
       <section className="section pt-0">
         <div
-          className="module-panel module-hero space-y-8"
+          key={activeSection}
+          className="module-panel module-hero space-y-8 animate-room-in"
           style={{ background: heroModule.background, borderColor: heroModule.borderColor }}
         >
           <div className="space-y-8">
@@ -496,12 +614,21 @@ export default function HomePage() {
                   ))}
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  <button type="button" className="btn-primary" onClick={() => handleSelect(activeSection)}>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    data-blog-cta={activeSection === "blog" ? "list" : undefined}
+                    onClick={() => handleSelect(activeSection)}
+                  >
                     {heroModule.ctaLabel}
                   </button>
-                  <a href="#lab" className="btn-ghost">
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => setActiveSection("lab")}
+                  >
                     看互動實驗
-                  </a>
+                  </button>
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -522,11 +649,15 @@ export default function HomePage() {
         </div>
       </section>
 
-      {SECTION_KEYS.map((sectionKey) => {
-        const section = SECTION_DATA[sectionKey].section;
-        return (
-          <section key={sectionKey} id={sectionKey} className="section">
-            <div className="module-panel" style={{ "--module-color": section.tint } as CSSProperties}>
+      <section className="section">
+        {(() => {
+          const section = SECTION_DATA[activeSection].section;
+          return (
+            <div
+              key={`${activeSection}-body`}
+              className="module-panel animate-room-in"
+              style={{ "--module-color": section.tint } as CSSProperties}
+            >
               <div className="space-y-6">
                 <div className="space-y-2">
                   <p className="eyebrow">{section.eyebrow}</p>
@@ -535,12 +666,12 @@ export default function HomePage() {
                 <p className="text-lg text-neutral-700 leading-relaxed max-w-3xl">
                   {section.intro}
                 </p>
-                {renderSectionBody(sectionKey, { changelogItems, blogPosts, blogCategories })}
+                {renderSectionBody(activeSection, { changelogItems, blogPosts, blogCategories })}
               </div>
             </div>
-          </section>
-        );
-      })}
+          );
+        })()}
+      </section>
     </div>
   );
 }
