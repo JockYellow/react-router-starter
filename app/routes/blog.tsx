@@ -2,7 +2,7 @@ import { type CSSProperties } from "react";
 import { Link, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
-import { loadBlogCategories } from "../lib/blog.server";
+import { loadBlogCategories, loadBlogPosts } from "../lib/blog.server";
 import type { BlogCategory, BlogPost } from "../lib/blog.types";
 import { getAllBlogPosts } from "../lib/blog.d1.server";
 import { requireBlogDb } from "../lib/d1.server";
@@ -55,9 +55,29 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
   const subcategoryId = url.searchParams.get("subcategory");
 
   const categories = await loadBlogCategories();
+  const filePosts = await loadBlogPosts().catch<BlogPost[]>((err) => {
+    console.error("Failed to load file-based blog posts", err);
+    return [];
+  });
 
-  const db = requireBlogDb(context);
-  const posts: BlogPost[] = await getAllBlogPosts(db);
+  let postsFromDb: BlogPost[] = [];
+  try {
+    const db = requireBlogDb(context);
+    postsFromDb = await getAllBlogPosts(db);
+  } catch (err) {
+    console.error("Failed to load blog posts from D1, falling back to static files", err);
+  }
+
+  const mergedMap = new Map<string, BlogPost>();
+  for (const post of filePosts) {
+    mergedMap.set(post.slug, post);
+  }
+  for (const post of postsFromDb) {
+    mergedMap.set(post.slug, post);
+  }
+  const posts = Array.from(mergedMap.values()).sort((a, b) =>
+    a.publishedAt < b.publishedAt ? 1 : -1,
+  );
 
   const selectedCategory = categories.find((cat) => cat.id === categoryId) ?? null;
   const selectedSubcategory = selectedCategory?.children.find((child) => child.id === subcategoryId) ?? null;

@@ -2,7 +2,7 @@ import { type CSSProperties, useMemo } from "react";
 import { Link, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
-import { loadBlogCategories } from "../lib/blog.server";
+import { loadBlogCategories, loadBlogPosts } from "../lib/blog.server";
 import type { BlogPost, BlogCategory } from "../lib/blog.types";
 import { requireBlogDb } from "../lib/d1.server";
 import { getBlogPostBySlug } from "../lib/blog.d1.server";
@@ -46,12 +46,24 @@ export async function loader({ params, context }: LoaderFunctionArgs) {
   if (!slug) {
     throw Response.json({ error: "slug is required" }, { status: 400 });
   }
-  const db = requireBlogDb(context);
-  const post = await getBlogPostBySlug(db, slug);
+  let post: BlogPost | null = null;
+  try {
+    const db = requireBlogDb(context);
+    post = await getBlogPostBySlug(db, slug);
+  } catch (err) {
+    console.error("Failed to load post from D1, trying static files", err);
+  }
+  const categories = await loadBlogCategories();
+  if (!post) {
+    const filePosts = await loadBlogPosts().catch<BlogPost[]>((err) => {
+      console.error("Failed to load file-based blog posts", err);
+      return [];
+    });
+    post = filePosts.find((item) => item.slug === slug) ?? null;
+  }
   if (!post) {
     throw Response.json({ error: "Post not found" }, { status: 404 });
   }
-  const categories = await loadBlogCategories();
   const accent = deriveAccentColor(post, categories);
   return Response.json({ post, categories, accent });
 }

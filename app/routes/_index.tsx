@@ -1,677 +1,274 @@
-import { useEffect, useRef, useState } from "react";
-import type { CSSProperties } from "react";
-import { useLoaderData, useNavigate } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import { useState, useEffect } from "react";
+import { Link, useLoaderData } from "react-router";
 
-import { loadChangelogItems, type ChangelogItem } from "../lib/changelog.server";
-import { loadBlogCategories } from "../lib/blog.server";
-import type { BlogPost, BlogCategory } from "../lib/blog.types";
-import { getAllBlogPosts } from "../lib/blog.d1.server";
-import { requireBlogDb } from "../lib/d1.server";
+// -----------------------------------------------------------------------------
+// 1. 真實資料讀取邏輯 (Server/Build Time)
+// -----------------------------------------------------------------------------
 
-const SECTION_DATA = {
-  blog: {
-    label: "Blog",
-    hero: {
-      eyebrow: "Blog 模組",
-      title: "個人網站 · 實驗室的文章焦點",
-      description:
-        "Workers、React Router 與 Cloudflare 架構的實戰心得會先在 Blog 模組整理，再同步至 Notion 與 RSS。",
-      background: "linear-gradient(130deg, #fff5e3 0%, #f5e8ff 55%, #f0f8ff 100%)",
-      borderColor: "rgba(233, 200, 155, 0.7)",
-      metrics: [
-        { label: "最新文章", value: "03", hint: "Workers 實作" },
-        { label: "草稿排程", value: "08", hint: "Notion 同步" },
-        { label: "Stack", value: "RRv7 · D1", hint: "Edge first" },
-      ],
-      preview: [
-        {
-          category: "焦點",
-          title: "Workers + React Router",
-          detail: "路由串接、快取策略與混合渲染記錄。",
-        },
-        {
-          category: "設計",
-          title: "Design Token 實作",
-          detail: "以 tokens 與 CSS variables 讓文章與實驗保持一致。",
-        },
-      ],
-      ctaLabel: "閱讀文章",
-    },
-    section: {
-      eyebrow: "Blog",
-      title: "文章列表",
-      intro:
-        "聚焦雲邊緣、React Router 與 UI 系統，文章以模組化格式記錄，方便快速擴充。",
-      tint: "#FFF4E5",
-      articles: [
-        {
-          title: "Workers + React Router 的混合渲染紀錄",
-          excerpt: "整理 loader/action、快取、變更通知與 SSR 組合方式。",
-          meta: "技術筆記 · 8 min",
-          tags: ["Streaming", "Caching", "Routes"],
-        },
-        {
-          title: "Design Token 驅動的 UI 調色流程",
-          excerpt: "以 tokens 與 CSS variables 讓多模組維持一致光感。",
-          meta: "設計系統 · 6 min",
-          tags: ["Token", "UI Kit", "Tailwind"],
-        },
-        {
-          title: "從 CLI 到 Cloudflare Pages 的部署腳本",
-          excerpt: "整理 CI、Workers 與 Pages 的自動化部署步驟。",
-          meta: "部署 · 5 min",
-          tags: ["CLI", "Pages", "DX"],
-        },
-      ],
-    },
-  },
-  guestbook: {
-    label: "Guestbook",
-    hero: {
-      eyebrow: "Guestbook 模組",
-      title: "留言板：把聲音留在邊緣節點",
-      description:
-        "留言使用 Cloudflare D1 + Durable Objects 進行即時紀錄，並透過 Turnstile 驗證阻擋垃圾訊息。",
-      background: "linear-gradient(120deg, #f8ecff 0%, #e5f1ff 70%, #fef6ff 100%)",
-      borderColor: "rgba(164, 138, 208, 0.6)",
-      metrics: [
-        { label: "互動紀錄", value: "48", hint: "最近 30 天" },
-        { label: "表單驗證", value: "Turnstile", hint: "Edge action" },
-        { label: "資料庫", value: "D1", hint: "雙寫入" },
-      ],
-      preview: [
-        {
-          category: "流程",
-          title: "Edge Validation",
-          detail: "使用 Remix action 結合 Turnstile 與節流策略減少 spam。",
-        },
-        {
-          category: "同步",
-          title: "Notion / D1 雙向",
-          detail: "留言會推送至 Notion，排程整理後回寫邊緣節點。",
-        },
-      ],
-      ctaLabel: "開啟留言板",
-    },
-    section: {
-      eyebrow: "Guestbook",
-      title: "留言板",
-      intro: "只要動態表單驗證通過，就能在邊緣留言並即時同步到資料庫。",
-      tint: "#F1E9FF",
-      messages: [
-        {
-          name: "Sharon",
-          role: "UI 設計師",
-          message: "Tokens 色彩很穩，下一版一起把 Figma library 串進來。",
-          time: "2 小時前",
-          mood: "UI 夥伴",
-        },
-        {
-          name: "Leo",
-          role: "DX 工程師",
-          message: "Workers action 寫得很乾淨，等你開源 CLI。",
-          time: "昨天",
-          mood: "DX 建議",
-        },
-        {
-          name: "訪客 A",
-          role: "讀者",
-          message: "留言體驗順暢，Turnstile 幾乎感覺不到。",
-          time: "本週",
-          mood: "Feedback",
-        },
-      ],
-    },
-  },
-  changelog: {
-    label: "Changelog",
-    hero: {
-      eyebrow: "Changelog 模組",
-      title: "更新日誌：版本節奏透明",
-      description:
-        "記錄頁面改版、部署與資料串接節點。追蹤模組狀態方便回溯決策。",
-      background: "linear-gradient(120deg, #fef5e6 0%, #e9fff5 60%, #f3f9ff 100%)",
-      borderColor: "rgba(190, 214, 189, 0.7)",
-      metrics: [
-        { label: "本月 PR", value: "12", hint: "包含 UI" },
-        { label: "Deploy", value: "Pages", hint: "Auto" },
-        { label: "監控", value: "Logpush", hint: "Edge" },
-      ],
-      preview: [
-        {
-          category: "版本",
-          title: "Hero 動態切換",
-          detail: "新首頁 hero 可即時預覽 Blog / Guestbook / Lab。",
-        },
-        {
-          category: "Infra",
-          title: "CI/CD",
-          detail: "使用 Wrangler + GitHub Actions 部署到 Workers。",
-        },
-      ],
-      ctaLabel: "查看日誌",
-    },
-    section: {
-      eyebrow: "Changelog",
-      title: "更新日誌",
-      intro: "透過節點式記錄了解每週調整重點，搭配 Git tag 與 Pages Deploy ID。",
-      tint: "#ECF9F1",
-    },
-  },
-  lab: {
-    label: "Lab",
-    hero: {
-      eyebrow: "Lab 模組",
-      title: "互動實驗室：資料即時可視化",
-      description:
-        "Lab 模組會展示圖表、動態焦點卡與 Workers side project，為下一波文章鋪路。",
-      background: "linear-gradient(120deg, #eef7ff 0%, #e4fffb 65%, #f7f0ff 100%)",
-      borderColor: "rgba(148, 197, 219, 0.7)",
-      metrics: [
-        { label: "Prototype", value: "04", hint: "進行中" },
-        { label: "Live Demo", value: "02", hint: "Charts" },
-        { label: "Stack", value: "Canvas", hint: "Edge data" },
-      ],
-      preview: [
-        {
-          category: "動態",
-          title: "焦點圖層",
-          detail: "使用 requestAnimationFrame 做滾動感應與暈光。",
-        },
-        {
-          category: "資料",
-          title: "Workers Streaming",
-          detail: "即時拉取分析資料並渲染圖表。",
-        },
-      ],
-      ctaLabel: "前往實驗室",
-    },
-    section: {
-      eyebrow: "Lab",
-      title: "互動實驗",
-      intro: "邊緣上的資料視覺化與互動效果都會先在 Lab 試驗，穩定後再搬進正式頁。",
-      tint: "#E9F5FF",
-      experiments: [
-        {
-          title: "動態焦點圖",
-          description: "以 IntersectionObserver 驅動的 spotlight，會根據滑鼠與捲動做光暈。",
-          status: "進行中",
-          stack: ["Canvas", "IO", "Token"],
-        },
-        {
-          title: "Live Metrics",
-          description: "串流 Workers logpush，將請求量 / 錯誤率轉成即時折線圖。",
-          status: "Prototype",
-          stack: ["Logpush", "Chart", "Workers"],
-        },
-        {
-          title: "色彩混合器",
-          description: "測試色票混合演算法，讓模塊背景在暗色系也能保持層次。",
-          status: "概念",
-          stack: ["Color", "Shader"],
-        },
-      ],
-    },
-  },
-  outerspace: {
-    label: "OuterSpace",
-    hero: {
-      eyebrow: "OuterSpace 獨立模組",
-      title: "ORION-7 外太空監控中心",
-      description:
-        "全螢幕的 3D 儀表板示範，用 Three.js 與即時數據打造沉浸式監控體驗。",
-      background: "linear-gradient(135deg, #e4f4ff 0%, #cdeefe 50%, #0b1d36 100%)",
-      borderColor: "rgba(56, 189, 248, 0.4)",
-      metrics: [
-        { label: "Renderer", value: "Three.js", hint: "WebGL" },
-        { label: "UI", value: "Tailwind", hint: "Glassmorphism" },
-        { label: "Mode", value: "全螢幕", hint: "Draggable CTA" },
-      ],
-      preview: [
-        {
-          category: "Senter",
-          title: "軌道監控儀表",
-          detail: "以 3D 星球與數據面板呈現外太空場景。",
-        },
-        {
-          category: "Nav",
-          title: "懸浮返回按鈕",
-          detail: "可拖曳的回上一頁 CTA，保持獨立體驗。",
-        },
-      ],
-      ctaLabel: "啟動 OuterSpace",
-    },
-    section: {
-      eyebrow: "OuterSpace",
-      title: "ORION-7 監控中心",
-      intro:
-        "這是獨立的外太空監控頁面，點擊即可全螢幕體驗；頁面只保留一顆可拖曳的懸浮返回按鈕。",
-      tint: "#E7F4FF",
-      checklist: ["Three.js 地球視圖", "即時遙測儀表板", "懸浮返回按鈕"],
-    },
-  },
-} as const;
-
-type SectionKey = keyof typeof SECTION_DATA;
-const SECTION_KEYS: SectionKey[] = ["blog", "guestbook", "changelog", "lab", "outerspace"];
-
-const TAG_LABELS = { add: "新增", fix: "修正", change: "變更", docs: "文件" } as const;
-
-function TagBadge({ tag }: { tag?: ChangelogItem["tag"] }) {
-  if (!tag) return null;
-  return <span className="chip">{TAG_LABELS[tag]}</span>;
+// 定義資料型別 (根據你的檔案名稱與推測結構)
+interface Post {
+  slug: string;
+  title: string;
+  date: string;
+  description?: string;
 }
 
-function formatDate(date: string) {
-  try {
-    return new Intl.DateTimeFormat("zh-Hant", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    }).format(new Date(date));
-  } catch {
-    return date;
-  }
+interface Changelog {
+  slug: string;
+  date: string;
+  title?: string;
+  items?: string[]; // 假設內容是條列式
 }
 
-function renderSectionBody(
-  sectionKey: SectionKey,
-  options: { changelogItems: ChangelogItem[]; blogPosts: BlogPost[]; blogCategories: BlogCategory[] },
-) {
-  switch (sectionKey) {
-    case "blog": {
-      const posts = options.blogPosts.slice(0, 3);
-      const categories = options.blogCategories;
-      const categoryLabel = (post: BlogPost) => {
-        const cat = categories.find((c) => c.id === post.categoryId);
-        if (!cat) return "";
-        const sub = cat.children.find((child) => child.id === post.subcategoryId);
-        return sub ? `${cat.title} · ${sub.title}` : cat.title;
-      };
+export async function loader() {
+  // 使用 Vite 的 import.meta.glob 一次讀取所有 JSON 檔案
+  // 這樣無論你在 Local 還是 Cloudflare Pages 都能完美運作
+  const postModules = import.meta.glob("../content/blog/posts/*.json", { eager: true });
+  const changelogModules = import.meta.glob("../content/changelog/*.json", { eager: true });
 
-      if (!posts.length) {
-        return <p className="text-sm text-neutral-600">目前還沒有文章，從後台新增第一篇吧。</p>;
-      }
-
-      const excerpt = (body: string) => {
-        const firstParagraph = body.split(/\n+/).map((line) => line.trim()).filter(Boolean)[0];
-        if (!firstParagraph) return body.slice(0, 120);
-        return firstParagraph.length > 180 ? `${firstParagraph.slice(0, 177)}…` : firstParagraph;
-      };
-
-      return (
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {posts.map((post) => (
-            <article
-              key={(post.filename ?? post.slug ?? post.title) + post.publishedAt}
-              className="card hover-raise h-full bg-white/90 flex flex-col"
-            >
-              <p className="text-xs uppercase tracking-[0.25em] text-neutral-500">
-                {formatDate(post.publishedAt)}
-              </p>
-              <h3 className="mt-3 text-lg font-semibold text-neutral-900">{post.title}</h3>
-              {categoryLabel(post) ? (
-                <p className="text-xs text-neutral-500 mt-1">{categoryLabel(post)}</p>
-              ) : null}
-              <p className="mt-3 text-sm text-neutral-700 leading-relaxed flex-1">{excerpt(post.body)}</p>
-              <div className="flex items-center justify-between pt-4 text-sm text-[--color-accent-600]">
-                <span className="font-medium">純文字筆記</span>
-                <a href="/blog" className="link-soft">
-                  查看全部
-                </a>
-              </div>
-            </article>
-          ))}
-        </div>
-      );
-    }
-    case "guestbook": {
-      const { messages } = SECTION_DATA.guestbook.section;
-      return (
-        <div className="grid gap-4 md:grid-cols-2">
-          {messages.map((msg) => (
-            <article
-              key={msg.name}
-              className="rounded-2xl border border-white/70 bg-white/85 p-5 shadow-sm"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-neutral-900">{msg.name}</p>
-                  <p className="text-xs uppercase tracking-[0.25em] text-neutral-500">
-                    {msg.role}
-                  </p>
-                </div>
-                <span className="text-xs rounded-full bg-[color:rgba(255,255,255,0.7)] px-3 py-1 text-neutral-600 border border-white/60">
-                  {msg.time}
-                </span>
-              </div>
-              <p className="mt-3 text-sm text-neutral-800 leading-relaxed">{msg.message}</p>
-              <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[--color-accent-500]">
-                {msg.mood}
-              </p>
-            </article>
-          ))}
-        </div>
-      );
-    }
-    case "changelog": {
-      const timeline = options.changelogItems;
-      return (
-        <div className="space-y-5">
-          {timeline.length ? (
-            timeline.map((log, index) => (
-              <article
-                key={(log.filename ?? log.date) + index}
-                className="rounded-2xl border border-white/70 bg-white/85 p-5 shadow-sm"
-              >
-                <div className="flex flex-wrap items-center gap-3 text-sm text-neutral-600">
-                  <time dateTime={log.date} className="font-semibold text-neutral-900">
-                    {log.date}
-                  </time>
-                  <TagBadge tag={log.tag} />
-                </div>
-                <h3 className="mt-2 text-lg font-semibold text-neutral-900">{log.title}</h3>
-                {log.notes?.length ? (
-                  <ul className="mt-2 list-disc pl-5 text-sm text-neutral-700 space-y-1">
-                    {log.notes.map((note, i) => (
-                      <li key={i}>{note}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </article>
-            ))
-          ) : (
-            <p className="text-sm text-neutral-500">目前沒有更新日誌，稍後再回來看看。</p>
-          )}
-        </div>
-      );
-    }
-    case "lab": {
-      const { experiments } = SECTION_DATA.lab.section;
-      return (
-        <div className="grid gap-5 md:grid-cols-2">
-          {experiments.map((exp) => (
-            <article
-              key={exp.title}
-              className="card hover-raise h-full bg-white/90 flex flex-col"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-neutral-900">{exp.title}</h3>
-                <span className="text-xs rounded-full bg-[color:rgba(236,248,255,0.9)] px-3 py-1 text-neutral-600 border border-white/60">
-                  {exp.status}
-                </span>
-              </div>
-              <p className="mt-3 text-sm text-neutral-700 leading-relaxed flex-1">{exp.description}</p>
-              <div className="flex flex-wrap gap-2 mt-4">
-                {exp.stack.map((tag) => (
-                  <span key={tag} className="chip">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      );
-    }
-    case "outerspace": {
-      const { checklist } = SECTION_DATA.outerspace.section;
-      return (
-        <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr] items-start">
-          <div className="space-y-3">
-            <p className="text-sm text-neutral-700 leading-relaxed">
-              全螢幕、無站內導航的獨立體驗，以 3D 地球、遙測曲線與玻璃質感面板呈現外太空監控。
-            </p>
-            <ul className="grid sm:grid-cols-3 gap-2">
-              {checklist.map((item) => (
-                <li
-                  key={item}
-                  className="flex items-center gap-2 rounded-xl border border-white/70 bg-white/85 px-3 py-2 text-sm text-neutral-800"
-                >
-                  <span className="inline-block h-2 w-2 rounded-full bg-[--color-accent-500]" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="card bg-white/85 space-y-3">
-            <p className="text-sm text-neutral-700">
-              點擊開啟後會進入外太空監控中心，使用懸浮返回按鈕即可回到之前的頁面。
-            </p>
-            <a href="/outerspace/OuterSpaceSenter" className="btn-primary w-full justify-center text-center">
-              前往 OuterSpace Senter
-            </a>
-          </div>
-        </div>
-      );
-    }
-    default:
-      return null;
-  }
-}
-
-type ModuleButtonsProps = {
-  activeSection: SectionKey;
-  onHover: (section: SectionKey) => void;
-  onSelect: (section: SectionKey) => void;
-  className?: string;
-};
-
-export async function loader(args: LoaderFunctionArgs) {
-  const [changelog, blogCategories] = await Promise.all([
-    loadChangelogItems(args),
-    loadBlogCategories(),
-  ]);
-  const db = requireBlogDb(args.context);
-  const blogPosts: BlogPost[] = await getAllBlogPosts(db);
-  return { changelog, blogPosts, blogCategories };
-}
-
-type LoaderData = Awaited<ReturnType<typeof loader>>;
-
-function ModuleButtons({ activeSection, onHover, onSelect, className }: ModuleButtonsProps) {
-  return (
-    <div className={`flex flex-wrap gap-2 ${className ?? ""}`}>
-      {SECTION_KEYS.map((section) => {
-        const isActive = activeSection === section;
-        return (
-          <button
-            key={section}
-            type="button"
-            onMouseEnter={() => onHover(section)}
-            onFocus={() => onHover(section)}
-            onClick={() => onSelect(section)}
-            aria-pressed={isActive}
-            className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--color-accent-300]
-            ${
-              isActive
-                ? "bg-neutral-900 text-white border-neutral-900 shadow-lg"
-                : "bg-white/75 text-neutral-600 border-white/60 hover:text-neutral-900"
-            }`}
-          >
-            {SECTION_DATA[section].label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-export default function HomePage() {
-  const [activeSection, setActiveSection] = useState<SectionKey>("blog");
-  const didMount = useRef(false);
-  const blogSecretRef = useRef<{ clicks: number; timer: ReturnType<typeof setTimeout> | null }>({
-    clicks: 0,
-    timer: null,
+  // 處理部落格文章
+  const posts: Post[] = Object.entries(postModules).map(([path, mod]: any) => {
+    // 從檔名或 JSON 內容解析
+    const fileName = path.split("/").pop()?.replace(".json", "") || "";
+    return {
+      slug: fileName,
+      title: mod.title || fileName, // 如果沒標題就用檔名
+      date: mod.date || "2025-01-01",
+      description: mod.description || "點擊閱讀更多...",
+    };
   });
-  const navigate = useNavigate();
-  const { changelog, blogPosts, blogCategories } = useLoaderData() as LoaderData;
-  const changelogItems = changelog.slice(0, 4);
-  const heroModule = SECTION_DATA[activeSection].hero;
 
-  const handleHover = (section: SectionKey) => {
-    if (section !== activeSection) {
-      setActiveSection(section);
-    }
-  };
+  // 處理更新日誌
+  const changelogs: Changelog[] = Object.entries(changelogModules).map(([path, mod]: any) => {
+    const fileName = path.split("/").pop()?.replace(".json", "") || "";
+    return {
+      slug: fileName,
+      date: mod.date || fileName.split("-").slice(0, 3).join("-"), // 嘗試從檔名抓日期
+      title: mod.title || `Update ${fileName}`,
+      items: mod.items || [],
+    };
+  });
 
-  const handleSelect = (section: SectionKey) => {
-    if (section === "outerspace") {
-      navigate("/outerspace/OuterSpaceSenter");
-      return;
-    }
-    if (section === "changelog") {
-      navigate("/changelog");
-      return;
-    }
-    setActiveSection(section);
-  };
+  // 依照日期排序 (新到舊) 並只取前 5 筆
+  const sortedPosts = posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+  const sortedChangelogs = changelogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
 
+  return { posts: sortedPosts, changelogs: sortedChangelogs };
+}
+
+// -----------------------------------------------------------------------------
+// 2. 頁面組件
+// -----------------------------------------------------------------------------
+
+export default function Index() {
+  const { posts, changelogs } = useLoaderData<typeof loader>();
+  const [activeSection, setActiveSection] = useState("hero");
+
+  // 切換時瞬間回頂，保持乾淨俐落
   useEffect(() => {
-    if (!didMount.current) {
-      didMount.current = true;
-      return;
-    }
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "instant" });
   }, [activeSection]);
 
-  useEffect(() => {
-    const buttons = Array.from(document.querySelectorAll('[data-blog-cta="list"]'));
-    const state = blogSecretRef.current;
-    const reset = () => {
-      state.clicks = 0;
-      if (state.timer) {
-        clearTimeout(state.timer);
-        state.timer = null;
-      }
-    };
-    const handler = (event: Event) => {
-      state.clicks += 1;
-      if (state.timer) clearTimeout(state.timer);
-      state.timer = setTimeout(reset, 1400);
-      if (state.clicks >= 3) {
-        document.cookie = `admin_session=1; path=/; max-age=${30 * 24 * 60 * 60}`;
-        reset();
-        event.preventDefault();
-        alert("已解鎖後台，直接開 /admin");
-        window.location.href = "/admin";
-      }
-    };
-    buttons.forEach((btn) => btn.addEventListener("click", handler));
-    return () => {
-      buttons.forEach((btn) => btn.removeEventListener("click", handler));
-      reset();
-    };
-  }, []);
+  // --- 動態產生 Sections ---
+  const sections = {
+    hero: {
+      id: "hero",
+      label: "主頁",
+      title: "Welcome",
+      description: "歡迎來到我的數位花園。",
+      accent: "#60A5FA", // Blue-400
+      bg: "bg-blue-50/50",
+      meta: "HOME",
+      content: (
+        <div className="space-y-4">
+          <p>這裡整合了我的技術筆記、專案實驗與生活紀錄。</p>
+          <div className="flex gap-3 pt-2">
+            <button onClick={() => setActiveSection("articles")} className="btn-sm bg-blue-100 text-blue-700 hover:bg-blue-200 px-4 py-1.5 rounded-full text-sm font-medium transition-colors">
+              看最新文章
+            </button>
+            <button onClick={() => setActiveSection("projects")} className="btn-sm bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-1.5 rounded-full text-sm font-medium transition-colors">
+              逛逛專案
+            </button>
+          </div>
+        </div>
+      ),
+    },
+    articles: {
+      id: "articles",
+      label: "文章",
+      title: "Latest Posts",
+      description: "近期發布的技術文章與心得。",
+      accent: "#F59E0B", // Amber-400
+      bg: "bg-amber-50/50",
+      meta: "WRITING",
+      content: (
+        <div className="grid gap-3">
+          {posts.length > 0 ? (
+            posts.map((post) => (
+              <Link key={post.slug} to={`/blog/${post.slug}`} className="group block bg-white/60 hover:bg-white p-4 rounded-xl border border-transparent hover:border-amber-200 transition-all shadow-sm hover:shadow-md">
+                <div className="flex justify-between items-start">
+                  <h3 className="font-bold text-gray-800 group-hover:text-amber-600 transition-colors">{post.title}</h3>
+                  <span className="text-xs font-mono text-gray-400 whitespace-nowrap ml-2">{post.date}</span>
+                </div>
+                {post.description && <p className="text-sm text-gray-500 mt-1 line-clamp-1">{post.description}</p>}
+              </Link>
+            ))
+          ) : (
+            <div className="text-gray-400 text-sm py-4 italic">目前還沒有文章...</div>
+          )}
+          <Link to="/blog" className="text-center text-xs text-gray-400 hover:text-amber-600 py-2 block">查看全部文章 →</Link>
+        </div>
+      ),
+    },
+    projects: {
+      id: "projects",
+      label: "專案",
+      title: "Featured Projects",
+      description: "實作、實驗與開源貢獻。",
+      accent: "#10B981", // Emerald-400
+      bg: "bg-emerald-50/50",
+      meta: "WORK",
+      content: (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Link to="/outerspace" className="group bg-white/60 hover:bg-white p-4 rounded-xl border border-transparent hover:border-emerald-200 transition-all shadow-sm hover:shadow-md">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <span className="text-lg">🪐</span>
+                </div>
+                <h4 className="font-bold text-gray-800">OuterSpace</h4>
+                <p className="text-xs text-gray-500 mt-1">3D 互動實驗室</p>
+            </Link>
+             <Link to="/tools" className="group bg-white/60 hover:bg-white p-4 rounded-xl border border-transparent hover:border-emerald-200 transition-all shadow-sm hover:shadow-md">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <span className="text-lg">🛠️</span>
+                </div>
+                <h4 className="font-bold text-gray-800">Dev Tools</h4>
+                <p className="text-xs text-gray-500 mt-1">開發者小工具集合</p>
+            </Link>
+        </div>
+      ),
+    },
+    changelog: {
+      id: "changelog",
+      label: "日誌",
+      title: "Changelog",
+      description: "網站更新與維護紀錄。",
+      accent: "#EC4899", // Pink-400
+      bg: "bg-pink-50/50",
+      meta: "LOGS",
+      content: (
+        <div className="relative border-l-2 border-pink-100 ml-3 space-y-6 py-2">
+            {changelogs.length > 0 ? (
+                changelogs.map((log) => (
+                    <div key={log.slug} className="relative pl-6">
+                        <div className="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-white border-2 border-pink-200" />
+                        <div className="text-xs font-mono text-pink-500 mb-1">{log.date}</div>
+                        <h4 className="font-bold text-gray-800 text-sm">{log.title}</h4>
+                        {/* 這裡簡單顯示內容摘要 */}
+                        <div className="text-xs text-gray-500 mt-1">
+                             已更新相關內容
+                        </div>
+                    </div>
+                ))
+            ) : (
+                <div className="pl-6 text-sm text-gray-400">尚無更新紀錄</div>
+            )}
+        </div>
+      ),
+    },
+    about: {
+      id: "about",
+      label: "關於",
+      title: "About Me",
+      description: "熱愛開發與設計的工程師。",
+      accent: "#8B5CF6", // Violet-400
+      bg: "bg-violet-50/50",
+      meta: "PROFILE",
+      content: (
+         <div className="text-sm text-gray-600 space-y-3 leading-relaxed">
+            <p>你好！我是一名專注於前端技術的開發者。我喜歡探索新工具，並致力於打造流暢的使用者體驗。</p>
+            <div className="flex flex-wrap gap-2 pt-2">
+                {["React", "Remix", "TypeScript", "Tailwind", "Vite"].map(tag => (
+                    <span key={tag} className="px-2 py-1 rounded-md bg-white border border-violet-100 text-violet-600 text-xs font-medium">
+                        {tag}
+                    </span>
+                ))}
+            </div>
+         </div>
+      )
+    }
+  };
+
+  const activeData = sections[activeSection as keyof typeof sections];
 
   return (
-    <div className="mx-auto max-w-6xl px-4">
-      <div className="sticky top-0 z-20 -mx-4">
-        <div className="sticky-tabs-shell">
-          <div className="mx-auto max-w-6xl px-4 py-3 space-y-1">
-            <p className="eyebrow text-neutral-600">模組切換</p>
-            <ModuleButtons
-              activeSection={activeSection}
-              onHover={handleHover}
-              onSelect={handleSelect}
-              className="sticky-tabs"
-            />
-          </div>
-        </div>
+    <div className="mx-auto max-w-2xl px-4 min-h-screen">
+      
+      {/* 1. 頂部標題與島嶼導覽 (Floating Island Nav) */}
+      <div className="sticky top-6 z-50 flex flex-col items-center gap-4 mb-6">
+        
+        {/* 島嶼選單：懸浮膠囊設計，徹底移除白色長條背景 */}
+        <nav className="p-1.5 bg-white/80 backdrop-blur-xl border border-white/40 shadow-lg shadow-black/5 rounded-full flex gap-1 transition-all hover:scale-[1.02]">
+          {Object.values(sections).map((section) => {
+            const isActive = activeSection === section.id;
+            return (
+              <button
+                key={section.id}
+                onMouseEnter={() => setActiveSection(section.id)}
+                onClick={() => setActiveSection(section.id)}
+                className={`
+                  relative px-4 py-2 rounded-full text-xs md:text-sm font-bold transition-all duration-300
+                  ${isActive ? "text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-600 hover:bg-black/5"}
+                `}
+                style={{
+                    backgroundColor: isActive ? "white" : "transparent",
+                    color: isActive ? "var(--tw-text-opacity)" : undefined
+                }}
+              >
+                {section.label}
+                {isActive && (
+                    <span className="absolute inset-x-0 -bottom-1 mx-auto w-1 h-1 rounded-full bg-current opacity-50" style={{ color: section.accent }}/>
+                )}
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
-      <section className="section pt-0">
-        <div
-          key={activeSection}
-          className="module-panel module-hero space-y-8 animate-room-in"
-          style={{ background: heroModule.background, borderColor: heroModule.borderColor }}
+      {/* 2. 主內容區塊 (無縫滑入) */}
+      <main className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div 
+            className="relative overflow-hidden rounded-3xl border border-white/60 bg-white/40 backdrop-blur-sm shadow-xl shadow-indigo-500/5 p-6 md:p-8 transition-colors duration-500"
+            style={{ backgroundColor: activeData.bg }}
         >
-          <div className="space-y-8">
-            <div className="space-y-4 max-w-3xl">
-              <p className="eyebrow">{heroModule.eyebrow}</p>
-              <h1 className="text-3xl md:text-5xl font-bold leading-tight text-neutral-900">
-                {heroModule.title}
-              </h1>
-              <p className="text-lg text-neutral-800/90 leading-relaxed">
-                {heroModule.description}
-              </p>
-            </div>
-            <div className="grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {heroModule.metrics.map((metric) => (
-                    <div
-                      key={metric.label}
-                      className="rounded-2xl border border-white/60 bg-white/80 px-5 py-4 shadow-sm"
-                    >
-                      <p className="text-xs uppercase tracking-[0.25em] text-neutral-500">
-                        {metric.label}
-                      </p>
-                      <p className="text-2xl font-semibold text-neutral-900 mt-1">{metric.value}</p>
-                      <p className="text-xs text-neutral-600">{metric.hint}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    data-blog-cta={activeSection === "blog" ? "list" : undefined}
-                    onClick={() => handleSelect(activeSection)}
-                  >
-                    {heroModule.ctaLabel}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    onClick={() => setActiveSection("lab")}
-                  >
-                    看互動實驗
-                  </button>
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {heroModule.preview.map((item) => (
-                  <article key={item.title} className="card bg-white/85">
-                    <p className="text-xs uppercase tracking-[0.25em] text-neutral-500">
-                      {item.category}
-                    </p>
-                    <h3 className="mt-2 text-lg font-semibold text-neutral-900">
-                      {item.title}
-                    </h3>
-                    <p className="mt-2 text-sm text-neutral-700 leading-relaxed">{item.detail}</p>
-                  </article>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+            {/* 裝飾背景光暈 */}
+            <div 
+                className="absolute -top-20 -right-20 w-60 h-60 rounded-full blur-3xl opacity-30 mix-blend-multiply transition-colors duration-700 pointer-events-none"
+                style={{ backgroundColor: activeData.accent }}
+            />
 
-      <section className="section">
-        {(() => {
-          const section = SECTION_DATA[activeSection].section;
-          return (
-            <div
-              key={`${activeSection}-body`}
-              className="module-panel animate-room-in"
-              style={{ "--module-color": section.tint } as CSSProperties}
-            >
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <p className="eyebrow">{section.eyebrow}</p>
-                  <h2 className="section-title">{section.title}</h2>
+            <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2 opacity-50">
+                    <span className="h-px w-4 bg-current" style={{ color: activeData.accent }}/>
+                    <span className="text-[10px] font-bold tracking-widest" style={{ color: activeData.accent }}>{activeData.meta}</span>
                 </div>
-                <p className="text-lg text-neutral-700 leading-relaxed max-w-3xl">
-                  {section.intro}
-                </p>
-                {renderSectionBody(activeSection, { changelogItems, blogPosts, blogCategories })}
-              </div>
+                
+                <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-2">{activeData.title}</h2>
+                <p className="text-slate-500 text-sm mb-6">{activeData.description}</p>
+
+                {/* 分隔線 */}
+                <div className="w-full h-px bg-slate-900/5 mb-6" />
+
+                <div className="min-h-[200px]">
+                    {activeData.content}
+                </div>
             </div>
-          );
-        })()}
-      </section>
+        </div>
+      </main>
+
+      {/* 底部版權 */}
+      <footer className="text-center py-12 text-xs text-gray-300">
+        © 2025 Personal Website. Built with Remix.
+      </footer>
     </div>
   );
 }

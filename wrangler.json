@@ -1,35 +1,33 @@
 {
-	"$schema": "./node_modules/wrangler/config-schema.json",
-	"name": "react-router-starter",
-	"main": "./workers/app.ts",
-	"compatibility_date": "2025-10-08",
-	"compatibility_flags": [
-		"nodejs_compat"
-	],
-	"observability": {
-		"enabled": true
-	},
-	"upload_source_maps": true,
-	"vars": {
-		"VALUE_FROM_CLOUDFLARE": "Hello from Cloudflare",
-		"ADMIN_PASS": "jock0701QQ@cf",
-		"BLOG_IMAGES_PUBLIC_BASE_URL": "https://pub-dced73b40e724469990adfef043fc5b2.r2.dev"
-	},
-	"d1_databases": [
-		{
-			"binding": "BLOG_DB",
-			"database_name": "blog-db",
-			"database_id": "9e8e276a-fd1f-4385-ac56-706970486025"
-		}
-	],
-	"r2_buckets": [
-		{
-			"binding": "BLOG_IMAGES",
-			"bucket_name": "blog-images"
-		},
-		{
-			"bucket_name": "blog-images",
-			"binding": "blog_images",
-		}
-	]
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "react-router-starter",
+  "main": "./workers/app.ts",
+  "compatibility_date": "2025-10-08",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "observability": {
+    "enabled": true
+  },
+  "upload_source_maps": true,
+  "vars": {
+    "VALUE_FROM_CLOUDFLARE": "Hello from Cloudflare",
+    "ADMIN_PASS": "jock0701QQ@cf",
+    "BLOG_IMAGES_PUBLIC_BASE_URL": "https://pub-dced73b40e724469990adfef043fc5b2.r2.dev"
+  },
+  "d1_databases": [
+    {
+      "binding": "BLOG_DB",
+      "database_name": "blog-db",
+      "database_id": "9e8e276a-fd1f-4385-ac56-706970486025",
+      "preview_database_id": "9e8e276a-fd1f-4385-ac56-706970486025"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "bucket_name": "blog-images",
+      "binding": "blog_images",
+      "preview_bucket_name": "blog-images"
+    }
+  ]
 }
