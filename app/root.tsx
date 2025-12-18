@@ -47,7 +47,7 @@ function AutoHideHeader() {
     >
       <div className="backdrop-blur-md bg-[--color-warm-25]/80 border-b border-[--color-warm-100]">
         <div className="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between">
-          <Link to="/" className="font-semibold tracking-wide">個人網站</Link>
+          <Link to="/jock_space" className="font-semibold tracking-wide">個人網站</Link>
           <div className="flex items-center gap-4 text-sm">
             <Link to="/blog" className="link-soft hidden md:inline">文章列表</Link>
             <Link to="/changelog" className="link-soft">更新日誌</Link>
@@ -64,6 +64,12 @@ function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
   }, [pathname]);
+
+  const isStandalone = pathname === "/" || pathname === "/gift" || pathname.startsWith("/gift/");
+
+  if (isStandalone) {
+    return <Outlet />;
+  }
 
   return (
     <div className="min-h-screen bg-[--color-warm-50] text-neutral-900">

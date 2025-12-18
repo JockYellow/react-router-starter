@@ -1,5 +1,4 @@
 // app/routes/about.tsx
-// app/routes/about.tsx
 export default function AboutPage() {
   return (
     <main className="max-w-3xl mx-auto px-4 py-12 leading-relaxed">

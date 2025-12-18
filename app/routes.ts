@@ -3,7 +3,8 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
 
 export default [
-  index("routes/_index.tsx"), 
+  index("routes/missing.tsx"),
+  route("jock_space", "routes/_index.tsx"),
   route("about", "routes/about.tsx"),
   route("blog", "routes/blog.tsx"),
   route("blog/:slug", "routes/blog.$slug.tsx"),
@@ -15,5 +16,7 @@ export default [
   route("outerspace/OuterSpaceSenter", "routes/outerspace/OuterSpaceSenter.tsx"),
   route("outerspace/PokeAPIcreatures", "routes/outerspace/PokeAPIcreatures.tsx"),
   route("outerspace/Gravity", "routes/outerspace/Gravity.tsx"),
+  route("gift", "routes/gift.tsx"),
+  route("gift/host", "routes/gift.host.tsx"),
   route("vote", "routes/vote.tsx"),
 ] satisfies RouteConfig;

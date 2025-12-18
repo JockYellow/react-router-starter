@@ -26,7 +26,7 @@ export default function ChangelogPage() {
         ) : (
           <p className="mt-2 text-neutral-600">靜態內容（build 時打包）</p>
         )}
-        <p className="mt-2"><Link to="/" className="link-soft">回首頁</Link></p>
+        <p className="mt-2"><Link to="/jock_space" className="link-soft">回首頁</Link></p>
       </header>
 
       <div className="space-y-4">

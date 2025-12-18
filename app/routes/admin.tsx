@@ -210,7 +210,7 @@ export default function AdminPage() {
           <h1 className="text-3xl font-bold text-neutral-900">Blog 管理</h1>
           <p className="text-sm text-neutral-600">新增 / 更新 / 刪除部落格文章，直接寫入 D1。</p>
         </div>
-        <Link to="/" className="btn-ghost">
+        <Link to="/jock_space" className="btn-ghost">
           返回前台
         </Link>
       </header>

@@ -41,7 +41,7 @@ export default function OuterSpaceIndexPage() {
           OuterSpace 是用來放各種實驗性頁面的區域，不限定太空主題。從這裡挑一個卡片進入，看到的就是實際頁面（其中有些會進入全螢幕模式並附上返回按鈕）。
         </p>
         <div className="flex flex-wrap gap-3">
-          <Link to="/" className="link-soft">
+          <Link to="/jock_space" className="link-soft">
             回首頁
           </Link>
           <Link to="/blog" className="link-soft">
