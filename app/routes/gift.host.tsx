@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { useMemo } from "react";
 import type { D1Database } from "@cloudflare/workers-types";
-import { Monitor, Trophy, Lock, Unlock, Play, StopCircle, Edit3, Eye, EyeOff, Gavel, Users, RefreshCw } from "lucide-react";
+import { Monitor, Lock, Unlock, Edit3, Eye, EyeOff, Gavel, Users, RefreshCw } from "lucide-react";
 
 import { requireBlogDb } from "../lib/d1.server";
 import { requireBlogImagesPublicBase, buildPublicImageUrl } from "../lib/r2.server";
@@ -21,13 +21,12 @@ type StageRow = {
 type PlayerRow = {
   id: string;
   name: string;
+  birthday?: string | null;
 };
 
 type GiftWithImage = GiftType & { image_url?: string | null; number?: string };
 
 type ActionResponse = { error?: string; success?: boolean };
-
-type VoteRow = { target_id: string; count: number };
 
 async function ensurePlayerColumns(db: D1Database) {
   const { results } = await db.prepare("PRAGMA table_info(players)").all<{ name: string }>();
@@ -36,6 +35,7 @@ async function ensurePlayerColumns(db: D1Database) {
   if (!columns.has("age_months")) await db.prepare("ALTER TABLE players ADD COLUMN age_months INTEGER DEFAULT 0").run();
   if (!columns.has("pk_loss_count")) await db.prepare("ALTER TABLE players ADD COLUMN pk_loss_count INTEGER DEFAULT 0").run();
   if (!columns.has("pk_loss_opponents")) await db.prepare("ALTER TABLE players ADD COLUMN pk_loss_opponents INTEGER DEFAULT 0").run();
+  if (!columns.has("birthday")) await db.prepare("ALTER TABLE players ADD COLUMN birthday TEXT").run();
 }
 
 async function ensureStage(db: D1Database): Promise<StageRow> {
@@ -82,6 +82,12 @@ async function ensureR1Tables(db: D1Database) {
       )`
     )
     .run();
+
+  const { results } = await db.prepare("PRAGMA table_info(gift_r1_picks)").all<{ name: string }>();
+  const columns = new Set((results ?? []).map((row) => row.name));
+  if (!columns.has("winner_id")) {
+    await db.prepare("ALTER TABLE gift_r1_picks ADD COLUMN winner_id TEXT").run();
+  }
 }
 
 async function ensureS1Tables(db: D1Database) {
@@ -97,6 +103,12 @@ async function ensureS1Tables(db: D1Database) {
       )`
     )
     .run();
+
+  const { results } = await db.prepare("PRAGMA table_info(gift_votes)").all<{ name: string }>();
+  const columns = new Set((results ?? []).map((row) => row.name));
+  if (!columns.has("target_id")) await db.prepare("ALTER TABLE gift_votes ADD COLUMN target_id TEXT").run();
+  if (!columns.has("weight")) await db.prepare("ALTER TABLE gift_votes ADD COLUMN weight INTEGER DEFAULT 1").run();
+  if (!columns.has("created_at")) await db.prepare("ALTER TABLE gift_votes ADD COLUMN created_at INTEGER").run();
 }
 
 function numberGifts(gifts: GiftWithImage[]) {
@@ -122,16 +134,10 @@ export async function loader({ context }: LoaderFunctionArgs) {
   const players = playersRes.results ?? [];
   const stage = await ensureStage(db);
 
-  let voteSummary: VoteRow[] = [];
-  if (stage.current_gift_id) {
-    const votesRes = await db
-      .prepare("SELECT target_id, SUM(weight) as count FROM gift_votes WHERE gift_id = ? GROUP BY target_id")
-      .bind(stage.current_gift_id)
-      .all<VoteRow>();
-    voteSummary = votesRes.results ?? [];
-  }
+  const goodLockedCount = gifts.filter((g) => g.type === "GOOD" && g.is_locked).length;
+  const goodTotal = gifts.filter((g) => g.type === "GOOD").length;
 
-  return { gifts, players, stage, voteSummary };
+  return { gifts, players, stage, goodLockedCount, goodTotal };
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
@@ -150,12 +156,27 @@ export async function action({ request, context }: ActionFunctionArgs) {
     const currentGiftId = (formData.get("current_gift_id") as string) || null;
     const round = Number(formData.get("round") ?? stage.round ?? 1) || 1;
 
+    if (nextStage === "r1") {
+      // 開啟許願時清空當前回合的玩家選擇，讓狀態重新開始
+      await db.prepare("DELETE FROM gift_r1_picks WHERE round = ?").bind(round).run();
+    }
+
     await db
       .prepare(
         "INSERT INTO gift_stage (id, stage, current_gift_id, round) VALUES ('global', ?, ?, ?) ON CONFLICT(id) DO UPDATE SET stage = excluded.stage, current_gift_id = excluded.current_gift_id, round = excluded.round, updated_at = strftime('%s','now')"
       )
       .bind(nextStage, currentGiftId, round)
       .run();
+    return { success: true } satisfies ActionResponse;
+  }
+
+  if (intent === "reset_all") {
+    await db.batch([
+      db.prepare("UPDATE gifts SET holder_id = NULL, is_locked = 0, is_forced = 0, vote_count = 0, is_revealed = 0"),
+      db.prepare("DELETE FROM gift_r1_picks"),
+      db.prepare("DELETE FROM gift_votes"),
+      db.prepare("UPDATE gift_stage SET stage = 'idle', current_gift_id = NULL, round = 1, updated_at = strftime('%s','now') WHERE id = 'global'"),
+    ]);
     return { success: true } satisfies ActionResponse;
   }
 
@@ -169,6 +190,31 @@ export async function action({ request, context }: ActionFunctionArgs) {
       .prepare("UPDATE gift_r1_picks SET outcome = CASE WHEN player_id = ? THEN 'WIN' ELSE 'LOSE' END, winner_id = ? WHERE gift_id = ?")
       .bind(playerId, playerId, giftId)
       .run();
+    return { success: true } satisfies ActionResponse;
+  }
+
+  if (intent === "delete_player") {
+    const playerId = (formData.get("player_id") as string) ?? "";
+    if (!playerId) return { error: "缺少玩家" } satisfies ActionResponse;
+
+    const giftIdsRes = await db
+      .prepare("SELECT id FROM gifts WHERE provider_id = ?")
+      .bind(playerId)
+      .all<{ id: string }>();
+    const giftIds = (giftIdsRes.results ?? []).map((g) => g.id);
+
+    const statements: ReturnType<D1Database["prepare"]>[] = [];
+    if (giftIds.length > 0) {
+      const placeholders = giftIds.map(() => "?").join(",");
+      statements.push(db.prepare(`DELETE FROM gift_votes WHERE gift_id IN (${placeholders})`).bind(...giftIds));
+      statements.push(db.prepare(`DELETE FROM gift_r1_picks WHERE gift_id IN (${placeholders})`).bind(...giftIds));
+      statements.push(db.prepare(`DELETE FROM gifts WHERE id IN (${placeholders})`).bind(...giftIds));
+    }
+    statements.push(db.prepare("DELETE FROM gift_votes WHERE voter_id = ? OR target_id = ?").bind(playerId, playerId));
+    statements.push(db.prepare("DELETE FROM gift_r1_picks WHERE player_id = ?").bind(playerId));
+    statements.push(db.prepare("DELETE FROM players WHERE id = ?").bind(playerId));
+
+    await db.batch(statements);
     return { success: true } satisfies ActionResponse;
   }
 
@@ -187,66 +233,39 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return { success: true } satisfies ActionResponse;
   }
 
-  if (intent === "start_vote") {
-    const giftId = (formData.get("gift_id") as string) ?? "";
-    if (!giftId) return { error: "缺少禮物" } satisfies ActionResponse;
-    await db
-      .prepare(
-        "INSERT INTO gift_stage (id, stage, current_gift_id, round) VALUES ('global', 's1', ?, ?) ON CONFLICT(id) DO UPDATE SET stage='s1', current_gift_id=excluded.current_gift_id, round = excluded.round, updated_at=strftime('%s','now')"
-      )
-      .bind(giftId, stage.round ?? 1)
-      .run();
-    return { success: true } satisfies ActionResponse;
-  }
-
-  if (intent === "end_vote") {
-    const giftId = (formData.get("gift_id") as string) ?? "";
-    if (!giftId) return { error: "缺少禮物" } satisfies ActionResponse;
-
-    const votesRes = await db
-      .prepare("SELECT target_id, SUM(weight) as count FROM gift_votes WHERE gift_id = ? GROUP BY target_id ORDER BY count DESC")
-      .bind(giftId)
-      .all<VoteRow>();
-    const votes = votesRes.results ?? [];
-    if (votes.length === 0) return { error: "目前沒有投票" } satisfies ActionResponse;
-    const winnerId = votes[0].target_id;
-    const voteCount = votes[0].count ?? 0;
-
-    await db
-      .prepare("UPDATE gifts SET holder_id = ?, vote_count = ? WHERE id = ?")
-      .bind(winnerId, voteCount, giftId)
-      .run();
-
-    await db
-      .prepare("UPDATE gift_stage SET stage='idle', current_gift_id=NULL, updated_at=strftime('%s','now') WHERE id='global'")
-      .run();
-
-    return { success: true } satisfies ActionResponse;
-  }
-
   return { error: "未知操作" } satisfies ActionResponse;
 }
 
 export default function GiftHostPage() {
-  const { gifts, players, stage, voteSummary } = useLoaderData<typeof loader>();
+  const { gifts, players, stage, goodLockedCount, goodTotal } = useLoaderData<typeof loader>();
   const actionData = useActionData<ActionResponse>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
   const goodGifts = useMemo(() => gifts.filter((g) => g.type === "GOOD"), [gifts]);
   const badGifts = useMemo(() => gifts.filter((g) => g.type === "BAD"), [gifts]);
+  const wishOpen = stage.stage === "r1";
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-6 pb-20 font-sans">
       <div className="max-w-5xl mx-auto space-y-6">
-        <header className="flex justify-between items-center">
+        <header className="flex justify-between items-center gap-3 flex-wrap">
           <div>
             <h1 className="text-3xl font-black text-white flex items-center gap-2">
               <Monitor /> 主控台 Dashboard
             </h1>
-            <p className="text-slate-400 text-sm">上帝視角控制中心</p>
+            <p className="text-slate-400 text-sm">控制許願、投票、鎖定與持有人</p>
           </div>
-          <StageForm stage={stage} gifts={gifts} isSubmitting={isSubmitting} />
+          <Form method="post">
+            <input type="hidden" name="intent" value="reset_all" />
+            <button
+              type="submit"
+              className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 text-sm font-bold hover:bg-slate-700 flex items-center gap-2 disabled:opacity-50"
+              disabled={isSubmitting}
+            >
+              <RefreshCw size={16} /> 重置所有禮物狀態
+            </button>
+          </Form>
         </header>
 
         {actionData?.error && (
@@ -255,195 +274,220 @@ export default function GiftHostPage() {
           </div>
         )}
 
-        <Section title="R1 好禮物">
+        <Section title="許願控制" note="開啟後玩家點選好禮會直接鎖定並指派持有人">
+          <Card>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs text-slate-400">目前狀態</div>
+                <div className={`text-lg font-bold ${wishOpen ? "text-amber-300" : "text-slate-200"}`}>
+                  {wishOpen ? "許願開啟中" : "許願已暫停"}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  已鎖定 {goodLockedCount}/{goodTotal} 個好禮
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Form method="post">
+                  <input type="hidden" name="intent" value="stage" />
+                  <input type="hidden" name="stage" value="r1" />
+                  <input type="hidden" name="round" value={stage.round ?? 1} />
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || wishOpen}
+                    className="px-4 py-2 rounded-lg bg-amber-400 text-black font-bold hover:bg-amber-300 disabled:opacity-50"
+                  >
+                    開啟許願
+                  </button>
+                </Form>
+                <Form method="post">
+                  <input type="hidden" name="intent" value="stage" />
+                  <input type="hidden" name="stage" value="idle" />
+                  <input type="hidden" name="round" value={stage.round ?? 1} />
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !wishOpen}
+                    className="px-4 py-2 rounded-lg bg-slate-800 text-slate-200 font-bold border border-slate-600 hover:bg-slate-700 disabled:opacity-50"
+                  >
+                    暫停許願
+                  </button>
+                </Form>
+              </div>
+            </div>
+          </Card>
+        </Section>
+
+        <Section title="R1 好禮物" note="可分別設定持有人與鎖定，許願只記錄選擇">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {goodGifts.map((gift) => (
-              <Card key={gift.id}>
-                <div className="flex justify-between items-start">
+              <Card key={gift.id} highlight={Boolean(gift.is_locked)}>
+                <div className="flex justify-between items-start gap-3">
                   <div>
+                    <div className="text-xs text-slate-500">#{gift.number}</div>
                     <h3 className="font-bold text-lg text-yellow-400">{gift.slogan}</h3>
-                    <div className="text-xs text-slate-500 mt-1">From: {gift.provider_name}</div>
+                    <div className="text-xs text-slate-500 mt-1">
+                      From: {gift.is_revealed ? gift.provider_name : "隱藏"}
+                    </div>
                     <div className="text-sm mt-3 text-slate-300">
-                      目前持有: {gift.holder_name ? <span className="text-green-400 font-bold text-lg">{gift.holder_name}</span> : <span className="text-slate-500 italic">等待抽出...</span>}
+                      目前持有:{" "}
+                      {gift.holder_name ? (
+                        <span className="text-green-400 font-bold text-lg">{gift.holder_name}</span>
+                      ) : (
+                        <span className="text-slate-500 italic">尚未有人鎖定</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">
+                      狀態: {gift.is_locked ? "已鎖定" : "未鎖定"}
                     </div>
                   </div>
-                  {gift.holder_id && (
-                    <PopoverAssign giftId={gift.id} players={players} label="變更持有" isSubmitting={isSubmitting} />
-                  )}
+                  <PopoverAssign giftId={gift.id} players={players} label="設定持有者" isSubmitting={isSubmitting} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 mt-4">
-                  {!gift.holder_id ? (
-                    <PopoverAssign giftId={gift.id} players={players} label="公布得主 / PK" isSubmitting={isSubmitting} full />
-                  ) : (
-                    <>
-                      <Form method="post">
-                        <input type="hidden" name="intent" value="toggle_lock" />
-                        <input type="hidden" name="gift_id" value={gift.id} />
-                        <button
-                          type="submit"
-                          className={`w-full py-2 rounded font-bold flex items-center justify-center gap-2 border ${
-                            gift.is_locked
-                              ? "bg-red-500/20 border-red-500 text-red-400"
-                              : "bg-slate-700 border-slate-600 text-slate-300"
-                          }`}
-                          disabled={isSubmitting}
-                        >
-                          {gift.is_locked ? (
-                            <>
-                              <Unlock size={16} /> 解鎖
-                            </>
-                          ) : (
-                            <>
-                              <Lock size={16} /> 鎖定
-                            </>
-                          )}
-                        </button>
-                      </Form>
-                      <Form method="post">
-                        <input type="hidden" name="intent" value="reveal" />
-                        <input type="hidden" name="gift_id" value={gift.id} />
-                        <button
-                          type="submit"
-                          disabled={gift.is_revealed || isSubmitting}
-                          className="w-full bg-blue-600/20 border border-blue-600 text-blue-400 py-2 rounded font-bold hover:bg-blue-600/40 disabled:opacity-30 flex items-center justify-center gap-2"
-                        >
-                          {gift.is_revealed ? (
-                            <>
-                              <Eye size={16} /> 已揭曉
-                            </>
-                          ) : (
-                            <>
-                              <EyeOff size={16} /> 揭曉來源
-                            </>
-                          )}
-                        </button>
-                      </Form>
-                    </>
-                  )}
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="reveal" />
+                    <input type="hidden" name="gift_id" value={gift.id} />
+                    <button
+                      type="submit"
+                      disabled={gift.is_revealed || isSubmitting}
+                      className="w-full bg-blue-600/20 border border-blue-600 text-blue-400 py-2 rounded font-bold hover:bg-blue-600/40 disabled:opacity-30 flex items-center justify-center gap-2"
+                    >
+                      {gift.is_revealed ? (
+                        <>
+                          <Eye size={16} /> 已揭曉
+                        </>
+                      ) : (
+                        <>
+                          <EyeOff size={16} /> 揭曉來源
+                        </>
+                      )}
+                    </button>
+                  </Form>
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="toggle_lock" />
+                    <input type="hidden" name="gift_id" value={gift.id} />
+                    <button
+                      type="submit"
+                      className={`w-full py-2 rounded font-bold flex items-center justify-center gap-2 border ${
+                        gift.is_locked
+                          ? "bg-red-500/20 border-red-500 text-red-400"
+                          : "bg-slate-700 border-slate-600 text-slate-300"
+                      }`}
+                      disabled={isSubmitting}
+                    >
+                      {gift.is_locked ? (
+                        <>
+                          <Unlock size={16} /> 解鎖
+                        </>
+                      ) : (
+                        <>
+                          <Lock size={16} /> 鎖定
+                        </>
+                      )}
+                    </button>
+                  </Form>
                 </div>
               </Card>
             ))}
           </div>
         </Section>
 
-        <Section title="S1 鬧禮物投票">
+        <Section title="鬧禮物" note="持有人與鎖定可分開設定；需要時可揭曉來源">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {badGifts.map((gift) => (
-              <Card key={gift.id} highlight={stage.current_gift_id === gift.id}>
-                <div className="flex justify-between items-start">
+              <Card key={gift.id} highlight={gift.is_locked}>
+                <div className="flex justify-between items-start gap-3">
                   <div>
+                    <div className="text-xs text-slate-500">#{gift.number}</div>
                     <h3 className="font-bold text-lg text-white">{gift.slogan}</h3>
-                    <div className="text-xs text-slate-500 mt-1">From: {gift.provider_name}</div>
+                    <div className="text-xs text-slate-500 mt-1">From: {gift.is_revealed ? gift.provider_name : "隱藏"}</div>
                     {gift.holder_name && (
                       <div className="text-xs text-slate-500 mt-1">Holder: {gift.holder_name}</div>
                     )}
+                    <div className="text-xs text-slate-500 mt-1">
+                      狀態: {gift.is_locked ? "已鎖定" : "未鎖定"} {stage.current_gift_id === gift.id ? "(投票中)" : ""}
+                    </div>
                   </div>
-                  {gift.holder_id && (
-                    <PopoverAssign giftId={gift.id} players={players} label="變更持有" isSubmitting={isSubmitting} />
-                  )}
+                  <PopoverAssign giftId={gift.id} players={players} label="指派受害者 (鎖定)" isSubmitting={isSubmitting} />
                 </div>
 
                 <div className="space-y-2 mt-4">
-                  {!gift.holder_id ? (
-                    stage.current_gift_id === gift.id ? (
-                      <Form method="post">
-                        <input type="hidden" name="intent" value="end_vote" />
-                        <input type="hidden" name="gift_id" value={gift.id} />
-                        <button
-                          type="submit"
-                          className="w-full bg-red-600 hover:bg-red-500 text-white py-3 rounded font-bold flex items-center justify-center gap-2"
-                          disabled={isSubmitting}
-                        >
-                          <StopCircle /> 結束投票 & 產生受害者
-                        </button>
-                      </Form>
-                    ) : (
-                      <Form method="post">
-                        <input type="hidden" name="intent" value="start_vote" />
-                        <input type="hidden" name="gift_id" value={gift.id} />
-                        <button
-                          type="submit"
-                          disabled={stage.current_gift_id !== null || isSubmitting}
-                          className="w-full bg-purple-600 hover:bg-purple-500 text-white py-3 rounded font-bold flex items-center justify-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <Play /> 發起投票
-                        </button>
-                      </Form>
-                    )
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      <Form method="post">
-                        <input type="hidden" name="intent" value="toggle_lock" />
-                        <input type="hidden" name="gift_id" value={gift.id} />
-                        <button
-                          type="submit"
-                          className={`w-full py-2 rounded font-bold flex items-center justify-center gap-2 border ${
-                            gift.is_locked
-                              ? "bg-red-500/20 border-red-500 text-red-400"
-                              : "bg-slate-700 border-slate-600 text-slate-300"
-                          }`}
-                          disabled={isSubmitting}
-                        >
-                          {gift.is_locked ? (
-                            <>
-                              <Gavel size={16} /> 強制鎖定
-                            </>
-                          ) : (
-                            <>
-                              <Unlock size={16} /> 解除鎖定
-                            </>
-                          )}
-                        </button>
-                      </Form>
-                      <Form method="post">
-                        <input type="hidden" name="intent" value="reveal" />
-                        <input type="hidden" name="gift_id" value={gift.id} />
-                        <button
-                          type="submit"
-                          disabled={gift.is_revealed || isSubmitting}
-                          className="w-full bg-blue-600/20 border border-blue-600 text-blue-400 py-2 rounded font-bold hover:bg-blue-600/40 disabled:opacity-30 flex items-center justify-center gap-2"
-                        >
-                          {gift.is_revealed ? (
-                            <>
-                              <Eye size={16} /> 已揭曉
-                            </>
-                          ) : (
-                            <>
-                              <EyeOff size={16} /> 揭曉來源
-                            </>
-                          )}
-                        </button>
-                      </Form>
-                    </div>
-                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Form method="post">
+                      <input type="hidden" name="intent" value="reveal" />
+                      <input type="hidden" name="gift_id" value={gift.id} />
+                      <button
+                        type="submit"
+                        disabled={gift.is_revealed || isSubmitting}
+                        className="w-full bg-blue-600/20 border border-blue-600 text-blue-400 py-2 rounded font-bold hover:bg-blue-600/40 disabled:opacity-30 flex items-center justify-center gap-2"
+                      >
+                        {gift.is_revealed ? (
+                          <>
+                            <Eye size={16} /> 已揭曉
+                          </>
+                        ) : (
+                          <>
+                            <EyeOff size={16} /> 揭曉來源
+                          </>
+                        )}
+                      </button>
+                    </Form>
+                    <Form method="post">
+                      <input type="hidden" name="intent" value="toggle_lock" />
+                      <input type="hidden" name="gift_id" value={gift.id} />
+                      <button
+                        type="submit"
+                        className={`w-full py-2 rounded font-bold flex items-center justify-center gap-2 border ${
+                          gift.is_locked
+                            ? "bg-red-500/20 border-red-500 text-red-400"
+                            : "bg-slate-700 border-slate-600 text-slate-300"
+                        }`}
+                        disabled={isSubmitting}
+                      >
+                        {gift.is_locked ? (
+                          <>
+                            <Gavel size={16} /> 鎖定中
+                          </>
+                        ) : (
+                          <>
+                            <Unlock size={16} /> 解除鎖定
+                          </>
+                        )}
+                      </button>
+                    </Form>
+                  </div>
+
+                  <div className="mt-2">
+                    <PopoverAssign giftId={gift.id} players={players} label="指派持有者" isSubmitting={isSubmitting} full />
+                  </div>
                 </div>
               </Card>
             ))}
           </div>
-
-          {stage.current_gift_id && voteSummary.length > 0 && (
-            <div className="rounded-2xl border border-purple-500/30 bg-purple-500/10 p-4 mt-4">
-              <div className="text-xs text-purple-200 mb-2">投票累計 (目前進行中的鬧禮物)</div>
-              <div className="grid gap-2 md:grid-cols-2">
-                {voteSummary.map((vote) => {
-                  const player = players.find((p) => p.id === vote.target_id);
-                  return (
-                    <div key={vote.target_id} className="rounded-xl bg-black/30 border border-white/10 px-3 py-2 flex justify-between text-sm">
-                      <span>{player?.name ?? vote.target_id}</span>
-                      <span className="font-bold">{vote.count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </Section>
 
-        <Section title="S2 最終交換 (資訊)" note="點擊 R1/S1 的鉛筆可手動變更持有者，或用投票結果產生受害者。">
-          <div className="rounded-2xl border border-slate-700 bg-slate-800 p-6 text-center space-y-2">
-            <RefreshCw size={32} className="mx-auto text-red-400" />
-            <p className="text-slate-200">交換流程請參考現場節奏，手機端控制器會顯示相應按鈕。</p>
+        <Section title="玩家管理" note="刪除玩家會同時刪除他提供的禮物與相關投票/紀錄">
+          <div className="grid gap-2 md:grid-cols-2">
+            {players.map((p) => (
+              <Card key={p.id}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold">{p.name}</div>
+                    <div className="text-xs text-slate-500">{p.id.slice(0, 8)}</div>
+                  </div>
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="delete_player" />
+                    <input type="hidden" name="player_id" value={p.id} />
+                    <button
+                      type="submit"
+                      className="px-3 py-1 rounded bg-red-500/20 border border-red-500 text-red-200 text-xs font-bold hover:bg-red-500/40 disabled:opacity-50"
+                      disabled={isSubmitting}
+                    >
+                      刪除
+                    </button>
+                  </Form>
+                </div>
+              </Card>
+            ))}
           </div>
         </Section>
       </div>
@@ -500,7 +544,7 @@ function PopoverAssign({
           required
           disabled={isSubmitting}
         >
-          <option value="">選擇勝者</option>
+          <option value="">選擇玩家</option>
           {players.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -515,52 +559,6 @@ function PopoverAssign({
           <Edit3 size={14} /> {label}
         </button>
       </div>
-    </Form>
-  );
-}
-
-function StageForm({ stage, gifts, isSubmitting }: { stage: StageRow; gifts: GiftWithImage[]; isSubmitting: boolean }) {
-  return (
-    <Form method="post" className="flex items-center gap-2 bg-slate-800 p-2 rounded-lg border border-slate-700">
-      <input type="hidden" name="intent" value="stage" />
-      <select
-        name="stage"
-        defaultValue={stage.stage}
-        className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
-      >
-        <option value="idle">idle</option>
-        <option value="r1">r1</option>
-        <option value="s1">s1</option>
-        <option value="s2">s2</option>
-      </select>
-      <select
-        name="current_gift_id"
-        defaultValue={stage.current_gift_id ?? undefined}
-        className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
-      >
-        <option value="">(可選) 指定鬧禮物</option>
-        {gifts
-          .filter((g) => g.type === "BAD")
-          .map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.slogan}
-            </option>
-          ))}
-      </select>
-      <input
-        type="number"
-        name="round"
-        defaultValue={stage.round ?? 1}
-        className="w-20 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
-        placeholder="回合"
-      />
-      <button
-        type="submit"
-        className="px-3 py-2 rounded-lg bg-amber-400 text-black font-bold flex items-center gap-1 hover:bg-amber-300 disabled:opacity-50"
-        disabled={isSubmitting}
-      >
-        <RefreshCw size={14} /> 更新
-      </button>
     </Form>
   );
 }
