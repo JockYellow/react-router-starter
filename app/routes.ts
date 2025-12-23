@@ -12,6 +12,7 @@ export default [
   route("admin/login", "routes/admin.login.tsx"),
   route("admin/blog-edit", "routes/admin.blog-edit.tsx"),
   route("admin", "routes/admin.tsx"),
+  route("api/data", "routes/api.data.tsx"),
   route("outerspace", "routes/outerspace/index.tsx"),
   route("outerspace/OuterSpaceSenter", "routes/outerspace/OuterSpaceSenter.tsx"),
   route("outerspace/PokeAPIcreatures", "routes/outerspace/PokeAPIcreatures.tsx"),
@@ -19,4 +20,5 @@ export default [
   route("gift", "routes/gift.tsx"),
   route("gift/host", "routes/gift.host.tsx"),
   route("vote", "routes/vote.tsx"),
+  route("rng_prompt", "routes/rng_prompt.tsx"),
 ] satisfies RouteConfig;
