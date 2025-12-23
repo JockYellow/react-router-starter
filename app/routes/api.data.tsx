@@ -6,6 +6,8 @@ type CategoryRow = {
   id: number;
   slug: string;
   label: string;
+  ui_group: string | null;
+  is_optional: number | boolean | null;
   type: string | null;
   min_count: number | null;
   max_count: number | null;
@@ -31,6 +33,8 @@ type CategoryPayload = {
   id: number;
   slug: string;
   label: string;
+  ui_group: string;
+  is_optional: boolean;
   type: string;
   min_count: number;
   max_count: number;
@@ -41,7 +45,9 @@ type CategoryPayload = {
 export async function loader({ context }: LoaderFunctionArgs) {
   const db = requireBlogDb(context);
   const categoriesRes = await db
-    .prepare("SELECT id, slug, label, type, min_count, max_count, sort_order FROM categories ORDER BY sort_order, id")
+    .prepare(
+      "SELECT id, slug, label, ui_group, is_optional, type, min_count, max_count, sort_order FROM categories ORDER BY sort_order, id",
+    )
     .all<CategoryRow>();
   const promptsRes = await db
     .prepare("SELECT id, category_slug, value, label, is_active FROM prompts ORDER BY id")
@@ -64,16 +70,21 @@ export async function loader({ context }: LoaderFunctionArgs) {
     }
   }
 
-  const payload: CategoryPayload[] = (categoriesRes.results ?? []).map((row) => ({
-    id: row.id,
-    slug: row.slug,
-    label: row.label,
-    type: row.type ?? "required",
-    min_count: row.min_count ?? 1,
-    max_count: row.max_count ?? 1,
-    sort_order: row.sort_order ?? 0,
-    items: promptMap.get(row.slug) ?? [],
-  }));
+  const payload: CategoryPayload[] = (categoriesRes.results ?? []).map((row) => {
+    const isOptional = row.is_optional === null || row.is_optional === undefined ? false : Boolean(row.is_optional);
+    return {
+      id: row.id,
+      slug: row.slug,
+      label: row.label,
+      ui_group: row.ui_group ?? "Default",
+      is_optional: isOptional,
+      type: row.type ?? (isOptional ? "optional" : "required"),
+      min_count: row.min_count ?? 1,
+      max_count: row.max_count ?? 1,
+      sort_order: row.sort_order ?? 0,
+      items: promptMap.get(row.slug) ?? [],
+    };
+  });
 
   return Response.json(payload);
 }

@@ -2,6 +2,8 @@ CREATE TABLE IF NOT EXISTS categories (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   slug TEXT UNIQUE NOT NULL,
   label TEXT NOT NULL,
+  ui_group TEXT DEFAULT 'Default',
+  is_optional BOOLEAN DEFAULT 0,
   type TEXT DEFAULT 'required',
   min_count INTEGER DEFAULT 1,
   max_count INTEGER DEFAULT 1,
