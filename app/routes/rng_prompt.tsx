@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   ArrowLeft,
   Code,
@@ -40,10 +40,29 @@ type Draws = Record<string, PromptItem[]>;
 
 type TagLockKey = number | string;
 
+type OutputBlock = {
+  id: string;
+  type: "category" | "group" | "text";
+  categorySlug?: string;
+  groupId?: string;
+  text?: string;
+};
+
+type OutputConfig = {
+  id: string;
+  name: string;
+  blocks: OutputBlock[];
+  is_active: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 type CategoryForm = {
   slug: string;
   label: string;
   type: CategoryType;
+  ui_group: string;
+  is_optional: boolean;
   min: string;
   max: string;
 };
@@ -51,6 +70,7 @@ type CategoryForm = {
 type PromptForm = {
   value: string;
   label: string;
+  is_active?: boolean;
 };
 
 type ApiGuideModalProps = {
@@ -60,7 +80,23 @@ type ApiGuideModalProps = {
 type AdminPanelProps = {
   data: Category[];
   onUpdateData: (nextData: Category[]) => void;
+  outputConfigs: OutputConfig[];
+  activeOutputConfigId: string | null;
+  onCreateOutputConfig: (name: string, blocks: OutputBlock[]) => Promise<string | null>;
+  onUpdateOutputConfig: (id: string, name: string, blocks: OutputBlock[]) => Promise<void>;
+  onDeleteOutputConfig: (id: string) => Promise<void>;
+  onSetActiveOutputConfig: (id: string) => Promise<void>;
   onClose: () => void;
+};
+
+type OutputComposerProps = {
+  categories: Category[];
+  configs: OutputConfig[];
+  activeConfigId: string | null;
+  onCreateConfig: (name: string, blocks: OutputBlock[]) => Promise<string | null>;
+  onUpdateConfig: (id: string, name: string, blocks: OutputBlock[]) => Promise<void>;
+  onDeleteConfig: (id: string) => Promise<void>;
+  onSetActiveConfig: (id: string) => Promise<void>;
 };
 
 type ToastState = {
@@ -246,6 +282,8 @@ label (TEXT), is_active (BOOL)`}</code>
   "data": {
     "slug": "weather",
     "label": "天氣",
+    "ui_group": "Scene",
+    "is_optional": 1,
     "type": "optional",
     "min_count": 0,
     "max_count": 1,
@@ -288,9 +326,20 @@ label (TEXT), is_active (BOOL)`}</code>
   );
 };
 
-const AdminPanel = ({ data, onUpdateData, onClose }: AdminPanelProps) => {
+const AdminPanel = ({
+  data,
+  onUpdateData,
+  outputConfigs,
+  activeOutputConfigId,
+  onCreateOutputConfig,
+  onUpdateOutputConfig,
+  onDeleteOutputConfig,
+  onSetActiveOutputConfig,
+  onClose,
+}: AdminPanelProps) => {
   const [activeTab, setActiveTab] = useState<string>(data[0]?.slug ?? "");
   const [showApiGuide, setShowApiGuide] = useState(false);
+  const [adminView, setAdminView] = useState<"categories" | "output">("categories");
 
   const [newCatMode, setNewCatMode] = useState(false);
   const [newPromptMode, setNewPromptMode] = useState(false);
@@ -298,12 +347,40 @@ const AdminPanel = ({ data, onUpdateData, onClose }: AdminPanelProps) => {
     slug: "",
     label: "",
     type: "required",
+    ui_group: "Default",
+    is_optional: false,
     min: "1",
     max: "1",
   });
-  const [promptForm, setPromptForm] = useState<PromptForm>({ value: "", label: "" });
+  const [promptForm, setPromptForm] = useState<PromptForm>({ value: "", label: "", is_active: true });
+  const [editCatForm, setEditCatForm] = useState<CategoryForm | null>(null);
+  const [editingPromptId, setEditingPromptId] = useState<number | null>(null);
+  const [promptEditForm, setPromptEditForm] = useState<PromptForm>({ value: "", label: "", is_active: true });
 
   const activeCategory = data.find((cat) => cat.slug === activeTab);
+
+  useEffect(() => {
+    if (!activeCategory) {
+      setEditCatForm(null);
+      setEditingPromptId(null);
+      return;
+    }
+    setEditCatForm({
+      slug: activeCategory.slug,
+      label: activeCategory.label,
+      type: activeCategory.type ?? "required",
+      ui_group: activeCategory.ui_group ?? "Default",
+      is_optional: activeCategory.is_optional ?? activeCategory.type === "optional",
+      min: String(activeCategory.min_count ?? 1),
+      max: String(activeCategory.max_count ?? 1),
+    });
+    setEditingPromptId(null);
+  }, [activeCategory]);
+
+  const resolveCategoryType = (type: CategoryType, isOptional: boolean) => {
+    if (type === "group") return "group";
+    return isOptional ? "optional" : "required";
+  };
 
   const handleAddCategory = () => {
     if (!catForm.slug || !catForm.label) {
@@ -316,11 +393,14 @@ const AdminPanel = ({ data, onUpdateData, onClose }: AdminPanelProps) => {
     const safeMin = Number.isNaN(minCount) ? 1 : minCount;
     const safeMax = Number.isNaN(maxCount) ? 1 : maxCount;
 
+    const resolvedType = resolveCategoryType(catForm.type, catForm.is_optional);
     const newCat: Category = {
       id: Date.now(),
       slug: catForm.slug,
       label: catForm.label,
-      type: catForm.type,
+      type: resolvedType,
+      ui_group: catForm.ui_group.trim() || "Default",
+      is_optional: catForm.is_optional,
       min_count: safeMin,
       max_count: safeMax,
       items: [],
@@ -330,7 +410,15 @@ const AdminPanel = ({ data, onUpdateData, onClose }: AdminPanelProps) => {
     onUpdateData([...data, newCat]);
     setNewCatMode(false);
     setActiveTab(newCat.slug);
-    setCatForm({ slug: "", label: "", type: "required", min: "1", max: "1" });
+    setCatForm({
+      slug: "",
+      label: "",
+      type: "required",
+      ui_group: "Default",
+      is_optional: false,
+      min: "1",
+      max: "1",
+    });
   };
 
   const handleDeleteCategory = (slug: string) => {
@@ -338,6 +426,33 @@ const AdminPanel = ({ data, onUpdateData, onClose }: AdminPanelProps) => {
     const newData = data.filter((cat) => cat.slug !== slug);
     onUpdateData(newData);
     if (activeTab === slug) setActiveTab(newData[0]?.slug ?? "");
+  };
+
+  const handleUpdateCategory = () => {
+    if (!activeCategory || !editCatForm) return;
+    if (!editCatForm.label.trim()) {
+      window.alert("請填寫 Label");
+      return;
+    }
+    const minCount = Number.parseInt(editCatForm.min, 10);
+    const maxCount = Number.parseInt(editCatForm.max, 10);
+    const safeMin = Number.isNaN(minCount) ? 0 : Math.max(0, minCount);
+    const safeMax = Number.isNaN(maxCount) ? safeMin : Math.max(safeMin, maxCount);
+    const resolvedType = resolveCategoryType(editCatForm.type, editCatForm.is_optional);
+
+    const updatedData = data.map((cat) => {
+      if (cat.slug !== activeCategory.slug) return cat;
+      return {
+        ...cat,
+        label: editCatForm.label,
+        ui_group: editCatForm.ui_group.trim() || "Default",
+        is_optional: editCatForm.is_optional,
+        type: resolvedType,
+        min_count: safeMin,
+        max_count: safeMax,
+      };
+    });
+    onUpdateData(updatedData);
   };
 
   const handleAddPrompt = () => {
@@ -356,7 +471,7 @@ const AdminPanel = ({ data, onUpdateData, onClose }: AdminPanelProps) => {
               id: Date.now(),
               value: promptForm.value,
               label: promptForm.label,
-              is_active: true,
+              is_active: promptForm.is_active ?? true,
             },
           ],
         };
@@ -366,7 +481,7 @@ const AdminPanel = ({ data, onUpdateData, onClose }: AdminPanelProps) => {
 
     onUpdateData(updatedData);
     setNewPromptMode(false);
-    setPromptForm({ value: "", label: "" });
+    setPromptForm({ value: "", label: "", is_active: true });
   };
 
   const handleDeletePrompt = (itemId: number) => {
@@ -376,6 +491,59 @@ const AdminPanel = ({ data, onUpdateData, onClose }: AdminPanelProps) => {
         return { ...cat, items: cat.items.filter((item) => item.id !== itemId) };
       }
       return cat;
+    });
+    onUpdateData(updatedData);
+  };
+
+  const handleStartEditPrompt = (item: PromptItem) => {
+    setEditingPromptId(item.id);
+    setPromptEditForm({
+      value: item.value,
+      label: item.label ?? "",
+      is_active: item.is_active !== false,
+    });
+  };
+
+  const handleCancelEditPrompt = () => {
+    setEditingPromptId(null);
+  };
+
+  const handleSavePrompt = () => {
+    if (!activeCategory || editingPromptId === null) return;
+    if (!promptEditForm.value.trim()) {
+      window.alert("請填寫 Prompt Value");
+      return;
+    }
+    const updatedData = data.map((cat) => {
+      if (cat.slug !== activeCategory.slug) return cat;
+      return {
+        ...cat,
+        items: cat.items.map((item) =>
+          item.id === editingPromptId
+            ? {
+                ...item,
+                value: promptEditForm.value,
+                label: promptEditForm.label,
+                is_active: promptEditForm.is_active ?? true,
+              }
+            : item,
+        ),
+      };
+    });
+    onUpdateData(updatedData);
+    setEditingPromptId(null);
+  };
+
+  const handleTogglePromptActive = (itemId: number) => {
+    if (!activeCategory) return;
+    const updatedData = data.map((cat) => {
+      if (cat.slug !== activeCategory.slug) return cat;
+      return {
+        ...cat,
+        items: cat.items.map((item) =>
+          item.id === itemId ? { ...item, is_active: !item.is_active } : item,
+        ),
+      };
     });
     onUpdateData(updatedData);
   };
@@ -392,6 +560,24 @@ const AdminPanel = ({ data, onUpdateData, onClose }: AdminPanelProps) => {
           </h2>
         </div>
         <div className="flex gap-2">
+          <div className="flex rounded-md border border-slate-700 overflow-hidden text-xs">
+            <button
+              onClick={() => setAdminView("categories")}
+              className={`px-3 py-1.5 font-semibold transition ${
+                adminView === "categories" ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+              }`}
+            >
+              類別/Prompt
+            </button>
+            <button
+              onClick={() => setAdminView("output")}
+              className={`px-3 py-1.5 font-semibold transition ${
+                adminView === "output" ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+              }`}
+            >
+              輸出編排
+            </button>
+          </div>
           <button
             onClick={() => setShowApiGuide(true)}
             className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-xs flex items-center gap-2 text-blue-300"
@@ -430,35 +616,62 @@ const AdminPanel = ({ data, onUpdateData, onClose }: AdminPanelProps) => {
                     value={catForm.label}
                     onChange={(event) => setCatForm({ ...catForm, label: event.target.value })}
                   />
+                  <input
+                    className="w-full text-sm p-1 border rounded"
+                    placeholder="群組 (ui_group, e.g. Character)"
+                    value={catForm.ui_group}
+                    onChange={(event) => setCatForm({ ...catForm, ui_group: event.target.value })}
+                  />
                   <div className="flex gap-2">
                     <select
                       className="text-sm border rounded p-1 flex-1"
                       value={catForm.type}
-                      onChange={(event) => setCatForm({ ...catForm, type: event.target.value as CategoryType })}
+                      onChange={(event) => {
+                        const nextType = event.target.value as CategoryType;
+                        const nextOptional = nextType === "group" ? catForm.is_optional : nextType === "optional";
+                        setCatForm({ ...catForm, type: nextType, is_optional: nextOptional });
+                      }}
                     >
                       <option value="required">必填 (Required)</option>
                       <option value="optional">選用 (Optional)</option>
                       <option value="group">群組 (Group)</option>
                     </select>
+                    <label className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                      <input
+                        type="checkbox"
+                        checked={catForm.is_optional}
+                        onChange={(event) =>
+                          setCatForm({
+                            ...catForm,
+                            is_optional: event.target.checked,
+                            type:
+                              catForm.type === "group"
+                                ? catForm.type
+                                : event.target.checked
+                                  ? "optional"
+                                  : "required",
+                          })
+                        }
+                      />
+                      Optional
+                    </label>
                   </div>
-                  {catForm.type === "group" && (
-                    <div className="flex items-center gap-2 text-xs">
-                      數:{" "}
-                      <input
-                        type="number"
-                        className="w-12 border p-1"
-                        value={catForm.min}
-                        onChange={(event) => setCatForm({ ...catForm, min: event.target.value })}
-                      />
-                      ~{" "}
-                      <input
-                        type="number"
-                        className="w-12 border p-1"
-                        value={catForm.max}
-                        onChange={(event) => setCatForm({ ...catForm, max: event.target.value })}
-                      />
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 text-xs">
+                    mul:{" "}
+                    <input
+                      type="number"
+                      className="w-12 border p-1"
+                      value={catForm.min}
+                      onChange={(event) => setCatForm({ ...catForm, min: event.target.value })}
+                    />
+                    ~{" "}
+                    <input
+                      type="number"
+                      className="w-12 border p-1"
+                      value={catForm.max}
+                      onChange={(event) => setCatForm({ ...catForm, max: event.target.value })}
+                    />
+                  </div>
                   <div className="flex gap-2 mt-2">
                     <button onClick={handleAddCategory} className="flex-1 bg-blue-600 text-white text-xs py-1 rounded">
                       儲存
@@ -485,7 +698,8 @@ const AdminPanel = ({ data, onUpdateData, onClose }: AdminPanelProps) => {
                 <div>
                   <div className="font-bold text-sm text-slate-800">{cat.label}</div>
                   <div className="text-[10px] text-slate-400 font-mono">
-                    {cat.slug} • {cat.type}
+                    {cat.slug} • {cat.ui_group ?? "Default"} • {isOptionalCategory(cat) ? "opt" : "req"} •{" "}
+                    {cat.type}
                   </div>
                 </div>
                 {activeTab === cat.slug && (
@@ -505,120 +719,850 @@ const AdminPanel = ({ data, onUpdateData, onClose }: AdminPanelProps) => {
         </div>
 
         <div className="flex-1 bg-slate-50 flex flex-col">
-          {activeCategory ? (
-            <>
-              <div className="p-4 bg-white border-b border-slate-200 flex justify-between items-center shadow-sm">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-800">
-                    {activeCategory.label}{" "}
-                    <span className="text-slate-400 font-normal text-sm">({activeCategory.items.length} items)</span>
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    類型: {activeCategory.type}{" "}
-                    {activeCategory.type === "group" &&
-                      `(${activeCategory.min_count ?? 1}~${activeCategory.max_count ?? 1})`}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setNewPromptMode(true)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-bold flex items-center gap-2 shadow-sm"
-                >
-                  <Plus size={16} /> 新增 Prompt
-                </button>
-              </div>
-
-              {newPromptMode && (
-                <div className="p-4 bg-emerald-50 border-b border-emerald-100 flex gap-2 items-end animate-in fade-in">
-                  <div className="flex-1">
-                    <label className="text-[10px] text-emerald-700 font-bold uppercase">Prompt Value (English)</label>
-                    <input
-                      autoFocus
-                      className="w-full p-2 border border-emerald-300 rounded text-sm"
-                      placeholder="e.g. oil painting"
-                      value={promptForm.value}
-                      onChange={(event) => setPromptForm({ ...promptForm, value: event.target.value })}
-                    />
+          {adminView === "categories" ? (
+            activeCategory ? (
+              <>
+                <div className="p-4 bg-white border-b border-slate-200 flex justify-between items-center shadow-sm">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800">
+                      {activeCategory.label}{" "}
+                      <span className="text-slate-400 font-normal text-sm">({activeCategory.items.length} items)</span>
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      群組: {activeCategory.ui_group ?? "Default"} ・{" "}
+                      {isOptionalCategory(activeCategory) ? "Optional" : "Required"} ・
+                      {" "}
+                      {activeCategory.type} ・ mul {activeCategory.min_count ?? 1}~{activeCategory.max_count ?? 1}
+                    </p>
                   </div>
-                  <div className="flex-1">
-                    <label className="text-[10px] text-emerald-700 font-bold uppercase">顯示名稱 (Chinese)</label>
-                    <input
-                      className="w-full p-2 border border-emerald-300 rounded text-sm"
-                      placeholder="e.g. 油畫"
-                      value={promptForm.label}
-                      onChange={(event) => setPromptForm({ ...promptForm, label: event.target.value })}
-                    />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setNewPromptMode(true)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-bold flex items-center gap-2 shadow-sm"
+                    >
+                      <Plus size={16} /> 新增 Prompt
+                    </button>
+                    <button
+                      onClick={handleUpdateCategory}
+                      className="px-3 py-1.5 rounded text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800"
+                    >
+                      儲存類別
+                    </button>
                   </div>
-                  <button
-                    onClick={handleAddPrompt}
-                    className="bg-emerald-600 text-white p-2 rounded hover:bg-emerald-700 h-[38px] w-[38px] flex items-center justify-center"
-                  >
-                    <Save size={18} />
-                  </button>
-                  <button
-                    onClick={() => setNewPromptMode(false)}
-                    className="bg-slate-200 text-slate-600 p-2 rounded hover:bg-slate-300 h-[38px] w-[38px] flex items-center justify-center"
-                  >
-                    <X size={18} />
-                  </button>
                 </div>
-              )}
 
-              <div className="p-4 overflow-y-auto flex-1">
-                <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
-                      <tr>
-                        <th className="p-3 w-16 text-center">ID</th>
-                        <th className="p-3">Prompt Value</th>
-                        <th className="p-3">標籤 (Label)</th>
-                        <th className="p-3 w-20 text-center">狀態</th>
-                        <th className="p-3 w-16 text-center">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {activeCategory.items.map((item) => (
-                        <tr key={item.id} className="hover:bg-slate-50 group">
-                          <td className="p-3 text-center text-slate-400 font-mono text-xs">{item.id}</td>
-                          <td className="p-3 font-mono text-slate-700">{item.value}</td>
-                          <td className="p-3 text-slate-600">{item.label}</td>
-                          <td className="p-3 text-center">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                item.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                              }`}
-                            >
-                              {item.is_active ? "Active" : "Disabled"}
-                            </span>
-                          </td>
-                          <td className="p-3 text-center">
-                            <button
-                              onClick={() => handleDeletePrompt(item.id)}
-                              className="text-slate-300 hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {activeCategory.items.length === 0 && (
+                {editCatForm && (
+                  <div className="p-4 bg-white border-b border-slate-100">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      <label className="flex flex-col gap-1">
+                        <span className="font-semibold text-slate-500">顯示名稱 (Label)</span>
+                        <input
+                          className="w-full text-sm p-2 border rounded"
+                          value={editCatForm.label}
+                          onChange={(event) => setEditCatForm({ ...editCatForm, label: event.target.value })}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="font-semibold text-slate-500">群組 (ui_group)</span>
+                        <input
+                          className="w-full text-sm p-2 border rounded"
+                          value={editCatForm.ui_group}
+                          onChange={(event) => setEditCatForm({ ...editCatForm, ui_group: event.target.value })}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="font-semibold text-slate-500">類型 (type)</span>
+                        <select
+                          className="w-full text-sm p-2 border rounded"
+                          value={editCatForm.type}
+                          onChange={(event) => {
+                            const nextType = event.target.value as CategoryType;
+                            const nextOptional =
+                              nextType === "group" ? editCatForm.is_optional : nextType === "optional";
+                            setEditCatForm({ ...editCatForm, type: nextType, is_optional: nextOptional });
+                          }}
+                        >
+                          <option value="required">必填 (Required)</option>
+                          <option value="optional">選用 (Optional)</option>
+                          <option value="group">群組 (Group)</option>
+                        </select>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                        <input
+                          type="checkbox"
+                          checked={editCatForm.is_optional}
+                          onChange={(event) =>
+                            setEditCatForm({
+                              ...editCatForm,
+                              is_optional: event.target.checked,
+                              type:
+                                editCatForm.type === "group"
+                                  ? editCatForm.type
+                                  : event.target.checked
+                                    ? "optional"
+                                    : "required",
+                            })
+                          }
+                        />
+                        Optional (is_optional)
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="font-semibold text-slate-500">mul 最小</span>
+                        <input
+                          type="number"
+                          className="w-full text-sm p-2 border rounded"
+                          value={editCatForm.min}
+                          onChange={(event) => setEditCatForm({ ...editCatForm, min: event.target.value })}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="font-semibold text-slate-500">mul 最大</span>
+                        <input
+                          type="number"
+                          className="w-full text-sm p-2 border rounded"
+                          value={editCatForm.max}
+                          onChange={(event) => setEditCatForm({ ...editCatForm, max: event.target.value })}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {newPromptMode && (
+                  <div className="p-4 bg-emerald-50 border-b border-emerald-100 flex gap-2 items-end animate-in fade-in">
+                    <div className="flex-1">
+                      <label className="text-[10px] text-emerald-700 font-bold uppercase">Prompt Value (English)</label>
+                      <input
+                        autoFocus
+                        className="w-full p-2 border border-emerald-300 rounded text-sm"
+                        placeholder="e.g. oil painting"
+                        value={promptForm.value}
+                        onChange={(event) => setPromptForm({ ...promptForm, value: event.target.value })}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[10px] text-emerald-700 font-bold uppercase">顯示名稱 (Chinese)</label>
+                      <input
+                        className="w-full p-2 border border-emerald-300 rounded text-sm"
+                        placeholder="e.g. 油畫"
+                        value={promptForm.label}
+                        onChange={(event) => setPromptForm({ ...promptForm, label: event.target.value })}
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-emerald-700 font-semibold">
+                      <input
+                        type="checkbox"
+                        checked={promptForm.is_active ?? true}
+                        onChange={(event) => setPromptForm({ ...promptForm, is_active: event.target.checked })}
+                      />
+                      啟用
+                    </label>
+                    <button
+                      onClick={handleAddPrompt}
+                      className="bg-emerald-600 text-white p-2 rounded hover:bg-emerald-700 h-[38px] w-[38px] flex items-center justify-center"
+                    >
+                      <Save size={18} />
+                    </button>
+                    <button
+                      onClick={() => setNewPromptMode(false)}
+                      className="bg-slate-200 text-slate-600 p-2 rounded hover:bg-slate-300 h-[38px] w-[38px] flex items-center justify-center"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                )}
+
+                <div className="p-4 overflow-y-auto flex-1">
+                  <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                         <tr>
-                          <td colSpan={5} className="p-8 text-center text-slate-400 italic">
-                            此類別尚無 Prompt，請點擊右上方新增。
-                          </td>
+                          <th className="p-3 w-16 text-center">ID</th>
+                          <th className="p-3">Prompt Value</th>
+                          <th className="p-3">標籤 (Label)</th>
+                          <th className="p-3 w-20 text-center">狀態</th>
+                          <th className="p-3 w-28 text-center">操作</th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {activeCategory.items.map((item) => {
+                          const isEditing = editingPromptId === item.id;
+                          return (
+                            <tr key={item.id} className="hover:bg-slate-50 group">
+                              <td className="p-3 text-center text-slate-400 font-mono text-xs">{item.id}</td>
+                              <td className="p-3 font-mono text-slate-700">
+                                {isEditing ? (
+                                  <input
+                                    className="w-full border rounded px-2 py-1 text-xs font-mono"
+                                    value={promptEditForm.value}
+                                    onChange={(event) =>
+                                      setPromptEditForm({ ...promptEditForm, value: event.target.value })
+                                    }
+                                  />
+                                ) : (
+                                  item.value
+                                )}
+                              </td>
+                              <td className="p-3 text-slate-600">
+                                {isEditing ? (
+                                  <input
+                                    className="w-full border rounded px-2 py-1 text-xs"
+                                    value={promptEditForm.label}
+                                    onChange={(event) =>
+                                      setPromptEditForm({ ...promptEditForm, label: event.target.value })
+                                    }
+                                  />
+                                ) : (
+                                  item.label
+                                )}
+                              </td>
+                              <td className="p-3 text-center">
+                                {isEditing ? (
+                                  <label className="inline-flex items-center gap-1 text-xs text-slate-600">
+                                    <input
+                                      type="checkbox"
+                                      checked={promptEditForm.is_active ?? true}
+                                      onChange={(event) =>
+                                        setPromptEditForm({ ...promptEditForm, is_active: event.target.checked })
+                                      }
+                                    />
+                                    啟用
+                                  </label>
+                                ) : (
+                                  <button
+                                    onClick={() => handleTogglePromptActive(item.id)}
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition ${
+                                      item.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                    }`}
+                                  >
+                                    {item.is_active ? "Active" : "Disabled"}
+                                  </button>
+                                )}
+                              </td>
+                              <td className="p-3 text-center">
+                                {isEditing ? (
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button
+                                      onClick={handleSavePrompt}
+                                      className="text-emerald-600 hover:text-emerald-700"
+                                    >
+                                      <Save size={16} />
+                                    </button>
+                                    <button
+                                      onClick={handleCancelEditPrompt}
+                                      className="text-slate-400 hover:text-slate-600"
+                                    >
+                                      <X size={16} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button
+                                      onClick={() => handleStartEditPrompt(item)}
+                                      className="text-slate-400 hover:text-slate-600"
+                                    >
+                                      <Settings size={16} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeletePrompt(item.id)}
+                                      className="text-slate-300 hover:text-red-500 transition-colors"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {activeCategory.items.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="p-8 text-center text-slate-400 italic">
+                              此類別尚無 Prompt，請點擊右上方新增。
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            </>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-slate-400">請選擇左側類別以編輯內容</div>
+            )
           ) : (
-            <div className="flex-1 flex items-center justify-center text-slate-400">請選擇左側類別以編輯內容</div>
+            <OutputComposer
+              categories={data}
+              configs={outputConfigs}
+              activeConfigId={activeOutputConfigId}
+              onCreateConfig={onCreateOutputConfig}
+              onUpdateConfig={onUpdateOutputConfig}
+              onDeleteConfig={onDeleteOutputConfig}
+              onSetActiveConfig={onSetActiveOutputConfig}
+            />
           )}
         </div>
       </div>
 
       {showApiGuide && <ApiGuideModal onClose={() => setShowApiGuide(false)} />}
+    </div>
+  );
+};
+
+const getDefaultOutputBlocks = (categories: Category[]) => {
+  return [...categories]
+    .sort((a, b) => {
+      const orderA = a.sort_order ?? a.id;
+      const orderB = b.sort_order ?? b.id;
+      return orderA - orderB;
+    })
+    .map((cat) => ({
+      id: `cat-${cat.slug}`,
+      type: "category" as const,
+      categorySlug: cat.slug,
+    }));
+};
+
+const getDefaultGroupBlocks = (categories: Category[]) => {
+  const ordered = [...categories].sort((a, b) => {
+    const orderA = a.sort_order ?? a.id;
+    const orderB = b.sort_order ?? b.id;
+    return orderA - orderB;
+  });
+  const groupIds: string[] = [];
+  ordered.forEach((cat) => {
+    const groupId = isGeneralGroupId(getCategoryGroupId(cat)) ? TAB_GENERAL : getCategoryGroupId(cat);
+    if (!groupIds.includes(groupId)) groupIds.push(groupId);
+  });
+  return groupIds.map((groupId) => ({
+    id: `group-${groupId}`,
+    type: "group" as const,
+    groupId,
+  }));
+};
+
+const NEW_OUTPUT_CONFIG_ID = "__new__";
+
+const OutputComposer = ({
+  categories,
+  configs,
+  activeConfigId,
+  onCreateConfig,
+  onUpdateConfig,
+  onDeleteConfig,
+  onSetActiveConfig,
+}: OutputComposerProps) => {
+  const [textDraft, setTextDraft] = useState("");
+  const [selectedConfigId, setSelectedConfigId] = useState<string>(
+    activeConfigId ?? configs[0]?.id ?? NEW_OUTPUT_CONFIG_ID,
+  );
+  const [draftName, setDraftName] = useState("");
+  const [draftBlocks, setDraftBlocks] = useState<OutputBlock[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>(TAB_GENERAL);
+  const hasInitializedConfigRef = useRef(false);
+
+  useEffect(() => {
+    if (hasInitializedConfigRef.current) return;
+    if (configs.length === 0) return;
+    setSelectedConfigId(activeConfigId ?? configs[0].id);
+    hasInitializedConfigRef.current = true;
+  }, [configs, activeConfigId]);
+
+  useEffect(() => {
+    if (selectedConfigId === NEW_OUTPUT_CONFIG_ID) return;
+    if (configs.some((config) => config.id === selectedConfigId)) return;
+    setSelectedConfigId(activeConfigId ?? configs[0]?.id ?? NEW_OUTPUT_CONFIG_ID);
+  }, [configs, activeConfigId, selectedConfigId]);
+
+  useEffect(() => {
+    const selected = configs.find((config) => config.id === selectedConfigId);
+    if (selected) {
+      setDraftName(selected.name);
+      setDraftBlocks(selected.blocks ?? []);
+      return;
+    }
+    if (selectedConfigId === NEW_OUTPUT_CONFIG_ID) {
+      setDraftName("");
+      const groupBlocks = getDefaultGroupBlocks(categories);
+      setDraftBlocks(groupBlocks.length > 0 ? groupBlocks : getDefaultOutputBlocks(categories));
+    }
+  }, [selectedConfigId, configs, categories]);
+
+  const orderedCategories = useMemo(() => {
+    return [...categories].sort((a, b) => {
+      const orderA = a.sort_order ?? a.id;
+      const orderB = b.sort_order ?? b.id;
+      return orderA - orderB;
+    });
+  }, [categories]);
+
+  const groupOptions = useMemo(() => {
+    const groups = new Map<string, number>();
+    orderedCategories.forEach((cat) => {
+      const groupId = isGeneralGroupId(getCategoryGroupId(cat)) ? TAB_GENERAL : getCategoryGroupId(cat);
+      groups.set(groupId, (groups.get(groupId) ?? 0) + 1);
+    });
+    return Array.from(groups.entries()).map(([id, count]) => ({
+      id,
+      label: id === TAB_GENERAL ? TAB_GENERAL : id,
+      count,
+    }));
+  }, [orderedCategories]);
+
+  useEffect(() => {
+    if (groupOptions.length === 0) return;
+    if (!groupOptions.some((group) => group.id === selectedGroupId)) {
+      setSelectedGroupId(groupOptions[0].id);
+    }
+  }, [groupOptions, selectedGroupId]);
+
+  const createBlockId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const selectedConfig = configs.find((config) => config.id === selectedConfigId);
+  const isActiveSelected = selectedConfigId !== NEW_OUTPUT_CONFIG_ID && selectedConfigId === activeConfigId;
+
+  const handleAddGroupBlock = () => {
+    if (!selectedGroupId) return;
+    setDraftBlocks((prev) => [
+      ...prev,
+      {
+        id: createBlockId(),
+        type: "group",
+        groupId: selectedGroupId,
+      },
+    ]);
+  };
+
+  const handleAddTextBlock = () => {
+    if (!textDraft.trim()) return;
+    setDraftBlocks((prev) => [
+      ...prev,
+      {
+        id: createBlockId(),
+        type: "text",
+        text: textDraft,
+      },
+    ]);
+    setTextDraft("");
+  };
+
+  const handleUpdateBlock = (id: string, patch: Partial<OutputBlock>) => {
+    setDraftBlocks(draftBlocks.map((block) => (block.id === id ? { ...block, ...patch } : block)));
+  };
+
+  const handleDeleteBlock = (id: string) => {
+    setDraftBlocks(draftBlocks.filter((block) => block.id !== id));
+  };
+
+  const moveBlockToIndex = (sourceId: string, targetIndex: number) => {
+    const sourceIndex = draftBlocks.findIndex((block) => block.id === sourceId);
+    if (sourceIndex < 0) return;
+    const next = [...draftBlocks];
+    const [item] = next.splice(sourceIndex, 1);
+    const normalizedIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+    next.splice(Math.max(0, Math.min(normalizedIndex, next.length)), 0, item);
+    setDraftBlocks(next);
+  };
+
+  const parseDragData = (raw: string | null) => {
+    if (!raw) return null;
+    if (raw.startsWith("new-group:")) return { type: "new-group" as const, groupId: raw.slice(10) };
+    if (raw.startsWith("new-category:")) return { type: "new-category" as const, slug: raw.slice(13) };
+    if (raw.startsWith("move:")) return { type: "move" as const, id: raw.slice(5) };
+    return { type: "move" as const, id: raw };
+  };
+
+  const insertBlockAtIndex = (block: OutputBlock, index: number) => {
+    const next = [...draftBlocks];
+    next.splice(Math.max(0, Math.min(index, next.length)), 0, block);
+    setDraftBlocks(next);
+  };
+
+  const handleDragStart = (event: DragEvent<HTMLElement>, id: string) => {
+    event.dataTransfer.effectAllowed = "move";
+    const payload = `move:${id}`;
+    event.dataTransfer.setData("text/plain", payload);
+    setDraggingId(payload);
+  };
+
+  const handlePaletteDragStart = (event: DragEvent<HTMLElement>, groupId: string) => {
+    event.dataTransfer.effectAllowed = "copy";
+    const payload = `new-group:${groupId}`;
+    event.dataTransfer.setData("text/plain", payload);
+    setDraggingId(payload);
+  };
+
+  const handleDragOverIndex = (event: DragEvent<HTMLElement>, index: number) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDropIndex(index);
+  };
+
+  const handleDropAtIndex = (event: DragEvent<HTMLElement>, index: number) => {
+    event.preventDefault();
+    const raw = event.dataTransfer.getData("text/plain") || draggingId;
+    const data = parseDragData(raw);
+    if (data?.type === "move") {
+      moveBlockToIndex(data.id, index);
+    } else if (data?.type === "new-group") {
+      insertBlockAtIndex(
+        {
+          id: createBlockId(),
+          type: "group",
+          groupId: data.groupId,
+        },
+        index,
+      );
+    } else if (data?.type === "new-category") {
+      insertBlockAtIndex(
+        {
+          id: createBlockId(),
+          type: "category",
+          categorySlug: data.slug,
+        },
+        index,
+      );
+    }
+    setDraggingId(null);
+    setDropIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    setDropIndex(null);
+  };
+
+  const getBlockLabel = (block: OutputBlock) => {
+    if (block.type === "text") return "文字";
+    if (block.type === "group") {
+      const groupId = block.groupId ?? "群組";
+      return groupId === TAB_GENERAL ? TAB_GENERAL : groupId;
+    }
+    return "類別";
+  };
+
+  const handleCreateConfig = async () => {
+    setIsSaving(true);
+    const newId = await onCreateConfig(draftName, draftBlocks);
+    setIsSaving(false);
+    if (newId) setSelectedConfigId(newId);
+  };
+
+  const handleSaveConfig = async () => {
+    if (!selectedConfig) return;
+    setIsSaving(true);
+    await onUpdateConfig(selectedConfig.id, draftName, draftBlocks);
+    setIsSaving(false);
+  };
+
+  const handleDeleteConfig = async () => {
+    if (!selectedConfig) return;
+    if (!window.confirm(`確定要刪除設定「${selectedConfig.name}」嗎？`)) return;
+    setIsSaving(true);
+    await onDeleteConfig(selectedConfig.id);
+    setIsSaving(false);
+    setSelectedConfigId(NEW_OUTPUT_CONFIG_ID);
+  };
+
+  const handleSetActive = async () => {
+    if (!selectedConfig) return;
+    await onSetActiveConfig(selectedConfig.id);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col">
+      <div className="p-4 bg-white border-b border-slate-200">
+        <h3 className="text-lg font-bold text-slate-800">輸出編排</h3>
+        <p className="text-xs text-slate-500 mt-1">
+          用「拼圖」方式決定輸出順序，可插入連結詞或文字段落，不影響 categories 的 ID。
+        </p>
+      </div>
+
+      <div className="p-4 space-y-4 overflow-y-auto flex-1">
+        <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              className="text-sm border rounded p-2 flex-1 min-w-[220px]"
+              value={selectedConfigId}
+              onChange={(event) => setSelectedConfigId(event.target.value)}
+            >
+              <option value={NEW_OUTPUT_CONFIG_ID}>＋ 新設定（尚未建立）</option>
+              {configs.map((config) => (
+                <option key={config.id} value={config.id}>
+                  {config.name}
+                  {config.id === activeConfigId ? "（使用中）" : ""}
+                </option>
+              ))}
+            </select>
+            <input
+              className="text-sm border rounded p-2 flex-1 min-w-[200px]"
+              placeholder="設定名稱"
+              value={draftName}
+              onChange={(event) => setDraftName(event.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            {selectedConfigId === NEW_OUTPUT_CONFIG_ID ? (
+              <button
+                onClick={handleCreateConfig}
+                disabled={isSaving}
+                className="px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+              >
+                建立設定檔
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleSaveConfig}
+                  disabled={isSaving}
+                  className="px-3 py-1.5 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  儲存變更
+                </button>
+                <button
+                  onClick={handleSetActive}
+                  disabled={isActiveSelected}
+                  className="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-60"
+                >
+                  {isActiveSelected ? "使用中" : "設為使用中"}
+                </button>
+                <button
+                  onClick={handleDeleteConfig}
+                  disabled={isSaving}
+                  className="px-3 py-1.5 rounded bg-rose-50 text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                >
+                  刪除設定
+                </button>
+              </>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-semibold text-slate-500">群組 (ui-group)</span>
+            <div className="flex flex-wrap gap-2">
+              {groupOptions.map((group) => (
+                <button
+                  key={group.id}
+                  onClick={() => setSelectedGroupId(group.id)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-full transition ${
+                    group.id === selectedGroupId
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {group.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleAddGroupBlock}
+              disabled={!selectedGroupId}
+              className="px-3 py-2 text-xs font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              加入群組拼圖
+            </button>
+            <span className="text-[11px] text-slate-400">已選群組：{selectedGroupId || "-"}</span>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="text-[11px] font-semibold text-slate-500">拖曳群組 (ui-group)</div>
+            <div className="flex flex-wrap gap-2">
+              {groupOptions.length === 0 ? (
+                <span className="text-xs text-slate-400">尚無可拖曳的群組</span>
+              ) : (
+                groupOptions.map((group) => (
+                  <button
+                    key={`palette-group-${group.id}`}
+                    type="button"
+                    draggable
+                    onDragStart={(event) => handlePaletteDragStart(event, group.id)}
+                    onDragEnd={handleDragEnd}
+                    className="px-3 py-1.5 text-xs rounded-full bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-grab"
+                    title={`拖曳群組 ${group.label}`}
+                  >
+                    {group.label}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <input
+              className="flex-1 min-w-[200px] text-sm border rounded p-2"
+              placeholder="輸入連結詞或文字段落，例如: with, and, in the style of"
+              value={textDraft}
+              onChange={(event) => setTextDraft(event.target.value)}
+            />
+            <button
+              onClick={handleAddTextBlock}
+              className="px-3 py-2 text-xs font-semibold rounded-md bg-slate-800 text-white hover:bg-slate-700"
+            >
+              加入文字段
+            </button>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <button
+              onClick={() => setDraftBlocks(getDefaultGroupBlocks(categories))}
+              className="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200"
+            >
+              以群組重建
+            </button>
+            <button
+              onClick={() => setDraftBlocks(getDefaultOutputBlocks(categories))}
+              className="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200"
+            >
+              以類別重建
+            </button>
+            <button
+              onClick={() => setDraftBlocks([])}
+              className="px-3 py-1.5 rounded bg-rose-50 text-rose-700 hover:bg-rose-100"
+            >
+              清空編排
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4 space-y-3">
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span className="font-semibold">拼接滑條</span>
+            <span>拖曳方塊排序，文字可直接改寫</span>
+          </div>
+          <div
+            className="border border-dashed border-slate-200 rounded-lg p-3 bg-slate-50/60 max-h-[240px] overflow-y-auto overflow-x-hidden"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              const raw = event.dataTransfer.getData("text/plain") || draggingId;
+              const data = parseDragData(raw);
+              if (data?.type === "move") {
+                moveBlockToIndex(data.id, draftBlocks.length);
+              } else if (data?.type === "new-group") {
+                insertBlockAtIndex(
+                  {
+                    id: createBlockId(),
+                    type: "group",
+                    groupId: data.groupId,
+                  },
+                  draftBlocks.length,
+                );
+              } else if (data?.type === "new-category") {
+                insertBlockAtIndex(
+                  {
+                    id: createBlockId(),
+                    type: "category",
+                    categorySlug: data.slug,
+                  },
+                  draftBlocks.length,
+                );
+              }
+              setDraggingId(null);
+              setDropIndex(null);
+            }}
+          >
+            {draftBlocks.length === 0 ? (
+              <div className="text-sm text-slate-400 py-4 text-center">尚未設定輸出拼圖，會使用 categories 預設順序。</div>
+            ) : (
+              <div className="flex flex-wrap items-start gap-2 min-h-[54px]">
+                {draftBlocks.map((block, index) => {
+                  const isDragging = draggingId === `move:${block.id}`;
+                  const isDropHere = dropIndex === index;
+                  return (
+                    <div key={block.id} className="flex items-center gap-2">
+                      <div
+                        onDragOver={(event) => handleDragOverIndex(event, index)}
+                        onDrop={(event) => handleDropAtIndex(event, index)}
+                        className={`h-10 w-4 flex items-center justify-center transition ${
+                          isDropHere ? "bg-blue-100/70 rounded-full" : ""
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-6 w-[2px] rounded-full ${
+                            isDropHere ? "bg-blue-500" : "bg-slate-200"
+                          }`}
+                        />
+                      </div>
+                      <div
+                        draggable
+                        onDragStart={(event) => handleDragStart(event, block.id)}
+                        onDragEnd={handleDragEnd}
+                        className={`flex items-center gap-2 rounded-full border px-3 py-2 bg-white shadow-sm transition max-w-full cursor-grab ${
+                          isDragging ? "opacity-50" : ""
+                        }`}
+                      >
+                        <span className="text-[10px] text-slate-400 w-4 text-center">{index + 1}</span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                          {getBlockLabel(block)}
+                        </span>
+                        {block.type === "group" ? (
+                          <select
+                            draggable={false}
+                            className="text-xs bg-transparent border border-slate-200 rounded-full px-2 py-1 max-w-[180px] truncate"
+                            value={block.groupId ?? ""}
+                            onChange={(event) => handleUpdateBlock(block.id, { groupId: event.target.value })}
+                          >
+                            {groupOptions.map((group) => (
+                              <option key={group.id} value={group.id}>
+                                {group.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : block.type === "category" ? (
+                          <select
+                            draggable={false}
+                            className="text-xs bg-transparent border border-slate-200 rounded-full px-2 py-1 max-w-[180px] truncate"
+                            value={block.categorySlug ?? ""}
+                            onChange={(event) => handleUpdateBlock(block.id, { categorySlug: event.target.value })}
+                          >
+                            {orderedCategories.map((cat) => (
+                              <option key={cat.slug} value={cat.slug}>
+                                {cat.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            draggable={false}
+                            className="text-xs bg-transparent border border-slate-200 rounded-full px-2 py-1 min-w-[120px] max-w-[200px] w-[140px] sm:w-[180px]"
+                            placeholder="輸入文字"
+                            value={block.text ?? ""}
+                            onChange={(event) => handleUpdateBlock(block.id, { text: event.target.value })}
+                          />
+                        )}
+                        <button
+                          onClick={() => handleDeleteBlock(block.id)}
+                          className="text-[10px] text-rose-600 hover:text-rose-700"
+                          title="移除"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div
+                  onDragOver={(event) => handleDragOverIndex(event, draftBlocks.length)}
+                  onDrop={(event) => handleDropAtIndex(event, draftBlocks.length)}
+                  className={`h-10 w-4 flex items-center justify-center transition ${
+                    dropIndex === draftBlocks.length ? "bg-blue-100/70 rounded-full" : ""
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-6 w-[2px] rounded-full ${
+                      dropIndex === draftBlocks.length ? "bg-blue-500" : "bg-slate-200"
+                    }`}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -1070,6 +2014,8 @@ export default function RngPromptRoute() {
   const [tagLockMap, setTagLockMap] = useState<Record<string, Set<TagLockKey>>>({});
   const [qtyMap, setQtyMap] = useState<Record<string, number>>({});
   const [groupLimits, setGroupLimits] = useState<Record<string, GroupLimit>>({});
+  const [outputConfigs, setOutputConfigs] = useState<OutputConfig[]>([]);
+  const [activeOutputConfigId, setActiveOutputConfigId] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>({ visible: false, message: "" });
   const [activeTab, setActiveTab] = useState<string>(TAB_ALL);
   const [loading, setLoading] = useState(true);
@@ -1077,6 +2023,19 @@ export default function RngPromptRoute() {
   const [view, setView] = useState<"generator" | "admin">("generator");
   const toastTimerRef = useRef<number | null>(null);
   const hasAutoRolledRef = useRef(false);
+
+  const applyOutputConfigs = (configs: OutputConfig[]) => {
+    setOutputConfigs(configs);
+    const active = configs.find((config) => config.is_active);
+    setActiveOutputConfigId(active?.id ?? null);
+  };
+
+  const fetchOutputConfigs = async () => {
+    const res = await fetch("/api/output-configs");
+    if (!res.ok) throw new Error("Output configs API not found");
+    const payload = (await res.json()) as { configs?: OutputConfig[] };
+    return payload.configs ?? [];
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -1101,6 +2060,22 @@ export default function RngPromptRoute() {
     };
 
     fetchData();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadConfigs = async () => {
+      try {
+        const configs = await fetchOutputConfigs();
+        if (!cancelled) applyOutputConfigs(configs);
+      } catch (_error) {
+        if (!cancelled) applyOutputConfigs([]);
+      }
+    };
+    loadConfigs();
     return () => {
       cancelled = true;
     };
@@ -1353,6 +2328,63 @@ export default function RngPromptRoute() {
     return next;
   };
 
+  const buildOutputText = () => {
+    const activeConfig = outputConfigs.find((config) => config.id === activeOutputConfigId);
+    const activeBlocks = activeConfig?.blocks ?? [];
+    const blocks = activeBlocks.length > 0 ? activeBlocks : getDefaultOutputBlocks(configData);
+    const orderedCategories = [...configData].sort((a, b) => {
+      const orderA = a.sort_order ?? a.id;
+      const orderB = b.sort_order ?? b.id;
+      return orderA - orderB;
+    });
+
+    const buildCategorySegment = (slug: string) => {
+      const cat = configData.find((item) => item.slug === slug);
+      if (!cat) return "";
+      if (!isChecked(slug) && !cardLockMap[slug]) return "";
+      const values = draws[slug] ?? [];
+      if (values.length === 0) return "";
+      return values.map((item) => item.value).join(", ");
+    };
+
+    const buildGroupSegment = (groupId: string) => {
+      const categories = orderedCategories.filter((cat) => {
+        const resolved = isGeneralGroupId(getCategoryGroupId(cat)) ? TAB_GENERAL : getCategoryGroupId(cat);
+        return resolved === groupId;
+      });
+      const segments = categories.map((cat) => buildCategorySegment(cat.slug)).filter(Boolean);
+      return segments.join(", ");
+    };
+
+    const resolved = blocks.map((block) => {
+      if (block.type === "text") {
+        return { kind: "text" as const, value: block.text ?? "" };
+      }
+      if (block.type === "group") {
+        const groupId = block.groupId ?? "";
+        return { kind: "content" as const, value: groupId ? buildGroupSegment(groupId) : "" };
+      }
+      const slug = block.categorySlug;
+      return { kind: "content" as const, value: slug ? buildCategorySegment(slug) : "" };
+    });
+
+    const segments: string[] = [];
+    for (let index = 0; index < resolved.length; index += 1) {
+      const item = resolved[index];
+      if (item.kind === "content") {
+        if (item.value && item.value.trim().length > 0) segments.push(item.value);
+        continue;
+      }
+
+      const nextContent = resolved.slice(index + 1).find((entry) => entry.kind === "content");
+      if (nextContent && nextContent.value && nextContent.value.trim().length > 0) {
+        if (item.value && item.value.trim().length > 0) segments.push(item.value);
+      }
+    }
+
+    return segments.join(" ").replace(/\s+/g, " ").trim();
+  };
+
   const onGlobalRoll = () => {
     setDraws((prev) => {
       let next: Draws = { ...prev };
@@ -1528,12 +2560,70 @@ export default function RngPromptRoute() {
     });
   };
 
+  const onCreateOutputConfig = async (name: string, blocks: OutputBlock[]) => {
+    try {
+      const res = await fetch("/api/output-configs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create", name, blocks }),
+      });
+      if (!res.ok) throw new Error("Create output config failed");
+      const payload = (await res.json()) as { id?: string };
+      const configs = await fetchOutputConfigs();
+      applyOutputConfigs(configs);
+      return payload.id ?? null;
+    } catch (_error) {
+      return null;
+    }
+  };
+
+  const onUpdateOutputConfig = async (id: string, name: string, blocks: OutputBlock[]) => {
+    try {
+      const res = await fetch("/api/output-configs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update", id, name, blocks }),
+      });
+      if (!res.ok) throw new Error("Update output config failed");
+      const configs = await fetchOutputConfigs();
+      applyOutputConfigs(configs);
+    } catch (_error) {
+      // ignore update errors for now
+    }
+  };
+
+  const onDeleteOutputConfig = async (id: string) => {
+    try {
+      const res = await fetch("/api/output-configs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", id }),
+      });
+      if (!res.ok) throw new Error("Delete output config failed");
+      const configs = await fetchOutputConfigs();
+      applyOutputConfigs(configs);
+    } catch (_error) {
+      // ignore delete errors for now
+    }
+  };
+
+  const onSetActiveOutputConfig = async (id: string) => {
+    try {
+      const res = await fetch("/api/output-configs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set-active", id }),
+      });
+      if (!res.ok) throw new Error("Set active output config failed");
+      const configs = await fetchOutputConfigs();
+      applyOutputConfigs(configs);
+    } catch (_error) {
+      // ignore set-active errors for now
+    }
+  };
+
   const onCopy = async () => {
-    const text = configData
-      .filter((cat) => isChecked(cat.slug) || cardLockMap[cat.slug])
-      .map((cat) => (draws[cat.slug] ?? []).map((item) => item.value).join(", "))
-      .filter(Boolean)
-      .join(", ");
+    const text = buildOutputText();
 
     try {
       await navigator.clipboard.writeText(text);
@@ -1555,7 +2645,19 @@ export default function RngPromptRoute() {
   }, [configData]);
 
   if (view === "admin") {
-    return <AdminPanel data={configData} onUpdateData={setConfigData} onClose={() => setView("generator")} />;
+    return (
+      <AdminPanel
+        data={configData}
+        onUpdateData={setConfigData}
+        outputConfigs={outputConfigs}
+        activeOutputConfigId={activeOutputConfigId}
+        onCreateOutputConfig={onCreateOutputConfig}
+        onUpdateOutputConfig={onUpdateOutputConfig}
+        onDeleteOutputConfig={onDeleteOutputConfig}
+        onSetActiveOutputConfig={onSetActiveOutputConfig}
+        onClose={() => setView("generator")}
+      />
+    );
   }
 
   if (loading) {
@@ -1566,11 +2668,7 @@ export default function RngPromptRoute() {
     );
   }
 
-  const previewText = configData
-    .filter((cat) => isChecked(cat.slug) || cardLockMap[cat.slug])
-    .map((cat) => (draws[cat.slug] ?? []).map((item) => item.value).join(", "))
-    .filter(Boolean)
-    .join(", ");
+  const previewText = buildOutputText();
 
   const activeTabMode = activeTab === TAB_ALL ? "all" : activeTab === TAB_GENERAL ? "general" : "group";
   const groupTabs = tabs.filter((tab) => tab.mode === "group");

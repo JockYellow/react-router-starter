@@ -20,14 +20,16 @@
       "binding": "BLOG_DB",
       "database_name": "blog-db",
       "database_id": "9e8e276a-fd1f-4385-ac56-706970486025",
-      "preview_database_id": "9e8e276a-fd1f-4385-ac56-706970486025"
+      "preview_database_id": "9e8e276a-fd1f-4385-ac56-706970486025",
+      "remote": true
     }
   ],
   "r2_buckets": [
     {
       "bucket_name": "blog-images",
       "binding": "blog_images",
-      "preview_bucket_name": "blog-images"
+      "preview_bucket_name": "blog-images",
+      "remote": true
     }
   ]
 }
