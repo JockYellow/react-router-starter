@@ -5,9 +5,9 @@ import { useMemo } from "react";
 import type { D1Database } from "@cloudflare/workers-types";
 import { Monitor, Lock, Unlock, Edit3, Eye, EyeOff, Gavel, Users, RefreshCw } from "lucide-react";
 
-import { requireBlogDb } from "../lib/d1.server";
-import { requireBlogImagesPublicBase, buildPublicImageUrl } from "../lib/r2.server";
-import { getGifts, type Gift as GiftType } from "../lib/gift.server";
+import { requireBlogDb } from "../../lib/d1.server";
+import { requireBlogImagesPublicBase, buildPublicImageUrl } from "../../lib/r2.server";
+import { getGifts, type Gift as GiftType } from "../../lib/gift.server";
 
 const STAGES = ["idle", "r1", "s1", "s2"] as const;
 type Stage = (typeof STAGES)[number];

@@ -13,7 +13,11 @@
   "vars": {
     "VALUE_FROM_CLOUDFLARE": "Hello from Cloudflare",
     "ADMIN_PASS": "jock0701QQ@cf",
-    "BLOG_IMAGES_PUBLIC_BASE_URL": "https://pub-dced73b40e724469990adfef043fc5b2.r2.dev"
+    "BLOG_IMAGES_PUBLIC_BASE_URL": "https://pub-dced73b40e724469990adfef043fc5b2.r2.dev",
+    "SPOTIFY_CLIENT_ID": "faa338557e2643799b05abc270cdf875",
+    "SPOTIFY_CLIENT_SECRET": "e55bdbfd5c77496aad01981ac259ef65",
+    "SPOTIFY_REDIRECT_URI": "https://react-router-starter.jockhuang77.workers.dev/call_spotify",
+    "SPOTIFY_ALLOWED_ORIGINS": "https://react-router-starter.jockhuang77.workers.dev"
   },
   "d1_databases": [
     {

@@ -2,11 +2,11 @@ import { useMemo, useState } from "react";
 import { Form, Link, useLoaderData, useNavigation } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
-import { requireAdmin } from "../lib/admin-auth.server";
-import { requireBlogDb } from "../lib/d1.server";
-import { getAllBlogPosts } from "../lib/blog.d1.server";
-import type { BlogCategory, BlogPost } from "../lib/blog.types";
-import { loadBlogCategories } from "../lib/blog.server";
+import { requireAdmin } from "../../lib/admin-auth.server";
+import { requireBlogDb } from "../../lib/d1.server";
+import { getAllBlogPosts } from "../../lib/blog.d1.server";
+import type { BlogCategory, BlogPost } from "../../lib/blog.types";
+import { loadBlogCategories } from "../../lib/blog.server";
 
 type LoaderData = {
   posts: BlogPost[];

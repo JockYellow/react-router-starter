@@ -2,8 +2,8 @@ import { Form, redirect, useActionData, useLoaderData, useNavigation } from "rea
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { Camera, UploadCloud, UserCircle2, AlertTriangle } from "lucide-react";
 
-import { requireBlogDb } from "../lib/d1.server";
-import { requireBlogImagesBucket } from "../lib/r2.server";
+import { requireBlogDb } from "../../lib/d1.server";
+import { requireBlogImagesBucket } from "../../lib/r2.server";
 
 const MAX_TAGS = 6;
 

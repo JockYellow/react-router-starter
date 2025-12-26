@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 
-import { requireBlogDb } from "../lib/d1.server";
+import { requireBlogDb } from "../../lib/d1.server";
 
 type AdminPayload = {
   action?: "create" | "update" | "delete";

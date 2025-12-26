@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   ArrowLeft,
-  Code,
   Copy,
   Database,
   Dice5,
-  FileJson,
   Loader2,
   Plus,
   Save,
@@ -57,7 +55,7 @@ type OutputConfig = {
   updated_at?: string | null;
 };
 
-type CategoryForm = {
+type CategoryFormState = {
   slug: string;
   label: string;
   type: CategoryType;
@@ -73,8 +71,12 @@ type PromptForm = {
   is_active?: boolean;
 };
 
-type ApiGuideModalProps = {
-  onClose: () => void;
+type CategoryFormProps = {
+  value: CategoryFormState;
+  onChange: (next: CategoryFormState) => void;
+  mode: "create" | "edit";
+  onSubmit?: () => void;
+  onCancel?: () => void;
 };
 
 type AdminPanelProps = {
@@ -273,92 +275,159 @@ const MOCK_DB_DATA: Category[] = [
   },
 ];
 
-const ApiGuideModal = ({ onClose }: ApiGuideModalProps) => {
+const CategoryForm = ({ value, onChange, mode, onSubmit, onCancel }: CategoryFormProps) => {
+  const isCreate = mode === "create";
+  const inputClassName = isCreate ? "w-full text-sm p-1 border rounded" : "w-full text-sm p-2 border rounded";
+  const selectClassName = isCreate ? "text-sm border rounded p-1 flex-1" : "w-full text-sm p-2 border rounded";
+
+  const updateValue = (patch: Partial<CategoryFormState>) => {
+    onChange({ ...value, ...patch });
+  };
+
+  const handleTypeChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const nextType = event.target.value as CategoryType;
+    const nextOptional = nextType === "group" ? value.is_optional : nextType === "optional";
+    updateValue({ type: nextType, is_optional: nextOptional });
+  };
+
+  const handleOptionalChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const checked = event.target.checked;
+    updateValue({
+      is_optional: checked,
+      type: value.type === "group" ? value.type : checked ? "optional" : "required",
+    });
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="flex justify-between items-center p-4 border-b bg-slate-50">
-          <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800">
-            <Code size={20} className="text-blue-600" /> 後端 API 開發指南
-          </h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full">
-            <X size={20} />
-          </button>
+    <div className={isCreate ? "space-y-2" : "grid grid-cols-1 md:grid-cols-2 gap-3 text-xs"}>
+      {isCreate && (
+        <input
+          className={inputClassName}
+          placeholder="ID (Slug, e.g. style)"
+          value={value.slug}
+          onChange={(event) => updateValue({ slug: event.target.value })}
+        />
+      )}
+
+      {isCreate ? (
+        <input
+          className={inputClassName}
+          placeholder="顯示名稱 (Label)"
+          value={value.label}
+          onChange={(event) => updateValue({ label: event.target.value })}
+        />
+      ) : (
+        <label className="flex flex-col gap-1">
+          <span className="font-semibold text-slate-500">顯示名稱 (Label)</span>
+          <input
+            className={inputClassName}
+            value={value.label}
+            onChange={(event) => updateValue({ label: event.target.value })}
+          />
+        </label>
+      )}
+
+      {isCreate ? (
+        <input
+          className={inputClassName}
+          placeholder="群組 (ui_group, e.g. Character)"
+          value={value.ui_group}
+          onChange={(event) => updateValue({ ui_group: event.target.value })}
+        />
+      ) : (
+        <label className="flex flex-col gap-1">
+          <span className="font-semibold text-slate-500">群組 (ui_group)</span>
+          <input
+            className={inputClassName}
+            value={value.ui_group}
+            onChange={(event) => updateValue({ ui_group: event.target.value })}
+          />
+        </label>
+      )}
+
+      {isCreate ? (
+        <div className="flex gap-2">
+          <select className={selectClassName} value={value.type} onChange={handleTypeChange}>
+            <option value="required">必填 (Required)</option>
+            <option value="optional">選用 (Optional)</option>
+            <option value="group">群組 (Group)</option>
+          </select>
+          <label className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+            <input type="checkbox" checked={value.is_optional} onChange={handleOptionalChange} />
+            Optional
+          </label>
         </div>
+      ) : (
+        <>
+          <label className="flex flex-col gap-1">
+            <span className="font-semibold text-slate-500">類型 (type)</span>
+            <select className={selectClassName} value={value.type} onChange={handleTypeChange}>
+              <option value="required">必填 (Required)</option>
+              <option value="optional">選用 (Optional)</option>
+              <option value="group">群組 (Group)</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <input type="checkbox" checked={value.is_optional} onChange={handleOptionalChange} />
+            Optional (is_optional)
+          </label>
+        </>
+      )}
 
-        <div className="p-6 overflow-y-auto space-y-6 text-sm text-slate-700">
-          <section>
-            <h4 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
-              <Database size={16} /> 資料庫結構 (D1 Schema)
-            </h4>
-            <div className="bg-slate-900 text-slate-50 p-4 rounded-lg font-mono text-xs overflow-x-auto">
-              <code className="whitespace-pre">{`-- Categories Table
-id (INT, PK), slug (TEXT), label (TEXT), ui_group (TEXT),
-is_optional (BOOL), type (TEXT), min_count (INT),
-max_count (INT), sort_order (INT)
-
--- Prompts Table
-id (INT, PK), category_slug (TEXT, FK), value (TEXT),
-label (TEXT), is_active (BOOL)`}</code>
-            </div>
-          </section>
-
-          <section>
-            <h4 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
-              <FileJson size={16} /> 預期 API Payload (JSON)
-            </h4>
-            <p className="mb-2">後端 API 應接收以下格式的 POST 請求以更新資料：</p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="font-semibold text-xs mb-1 text-blue-600">新增類別 (Create Category)</p>
-                <div className="bg-slate-100 p-3 rounded border border-slate-200 font-mono text-xs">
-                  {`{
-  "action": "create",
-  "table": "categories",
-  "data": {
-    "slug": "weather",
-    "label": "天氣",
-    "ui_group": "Scene",
-    "is_optional": 1,
-    "type": "optional",
-    "min_count": 0,
-    "max_count": 1,
-    "sort_order": 99
-  }
-}`}
-                </div>
-              </div>
-
-              <div>
-                <p className="font-semibold text-xs mb-1 text-green-600">新增提示詞 (Create Prompt)</p>
-                <div className="bg-slate-100 p-3 rounded border border-slate-200 font-mono text-xs">
-                  {`{
-  "action": "create",
-  "table": "prompts",
-  "data": {
-    "category_slug": "weather",
-    "value": "sunny day",
-    "label": "晴天"
-  }
-}`}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <div className="bg-amber-50 border border-amber-200 p-3 rounded text-amber-800 text-xs">
-            <strong>💡 提示：</strong> 請在 Cloudflare Pages Functions 中實作 <code>/api/admin</code>{" "}
-            端點來處理這些請求，並使用 <code>env.DB.prepare(...).run()</code> 執行 SQL。
-          </div>
+      {isCreate ? (
+        <div className="flex items-center gap-2 text-xs">
+          mul:{" "}
+          <input
+            type="number"
+            className="w-12 border p-1"
+            value={value.min}
+            onChange={(event) => updateValue({ min: event.target.value })}
+          />
+          ~{" "}
+          <input
+            type="number"
+            className="w-12 border p-1"
+            value={value.max}
+            onChange={(event) => updateValue({ max: event.target.value })}
+          />
         </div>
+      ) : (
+        <>
+          <label className="flex flex-col gap-1">
+            <span className="font-semibold text-slate-500">mul 最小</span>
+            <input
+              type="number"
+              className={inputClassName}
+              value={value.min}
+              onChange={(event) => updateValue({ min: event.target.value })}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="font-semibold text-slate-500">mul 最大</span>
+            <input
+              type="number"
+              className={inputClassName}
+              value={value.max}
+              onChange={(event) => updateValue({ max: event.target.value })}
+            />
+          </label>
+        </>
+      )}
 
-        <div className="p-4 border-t bg-slate-50 text-right">
-          <button onClick={onClose} className="px-4 py-2 bg-slate-800 text-white rounded hover:bg-slate-700">
-            了解
-          </button>
+      {isCreate && (onSubmit || onCancel) && (
+        <div className="flex gap-2 mt-2">
+          {onSubmit && (
+            <button onClick={onSubmit} className="flex-1 bg-blue-600 text-white text-xs py-1 rounded">
+              儲存
+            </button>
+          )}
+          {onCancel && (
+            <button onClick={onCancel} className="flex-1 bg-slate-200 text-slate-600 text-xs py-1 rounded">
+              取消
+            </button>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -375,12 +444,11 @@ const AdminPanel = ({
   onClose,
 }: AdminPanelProps) => {
   const [activeTab, setActiveTab] = useState<string>(data[0]?.slug ?? "");
-  const [showApiGuide, setShowApiGuide] = useState(false);
   const [adminView, setAdminView] = useState<"categories" | "output">("categories");
 
   const [newCatMode, setNewCatMode] = useState(false);
   const [newPromptMode, setNewPromptMode] = useState(false);
-  const [catForm, setCatForm] = useState<CategoryForm>({
+  const [catForm, setCatForm] = useState<CategoryFormState>({
     slug: "",
     label: "",
     type: "required",
@@ -390,7 +458,7 @@ const AdminPanel = ({
     max: "1",
   });
   const [promptForm, setPromptForm] = useState<PromptForm>({ value: "", label: "", is_active: true });
-  const [editCatForm, setEditCatForm] = useState<CategoryForm | null>(null);
+  const [editCatForm, setEditCatForm] = useState<CategoryFormState | null>(null);
   const [editingPromptId, setEditingPromptId] = useState<number | null>(null);
   const [promptEditForm, setPromptEditForm] = useState<PromptForm>({ value: "", label: "", is_active: true });
 
@@ -629,12 +697,6 @@ const AdminPanel = ({
               輸出編排
             </button>
           </div>
-          <button
-            onClick={() => setShowApiGuide(true)}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-xs flex items-center gap-2 text-blue-300"
-          >
-            <Code size={14} /> 開發者 API 指南
-          </button>
         </div>
       </div>
 
@@ -654,87 +716,13 @@ const AdminPanel = ({
           <div className="overflow-y-auto flex-1 min-h-0">
             {newCatMode && (
               <div className="p-3 bg-blue-50 border-b border-blue-100 animate-in slide-in-from-top-2">
-                <div className="space-y-2">
-                  <input
-                    className="w-full text-sm p-1 border rounded"
-                    placeholder="ID (Slug, e.g. style)"
-                    value={catForm.slug}
-                    onChange={(event) => setCatForm({ ...catForm, slug: event.target.value })}
-                  />
-                  <input
-                    className="w-full text-sm p-1 border rounded"
-                    placeholder="顯示名稱 (Label)"
-                    value={catForm.label}
-                    onChange={(event) => setCatForm({ ...catForm, label: event.target.value })}
-                  />
-                  <input
-                    className="w-full text-sm p-1 border rounded"
-                    placeholder="群組 (ui_group, e.g. Character)"
-                    value={catForm.ui_group}
-                    onChange={(event) => setCatForm({ ...catForm, ui_group: event.target.value })}
-                  />
-                  <div className="flex gap-2">
-                    <select
-                      className="text-sm border rounded p-1 flex-1"
-                      value={catForm.type}
-                      onChange={(event) => {
-                        const nextType = event.target.value as CategoryType;
-                        const nextOptional = nextType === "group" ? catForm.is_optional : nextType === "optional";
-                        setCatForm({ ...catForm, type: nextType, is_optional: nextOptional });
-                      }}
-                    >
-                      <option value="required">必填 (Required)</option>
-                      <option value="optional">選用 (Optional)</option>
-                      <option value="group">群組 (Group)</option>
-                    </select>
-                    <label className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
-                      <input
-                        type="checkbox"
-                        checked={catForm.is_optional}
-                        onChange={(event) =>
-                          setCatForm({
-                            ...catForm,
-                            is_optional: event.target.checked,
-                            type:
-                              catForm.type === "group"
-                                ? catForm.type
-                                : event.target.checked
-                                  ? "optional"
-                                  : "required",
-                          })
-                        }
-                      />
-                      Optional
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    mul:{" "}
-                    <input
-                      type="number"
-                      className="w-12 border p-1"
-                      value={catForm.min}
-                      onChange={(event) => setCatForm({ ...catForm, min: event.target.value })}
-                    />
-                    ~{" "}
-                    <input
-                      type="number"
-                      className="w-12 border p-1"
-                      value={catForm.max}
-                      onChange={(event) => setCatForm({ ...catForm, max: event.target.value })}
-                    />
-                  </div>
-                  <div className="flex gap-2 mt-2">
-                    <button onClick={handleAddCategory} className="flex-1 bg-blue-600 text-white text-xs py-1 rounded">
-                      儲存
-                    </button>
-                    <button
-                      onClick={() => setNewCatMode(false)}
-                      className="flex-1 bg-slate-200 text-slate-600 text-xs py-1 rounded"
-                    >
-                      取消
-                    </button>
-                  </div>
-                </div>
+                <CategoryForm
+                  mode="create"
+                  value={catForm}
+                  onChange={setCatForm}
+                  onSubmit={handleAddCategory}
+                  onCancel={() => setNewCatMode(false)}
+                />
               </div>
             )}
 
@@ -804,78 +792,7 @@ const AdminPanel = ({
 
                 {editCatForm && (
                   <div className="p-4 bg-white border-b border-slate-100">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                      <label className="flex flex-col gap-1">
-                        <span className="font-semibold text-slate-500">顯示名稱 (Label)</span>
-                        <input
-                          className="w-full text-sm p-2 border rounded"
-                          value={editCatForm.label}
-                          onChange={(event) => setEditCatForm({ ...editCatForm, label: event.target.value })}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="font-semibold text-slate-500">群組 (ui_group)</span>
-                        <input
-                          className="w-full text-sm p-2 border rounded"
-                          value={editCatForm.ui_group}
-                          onChange={(event) => setEditCatForm({ ...editCatForm, ui_group: event.target.value })}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="font-semibold text-slate-500">類型 (type)</span>
-                        <select
-                          className="w-full text-sm p-2 border rounded"
-                          value={editCatForm.type}
-                          onChange={(event) => {
-                            const nextType = event.target.value as CategoryType;
-                            const nextOptional =
-                              nextType === "group" ? editCatForm.is_optional : nextType === "optional";
-                            setEditCatForm({ ...editCatForm, type: nextType, is_optional: nextOptional });
-                          }}
-                        >
-                          <option value="required">必填 (Required)</option>
-                          <option value="optional">選用 (Optional)</option>
-                          <option value="group">群組 (Group)</option>
-                        </select>
-                      </label>
-                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                        <input
-                          type="checkbox"
-                          checked={editCatForm.is_optional}
-                          onChange={(event) =>
-                            setEditCatForm({
-                              ...editCatForm,
-                              is_optional: event.target.checked,
-                              type:
-                                editCatForm.type === "group"
-                                  ? editCatForm.type
-                                  : event.target.checked
-                                    ? "optional"
-                                    : "required",
-                            })
-                          }
-                        />
-                        Optional (is_optional)
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="font-semibold text-slate-500">mul 最小</span>
-                        <input
-                          type="number"
-                          className="w-full text-sm p-2 border rounded"
-                          value={editCatForm.min}
-                          onChange={(event) => setEditCatForm({ ...editCatForm, min: event.target.value })}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="font-semibold text-slate-500">mul 最大</span>
-                        <input
-                          type="number"
-                          className="w-full text-sm p-2 border rounded"
-                          value={editCatForm.max}
-                          onChange={(event) => setEditCatForm({ ...editCatForm, max: event.target.value })}
-                        />
-                      </label>
-                    </div>
+                    <CategoryForm mode="edit" value={editCatForm} onChange={(next) => setEditCatForm(next)} />
                   </div>
                 )}
 
@@ -1057,7 +974,6 @@ const AdminPanel = ({
         </div>
       </div>
 
-      {showApiGuide && <ApiGuideModal onClose={() => setShowApiGuide(false)} />}
     </div>
   );
 };

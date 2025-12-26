@@ -65,7 +65,13 @@ function App() {
     window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
   }, [pathname]);
 
-  const isStandalone = pathname === "/" || pathname === "/gift" || pathname.startsWith("/gift/");
+  const isStandalone =
+    pathname === "/" ||
+    pathname === "/gift" ||
+    pathname.startsWith("/gift/") ||
+    pathname === "/spotify" ||
+    pathname.startsWith("/spotify/") ||
+    pathname === "/call_spotify";
 
   if (isStandalone) {
     return <Outlet />;

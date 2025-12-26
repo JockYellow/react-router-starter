@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "react-router";
 
-import { requireBlogDb } from "../lib/d1.server";
+import { requireBlogDb } from "../../lib/d1.server";
 
 type CategoryRow = {
   id: number;

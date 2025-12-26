@@ -3,7 +3,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { useEffect, useState } from "react";
 import { Trash2, MessageCircle, Gift, Info, User, Quote } from "lucide-react";
 
-import { requireBlogDb } from "../lib/d1.server";
+import { requireBlogDb } from "../../lib/d1.server";
 
 interface VoteRecord {
   id: number;

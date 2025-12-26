@@ -3,7 +3,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { Crown, PauseCircle, Zap, Lock } from "lucide-react";
 import type { D1Database } from "@cloudflare/workers-types";
 
-import { requireBlogDb } from "../lib/d1.server";
+import { requireBlogDb } from "../../lib/d1.server";
 
 function ensurePlayerColumns(db: D1Database) {
   return db
