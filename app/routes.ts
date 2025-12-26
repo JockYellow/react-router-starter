@@ -12,6 +12,7 @@ export default [
   route("admin/login", "routes/admin.login.tsx"),
   route("admin/blog-edit", "routes/admin.blog-edit.tsx"),
   route("admin", "routes/admin.tsx"),
+  route("api/admin", "routes/api.admin.tsx"),
   route("api/data", "routes/api.data.tsx"),
   route("api/output-configs", "routes/api.output-configs.tsx"),
   route("outerspace", "routes/outerspace/index.tsx"),

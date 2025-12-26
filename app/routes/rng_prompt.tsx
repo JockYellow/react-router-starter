@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Code,
@@ -79,13 +79,13 @@ type ApiGuideModalProps = {
 
 type AdminPanelProps = {
   data: Category[];
-  onUpdateData: (nextData: Category[]) => void;
   outputConfigs: OutputConfig[];
   activeOutputConfigId: string | null;
   onCreateOutputConfig: (name: string, blocks: OutputBlock[]) => Promise<string | null>;
   onUpdateOutputConfig: (id: string, name: string, blocks: OutputBlock[]) => Promise<void>;
   onDeleteOutputConfig: (id: string) => Promise<void>;
   onSetActiveOutputConfig: (id: string) => Promise<void>;
+  onRefreshData: () => Promise<void>;
   onClose: () => void;
 };
 
@@ -120,6 +120,9 @@ type TabItem = {
 type StickyTopAreaProps = {
   previewText: string;
   charCount: number;
+  outputConfigs: OutputConfig[];
+  activeOutputConfigId: string | null;
+  onSelectOutputConfig: (id: string) => void;
   onGlobalRoll: () => void;
   onCopy: () => void;
   onOpenAdmin: () => void;
@@ -185,10 +188,44 @@ type CopyToastProps = {
 const TAB_ALL = "全部";
 const TAB_GENERAL = "一般";
 const GENERAL_GROUP_IDS = new Set(["Base", "Default", "一般", "General", "general"]);
+const GROUP_LIMITS_COOKIE = "rng_group_limits";
 
 const getCategoryGroupId = (category: Category) => category.ui_group?.trim() || "Default";
 const isGeneralGroupId = (groupId: string) => GENERAL_GROUP_IDS.has(groupId);
 const isOptionalCategory = (category: Category) => category.is_optional ?? category.type === "optional";
+
+const readCookieValue = (name: string) => {
+  if (typeof document === "undefined") return "";
+  const match = document.cookie.split("; ").find((row) => row.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : "";
+};
+
+const readGroupLimitsCookie = () => {
+  const raw = readCookieValue(GROUP_LIMITS_COOKIE);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, GroupLimit>;
+    const normalized: Record<string, GroupLimit> = {};
+    Object.entries(parsed).forEach(([key, value]) => {
+      if (!value || typeof value !== "object") return;
+      const min = Number(value.min);
+      const max = Number(value.max);
+      if (Number.isNaN(min) || Number.isNaN(max)) return;
+      const safeMin = Math.max(0, min);
+      const safeMax = Math.max(safeMin, max);
+      normalized[key] = { min: safeMin, max: safeMax };
+    });
+    return normalized;
+  } catch (_error) {
+    return {};
+  }
+};
+
+const writeGroupLimitsCookie = (limits: Record<string, GroupLimit>) => {
+  if (typeof document === "undefined") return;
+  const payload = encodeURIComponent(JSON.stringify(limits));
+  document.cookie = `${GROUP_LIMITS_COOKIE}=${payload}; path=/; max-age=31536000`;
+};
 
 // --- Mock Data ---
 const MOCK_DB_DATA: Category[] = [
@@ -328,13 +365,13 @@ label (TEXT), is_active (BOOL)`}</code>
 
 const AdminPanel = ({
   data,
-  onUpdateData,
   outputConfigs,
   activeOutputConfigId,
   onCreateOutputConfig,
   onUpdateOutputConfig,
   onDeleteOutputConfig,
   onSetActiveOutputConfig,
+  onRefreshData,
   onClose,
 }: AdminPanelProps) => {
   const [activeTab, setActiveTab] = useState<string>(data[0]?.slug ?? "");
@@ -382,7 +419,23 @@ const AdminPanel = ({
     return isOptional ? "optional" : "required";
   };
 
-  const handleAddCategory = () => {
+  const runAdminMutation = async (payload: Record<string, unknown>, errorMessage: string) => {
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Admin API failed");
+      await onRefreshData();
+      return true;
+    } catch (_error) {
+      window.alert(errorMessage);
+      return false;
+    }
+  };
+
+  const handleAddCategory = async () => {
     if (!catForm.slug || !catForm.label) {
       window.alert("請填寫 Slug 和 Label");
       return;
@@ -394,22 +447,26 @@ const AdminPanel = ({
     const safeMax = Number.isNaN(maxCount) ? 1 : maxCount;
 
     const resolvedType = resolveCategoryType(catForm.type, catForm.is_optional);
-    const newCat: Category = {
-      id: Date.now(),
-      slug: catForm.slug,
-      label: catForm.label,
-      type: resolvedType,
-      ui_group: catForm.ui_group.trim() || "Default",
-      is_optional: catForm.is_optional,
-      min_count: safeMin,
-      max_count: safeMax,
-      items: [],
-      sort_order: data.length + 1,
-    };
-
-    onUpdateData([...data, newCat]);
+    const ok = await runAdminMutation(
+      {
+        action: "create",
+        table: "categories",
+        data: {
+          slug: catForm.slug.trim(),
+          label: catForm.label.trim(),
+          type: resolvedType,
+          ui_group: catForm.ui_group.trim() || "Default",
+          is_optional: catForm.is_optional,
+          min_count: safeMin,
+          max_count: safeMax,
+          sort_order: data.length + 1,
+        },
+      },
+      "新增類別失敗",
+    );
+    if (!ok) return;
     setNewCatMode(false);
-    setActiveTab(newCat.slug);
+    setActiveTab(catForm.slug.trim());
     setCatForm({
       slug: "",
       label: "",
@@ -421,14 +478,14 @@ const AdminPanel = ({
     });
   };
 
-  const handleDeleteCategory = (slug: string) => {
+  const handleDeleteCategory = async (slug: string) => {
     if (!window.confirm(`確定要刪除類別 ${slug} 嗎？底下的所有 Prompt 都會消失！`)) return;
-    const newData = data.filter((cat) => cat.slug !== slug);
-    onUpdateData(newData);
-    if (activeTab === slug) setActiveTab(newData[0]?.slug ?? "");
+    const ok = await runAdminMutation({ action: "delete", table: "categories", slug }, "刪除類別失敗");
+    if (!ok) return;
+    if (activeTab === slug) setActiveTab(data.find((cat) => cat.slug !== slug)?.slug ?? "");
   };
 
-  const handleUpdateCategory = () => {
+  const handleUpdateCategory = async () => {
     if (!activeCategory || !editCatForm) return;
     if (!editCatForm.label.trim()) {
       window.alert("請填寫 Label");
@@ -439,60 +496,52 @@ const AdminPanel = ({
     const safeMin = Number.isNaN(minCount) ? 0 : Math.max(0, minCount);
     const safeMax = Number.isNaN(maxCount) ? safeMin : Math.max(safeMin, maxCount);
     const resolvedType = resolveCategoryType(editCatForm.type, editCatForm.is_optional);
-
-    const updatedData = data.map((cat) => {
-      if (cat.slug !== activeCategory.slug) return cat;
-      return {
-        ...cat,
-        label: editCatForm.label,
-        ui_group: editCatForm.ui_group.trim() || "Default",
-        is_optional: editCatForm.is_optional,
-        type: resolvedType,
-        min_count: safeMin,
-        max_count: safeMax,
-      };
-    });
-    onUpdateData(updatedData);
+    await runAdminMutation(
+      {
+        action: "update",
+        table: "categories",
+        id: activeCategory.id,
+        data: {
+          label: editCatForm.label.trim(),
+          ui_group: editCatForm.ui_group.trim() || "Default",
+          is_optional: editCatForm.is_optional,
+          type: resolvedType,
+          min_count: safeMin,
+          max_count: safeMax,
+          sort_order: activeCategory.sort_order ?? 0,
+        },
+      },
+      "更新類別失敗",
+    );
   };
 
-  const handleAddPrompt = () => {
+  const handleAddPrompt = async () => {
     if (!promptForm.value || !promptForm.label) {
       window.alert("請填寫 Prompt 和 Label");
       return;
     }
 
-    const updatedData = data.map((cat) => {
-      if (cat.slug === activeTab) {
-        return {
-          ...cat,
-          items: [
-            ...cat.items,
-            {
-              id: Date.now(),
-              value: promptForm.value,
-              label: promptForm.label,
-              is_active: promptForm.is_active ?? true,
-            },
-          ],
-        };
-      }
-      return cat;
-    });
-
-    onUpdateData(updatedData);
+    const ok = await runAdminMutation(
+      {
+        action: "create",
+        table: "prompts",
+        data: {
+          category_slug: activeTab,
+          value: promptForm.value.trim(),
+          label: promptForm.label.trim(),
+          is_active: promptForm.is_active ?? true,
+        },
+      },
+      "新增 Prompt 失敗",
+    );
+    if (!ok) return;
     setNewPromptMode(false);
     setPromptForm({ value: "", label: "", is_active: true });
   };
 
-  const handleDeletePrompt = (itemId: number) => {
+  const handleDeletePrompt = async (itemId: number) => {
     if (!window.confirm("確定刪除此 Prompt?")) return;
-    const updatedData = data.map((cat) => {
-      if (cat.slug === activeTab) {
-        return { ...cat, items: cat.items.filter((item) => item.id !== itemId) };
-      }
-      return cat;
-    });
-    onUpdateData(updatedData);
+    await runAdminMutation({ action: "delete", table: "prompts", id: itemId }, "刪除 Prompt 失敗");
   };
 
   const handleStartEditPrompt = (item: PromptItem) => {
@@ -508,49 +557,51 @@ const AdminPanel = ({
     setEditingPromptId(null);
   };
 
-  const handleSavePrompt = () => {
+  const handleSavePrompt = async () => {
     if (!activeCategory || editingPromptId === null) return;
     if (!promptEditForm.value.trim()) {
       window.alert("請填寫 Prompt Value");
       return;
     }
-    const updatedData = data.map((cat) => {
-      if (cat.slug !== activeCategory.slug) return cat;
-      return {
-        ...cat,
-        items: cat.items.map((item) =>
-          item.id === editingPromptId
-            ? {
-                ...item,
-                value: promptEditForm.value,
-                label: promptEditForm.label,
-                is_active: promptEditForm.is_active ?? true,
-              }
-            : item,
-        ),
-      };
-    });
-    onUpdateData(updatedData);
+    const ok = await runAdminMutation(
+      {
+        action: "update",
+        table: "prompts",
+        id: editingPromptId,
+        data: {
+          value: promptEditForm.value.trim(),
+          label: promptEditForm.label.trim(),
+          is_active: promptEditForm.is_active ?? true,
+        },
+      },
+      "更新 Prompt 失敗",
+    );
+    if (!ok) return;
     setEditingPromptId(null);
   };
 
-  const handleTogglePromptActive = (itemId: number) => {
+  const handleTogglePromptActive = async (itemId: number) => {
     if (!activeCategory) return;
-    const updatedData = data.map((cat) => {
-      if (cat.slug !== activeCategory.slug) return cat;
-      return {
-        ...cat,
-        items: cat.items.map((item) =>
-          item.id === itemId ? { ...item, is_active: !item.is_active } : item,
-        ),
-      };
-    });
-    onUpdateData(updatedData);
+    const target = activeCategory.items.find((item) => item.id === itemId);
+    if (!target) return;
+    await runAdminMutation(
+      {
+        action: "update",
+        table: "prompts",
+        id: itemId,
+        data: {
+          value: target.value,
+          label: target.label ?? "",
+          is_active: !target.is_active,
+        },
+      },
+      "更新 Prompt 狀態失敗",
+    );
   };
 
   return (
     <div className="fixed inset-0 bg-slate-100 z-50 flex flex-col">
-      <div className="bg-slate-900 text-white p-4 shadow-md flex justify-between items-center">
+      <div className="bg-slate-900 text-white p-4 shadow-md flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-full transition-colors">
             <ArrowLeft size={20} />
@@ -559,7 +610,7 @@ const AdminPanel = ({
             <Database size={20} className="text-blue-400" /> 資料庫管理
           </h2>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <div className="flex rounded-md border border-slate-700 overflow-hidden text-xs">
             <button
               onClick={() => setAdminView("categories")}
@@ -587,8 +638,8 @@ const AdminPanel = ({
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="w-1/4 min-w-[250px] bg-white border-r border-slate-200 flex flex-col">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        <div className="w-full lg:w-1/4 lg:min-w-[250px] min-w-0 bg-white border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col max-h-[45vh] lg:max-h-none">
           <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">類別列表</span>
             <button
@@ -600,7 +651,7 @@ const AdminPanel = ({
             </button>
           </div>
 
-          <div className="overflow-y-auto flex-1">
+          <div className="overflow-y-auto flex-1 min-h-0">
             {newCatMode && (
               <div className="p-3 bg-blue-50 border-b border-blue-100 animate-in slide-in-from-top-2">
                 <div className="space-y-2">
@@ -718,7 +769,7 @@ const AdminPanel = ({
           </div>
         </div>
 
-        <div className="flex-1 bg-slate-50 flex flex-col">
+        <div className="flex-1 bg-slate-50 flex flex-col min-h-0">
           {adminView === "categories" ? (
             activeCategory ? (
               <>
@@ -829,8 +880,8 @@ const AdminPanel = ({
                 )}
 
                 {newPromptMode && (
-                  <div className="p-4 bg-emerald-50 border-b border-emerald-100 flex gap-2 items-end animate-in fade-in">
-                    <div className="flex-1">
+                  <div className="p-4 bg-emerald-50 border-b border-emerald-100 flex flex-col md:flex-row gap-2 items-end animate-in fade-in">
+                    <div className="flex-1 w-full">
                       <label className="text-[10px] text-emerald-700 font-bold uppercase">Prompt Value (English)</label>
                       <input
                         autoFocus
@@ -840,7 +891,7 @@ const AdminPanel = ({
                         onChange={(event) => setPromptForm({ ...promptForm, value: event.target.value })}
                       />
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 w-full">
                       <label className="text-[10px] text-emerald-700 font-bold uppercase">顯示名稱 (Chinese)</label>
                       <input
                         className="w-full p-2 border border-emerald-300 rounded text-sm"
@@ -872,19 +923,20 @@ const AdminPanel = ({
                   </div>
                 )}
 
-                <div className="p-4 overflow-y-auto flex-1">
+                <div className="p-4 overflow-y-auto flex-1 min-h-0">
                   <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-                    <table className="w-full text-sm text-left">
-                      <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
-                        <tr>
-                          <th className="p-3 w-16 text-center">ID</th>
-                          <th className="p-3">Prompt Value</th>
-                          <th className="p-3">標籤 (Label)</th>
-                          <th className="p-3 w-20 text-center">狀態</th>
-                          <th className="p-3 w-28 text-center">操作</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                          <tr>
+                            <th className="p-3 w-16 text-center">ID</th>
+                            <th className="p-3">Prompt Value</th>
+                            <th className="p-3">標籤 (Label)</th>
+                            <th className="p-3 w-20 text-center">狀態</th>
+                            <th className="p-3 w-28 text-center">操作</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
                         {activeCategory.items.map((item) => {
                           const isEditing = editingPromptId === item.id;
                           return (
@@ -983,7 +1035,8 @@ const AdminPanel = ({
                           </tr>
                         )}
                       </tbody>
-                    </table>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </>
@@ -1041,6 +1094,52 @@ const getDefaultGroupBlocks = (categories: Category[]) => {
   }));
 };
 
+const blocksToTemplate = (blocks: OutputBlock[]) => {
+  let template = "";
+  blocks.forEach((block, index) => {
+    if (block.type === "text") {
+      template += block.text ?? "";
+      return;
+    }
+    const token =
+      block.type === "group" ? `{{group:${block.groupId ?? ""}}}` : `{{cat:${block.categorySlug ?? ""}}}`;
+    const prev = blocks[index - 1];
+    if (template && prev && prev.type !== "text") template += " ";
+    template += token;
+  });
+  return template;
+};
+
+const templateToBlocks = (template: string, createId: () => string) => {
+  const blocks: OutputBlock[] = [];
+  const tokenRegex = /{{\s*(group|cat)\s*:\s*([^}]+)\s*}}/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = tokenRegex.exec(template)) !== null) {
+    const before = template.slice(lastIndex, match.index);
+    if (before) {
+      blocks.push({ id: createId(), type: "text", text: before });
+    }
+    const rawValue = match[2]?.trim();
+    if (rawValue) {
+      if (match[1] === "group") {
+        blocks.push({ id: createId(), type: "group", groupId: rawValue });
+      } else {
+        blocks.push({ id: createId(), type: "category", categorySlug: rawValue });
+      }
+    }
+    lastIndex = tokenRegex.lastIndex;
+  }
+
+  const tail = template.slice(lastIndex);
+  if (tail) {
+    blocks.push({ id: createId(), type: "text", text: tail });
+  }
+
+  return blocks;
+};
+
 const NEW_OUTPUT_CONFIG_ID = "__new__";
 
 const OutputComposer = ({
@@ -1052,16 +1151,13 @@ const OutputComposer = ({
   onDeleteConfig,
   onSetActiveConfig,
 }: OutputComposerProps) => {
-  const [textDraft, setTextDraft] = useState("");
   const [selectedConfigId, setSelectedConfigId] = useState<string>(
     activeConfigId ?? configs[0]?.id ?? NEW_OUTPUT_CONFIG_ID,
   );
   const [draftName, setDraftName] = useState("");
-  const [draftBlocks, setDraftBlocks] = useState<OutputBlock[]>([]);
+  const [templateDraft, setTemplateDraft] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dropIndex, setDropIndex] = useState<number | null>(null);
-  const [selectedGroupId, setSelectedGroupId] = useState<string>(TAB_GENERAL);
+  const templateRef = useRef<HTMLTextAreaElement | null>(null);
   const hasInitializedConfigRef = useRef(false);
 
   useEffect(() => {
@@ -1081,13 +1177,14 @@ const OutputComposer = ({
     const selected = configs.find((config) => config.id === selectedConfigId);
     if (selected) {
       setDraftName(selected.name);
-      setDraftBlocks(selected.blocks ?? []);
+      setTemplateDraft(blocksToTemplate(selected.blocks ?? []));
       return;
     }
     if (selectedConfigId === NEW_OUTPUT_CONFIG_ID) {
       setDraftName("");
       const groupBlocks = getDefaultGroupBlocks(categories);
-      setDraftBlocks(groupBlocks.length > 0 ? groupBlocks : getDefaultOutputBlocks(categories));
+      const defaultBlocks = groupBlocks.length > 0 ? groupBlocks : getDefaultOutputBlocks(categories);
+      setTemplateDraft(blocksToTemplate(defaultBlocks));
     }
   }, [selectedConfigId, configs, categories]);
 
@@ -1112,140 +1209,35 @@ const OutputComposer = ({
     }));
   }, [orderedCategories]);
 
-  useEffect(() => {
-    if (groupOptions.length === 0) return;
-    if (!groupOptions.some((group) => group.id === selectedGroupId)) {
-      setSelectedGroupId(groupOptions[0].id);
-    }
-  }, [groupOptions, selectedGroupId]);
-
   const createBlockId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const selectedConfig = configs.find((config) => config.id === selectedConfigId);
   const isActiveSelected = selectedConfigId !== NEW_OUTPUT_CONFIG_ID && selectedConfigId === activeConfigId;
 
-  const handleAddGroupBlock = () => {
-    if (!selectedGroupId) return;
-    setDraftBlocks((prev) => [
-      ...prev,
-      {
-        id: createBlockId(),
-        type: "group",
-        groupId: selectedGroupId,
-      },
-    ]);
-  };
-
-  const handleAddTextBlock = () => {
-    if (!textDraft.trim()) return;
-    setDraftBlocks((prev) => [
-      ...prev,
-      {
-        id: createBlockId(),
-        type: "text",
-        text: textDraft,
-      },
-    ]);
-    setTextDraft("");
-  };
-
-  const handleUpdateBlock = (id: string, patch: Partial<OutputBlock>) => {
-    setDraftBlocks(draftBlocks.map((block) => (block.id === id ? { ...block, ...patch } : block)));
-  };
-
-  const handleDeleteBlock = (id: string) => {
-    setDraftBlocks(draftBlocks.filter((block) => block.id !== id));
-  };
-
-  const moveBlockToIndex = (sourceId: string, targetIndex: number) => {
-    const sourceIndex = draftBlocks.findIndex((block) => block.id === sourceId);
-    if (sourceIndex < 0) return;
-    const next = [...draftBlocks];
-    const [item] = next.splice(sourceIndex, 1);
-    const normalizedIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
-    next.splice(Math.max(0, Math.min(normalizedIndex, next.length)), 0, item);
-    setDraftBlocks(next);
-  };
-
-  const parseDragData = (raw: string | null) => {
-    if (!raw) return null;
-    if (raw.startsWith("new-group:")) return { type: "new-group" as const, groupId: raw.slice(10) };
-    if (raw.startsWith("new-category:")) return { type: "new-category" as const, slug: raw.slice(13) };
-    if (raw.startsWith("move:")) return { type: "move" as const, id: raw.slice(5) };
-    return { type: "move" as const, id: raw };
-  };
-
-  const insertBlockAtIndex = (block: OutputBlock, index: number) => {
-    const next = [...draftBlocks];
-    next.splice(Math.max(0, Math.min(index, next.length)), 0, block);
-    setDraftBlocks(next);
-  };
-
-  const handleDragStart = (event: DragEvent<HTMLElement>, id: string) => {
-    event.dataTransfer.effectAllowed = "move";
-    const payload = `move:${id}`;
-    event.dataTransfer.setData("text/plain", payload);
-    setDraggingId(payload);
-  };
-
-  const handlePaletteDragStart = (event: DragEvent<HTMLElement>, groupId: string) => {
-    event.dataTransfer.effectAllowed = "copy";
-    const payload = `new-group:${groupId}`;
-    event.dataTransfer.setData("text/plain", payload);
-    setDraggingId(payload);
-  };
-
-  const handleDragOverIndex = (event: DragEvent<HTMLElement>, index: number) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    setDropIndex(index);
-  };
-
-  const handleDropAtIndex = (event: DragEvent<HTMLElement>, index: number) => {
-    event.preventDefault();
-    const raw = event.dataTransfer.getData("text/plain") || draggingId;
-    const data = parseDragData(raw);
-    if (data?.type === "move") {
-      moveBlockToIndex(data.id, index);
-    } else if (data?.type === "new-group") {
-      insertBlockAtIndex(
-        {
-          id: createBlockId(),
-          type: "group",
-          groupId: data.groupId,
-        },
-        index,
-      );
-    } else if (data?.type === "new-category") {
-      insertBlockAtIndex(
-        {
-          id: createBlockId(),
-          type: "category",
-          categorySlug: data.slug,
-        },
-        index,
-      );
+  const insertTokenAtCursor = (token: string) => {
+    const target = templateRef.current;
+    if (!target) {
+      setTemplateDraft((prev) => prev + token);
+      return;
     }
-    setDraggingId(null);
-    setDropIndex(null);
+    const start = target.selectionStart ?? templateDraft.length;
+    const end = target.selectionEnd ?? templateDraft.length;
+    const nextValue = `${templateDraft.slice(0, start)}${token}${templateDraft.slice(end)}`;
+    setTemplateDraft(nextValue);
+    window.requestAnimationFrame(() => {
+      target.focus();
+      const cursor = start + token.length;
+      target.setSelectionRange(cursor, cursor);
+    });
   };
 
-  const handleDragEnd = () => {
-    setDraggingId(null);
-    setDropIndex(null);
-  };
-
-  const getBlockLabel = (block: OutputBlock) => {
-    if (block.type === "text") return "文字";
-    if (block.type === "group") {
-      const groupId = block.groupId ?? "群組";
-      return groupId === TAB_GENERAL ? TAB_GENERAL : groupId;
-    }
-    return "類別";
+  const handleInsertGroup = (groupId: string) => {
+    insertTokenAtCursor(`{{group:${groupId}}}`);
   };
 
   const handleCreateConfig = async () => {
     setIsSaving(true);
-    const newId = await onCreateConfig(draftName, draftBlocks);
+    const blocks = templateToBlocks(templateDraft, createBlockId);
+    const newId = await onCreateConfig(draftName, blocks);
     setIsSaving(false);
     if (newId) setSelectedConfigId(newId);
   };
@@ -1253,7 +1245,8 @@ const OutputComposer = ({
   const handleSaveConfig = async () => {
     if (!selectedConfig) return;
     setIsSaving(true);
-    await onUpdateConfig(selectedConfig.id, draftName, draftBlocks);
+    const blocks = templateToBlocks(templateDraft, createBlockId);
+    await onUpdateConfig(selectedConfig.id, draftName, blocks);
     setIsSaving(false);
   };
 
@@ -1271,12 +1264,23 @@ const OutputComposer = ({
     await onSetActiveConfig(selectedConfig.id);
   };
 
+  const handleResetToGroups = () => {
+    const blocks = getDefaultGroupBlocks(categories);
+    const fallbackBlocks = blocks.length > 0 ? blocks : getDefaultOutputBlocks(categories);
+    setTemplateDraft(blocksToTemplate(fallbackBlocks));
+  };
+
+  const handleResetToCategories = () => {
+    const blocks = getDefaultOutputBlocks(categories);
+    setTemplateDraft(blocksToTemplate(blocks));
+  };
+
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col min-h-0">
       <div className="p-4 bg-white border-b border-slate-200">
         <h3 className="text-lg font-bold text-slate-800">輸出編排</h3>
         <p className="text-xs text-slate-500 mt-1">
-          用「拼圖」方式決定輸出順序，可插入連結詞或文字段落，不影響 categories 的 ID。
+          使用範本拼接文字與群組變數，輸入 <span className="font-mono">{`{{group:群組名}}`}</span> 即可插入。
         </p>
       </div>
 
@@ -1339,227 +1343,61 @@ const OutputComposer = ({
               </>
             )}
           </div>
+        </div>
 
+        <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4 space-y-3">
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span className="font-semibold">範本編輯器</span>
+            <span>點選群組或直接輸入文字</span>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-semibold text-slate-500">群組 (ui-group)</span>
-            <div className="flex flex-wrap gap-2">
-              {groupOptions.map((group) => (
+            <span className="text-[11px] font-semibold text-slate-500">插入群組 (ui-group)</span>
+            {groupOptions.length === 0 ? (
+              <span className="text-xs text-slate-400">尚無可用群組</span>
+            ) : (
+              groupOptions.map((group) => (
                 <button
                   key={group.id}
-                  onClick={() => setSelectedGroupId(group.id)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-full transition ${
-                    group.id === selectedGroupId
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-                  }`}
+                  type="button"
+                  onClick={() => handleInsertGroup(group.id)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-full bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                  title={`插入 ${group.label}`}
                 >
                   {group.label}
                 </button>
-              ))}
-            </div>
+              ))
+            )}
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
+          <textarea
+            ref={templateRef}
+            className="w-full min-h-[220px] max-h-[420px] border border-slate-200 rounded-lg p-3 text-sm font-mono text-slate-700 leading-relaxed resize-y"
+            placeholder="在這裡輸入文字，點選上方群組即可插入變數。"
+            value={templateDraft}
+            onChange={(event) => setTemplateDraft(event.target.value)}
+          />
+          <div className="text-[11px] text-slate-500">
+            支援語法：<span className="font-mono">{`{{group:群組名}}`}</span>（建議），或{" "}
+            <span className="font-mono">{`{{cat:slug}}`}</span>（進階）。
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs text-slate-500">
             <button
-              onClick={handleAddGroupBlock}
-              disabled={!selectedGroupId}
-              className="px-3 py-2 text-xs font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-            >
-              加入群組拼圖
-            </button>
-            <span className="text-[11px] text-slate-400">已選群組：{selectedGroupId || "-"}</span>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <div className="text-[11px] font-semibold text-slate-500">拖曳群組 (ui-group)</div>
-            <div className="flex flex-wrap gap-2">
-              {groupOptions.length === 0 ? (
-                <span className="text-xs text-slate-400">尚無可拖曳的群組</span>
-              ) : (
-                groupOptions.map((group) => (
-                  <button
-                    key={`palette-group-${group.id}`}
-                    type="button"
-                    draggable
-                    onDragStart={(event) => handlePaletteDragStart(event, group.id)}
-                    onDragEnd={handleDragEnd}
-                    className="px-3 py-1.5 text-xs rounded-full bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-grab"
-                    title={`拖曳群組 ${group.label}`}
-                  >
-                    {group.label}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <input
-              className="flex-1 min-w-[200px] text-sm border rounded p-2"
-              placeholder="輸入連結詞或文字段落，例如: with, and, in the style of"
-              value={textDraft}
-              onChange={(event) => setTextDraft(event.target.value)}
-            />
-            <button
-              onClick={handleAddTextBlock}
-              className="px-3 py-2 text-xs font-semibold rounded-md bg-slate-800 text-white hover:bg-slate-700"
-            >
-              加入文字段
-            </button>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <button
-              onClick={() => setDraftBlocks(getDefaultGroupBlocks(categories))}
+              onClick={handleResetToGroups}
               className="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200"
             >
               以群組重建
             </button>
             <button
-              onClick={() => setDraftBlocks(getDefaultOutputBlocks(categories))}
+              onClick={handleResetToCategories}
               className="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200"
             >
               以類別重建
             </button>
             <button
-              onClick={() => setDraftBlocks([])}
+              onClick={() => setTemplateDraft("")}
               className="px-3 py-1.5 rounded bg-rose-50 text-rose-700 hover:bg-rose-100"
             >
-              清空編排
+              清空範本
             </button>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4 space-y-3">
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span className="font-semibold">拼接滑條</span>
-            <span>拖曳方塊排序，文字可直接改寫</span>
-          </div>
-          <div
-            className="border border-dashed border-slate-200 rounded-lg p-3 bg-slate-50/60 max-h-[240px] overflow-y-auto overflow-x-hidden"
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              event.preventDefault();
-              const raw = event.dataTransfer.getData("text/plain") || draggingId;
-              const data = parseDragData(raw);
-              if (data?.type === "move") {
-                moveBlockToIndex(data.id, draftBlocks.length);
-              } else if (data?.type === "new-group") {
-                insertBlockAtIndex(
-                  {
-                    id: createBlockId(),
-                    type: "group",
-                    groupId: data.groupId,
-                  },
-                  draftBlocks.length,
-                );
-              } else if (data?.type === "new-category") {
-                insertBlockAtIndex(
-                  {
-                    id: createBlockId(),
-                    type: "category",
-                    categorySlug: data.slug,
-                  },
-                  draftBlocks.length,
-                );
-              }
-              setDraggingId(null);
-              setDropIndex(null);
-            }}
-          >
-            {draftBlocks.length === 0 ? (
-              <div className="text-sm text-slate-400 py-4 text-center">尚未設定輸出拼圖，會使用 categories 預設順序。</div>
-            ) : (
-              <div className="flex flex-wrap items-start gap-2 min-h-[54px]">
-                {draftBlocks.map((block, index) => {
-                  const isDragging = draggingId === `move:${block.id}`;
-                  const isDropHere = dropIndex === index;
-                  return (
-                    <div key={block.id} className="flex items-center gap-2">
-                      <div
-                        onDragOver={(event) => handleDragOverIndex(event, index)}
-                        onDrop={(event) => handleDropAtIndex(event, index)}
-                        className={`h-10 w-4 flex items-center justify-center transition ${
-                          isDropHere ? "bg-blue-100/70 rounded-full" : ""
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-6 w-[2px] rounded-full ${
-                            isDropHere ? "bg-blue-500" : "bg-slate-200"
-                          }`}
-                        />
-                      </div>
-                      <div
-                        draggable
-                        onDragStart={(event) => handleDragStart(event, block.id)}
-                        onDragEnd={handleDragEnd}
-                        className={`flex items-center gap-2 rounded-full border px-3 py-2 bg-white shadow-sm transition max-w-full cursor-grab ${
-                          isDragging ? "opacity-50" : ""
-                        }`}
-                      >
-                        <span className="text-[10px] text-slate-400 w-4 text-center">{index + 1}</span>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                          {getBlockLabel(block)}
-                        </span>
-                        {block.type === "group" ? (
-                          <select
-                            draggable={false}
-                            className="text-xs bg-transparent border border-slate-200 rounded-full px-2 py-1 max-w-[180px] truncate"
-                            value={block.groupId ?? ""}
-                            onChange={(event) => handleUpdateBlock(block.id, { groupId: event.target.value })}
-                          >
-                            {groupOptions.map((group) => (
-                              <option key={group.id} value={group.id}>
-                                {group.label}
-                              </option>
-                            ))}
-                          </select>
-                        ) : block.type === "category" ? (
-                          <select
-                            draggable={false}
-                            className="text-xs bg-transparent border border-slate-200 rounded-full px-2 py-1 max-w-[180px] truncate"
-                            value={block.categorySlug ?? ""}
-                            onChange={(event) => handleUpdateBlock(block.id, { categorySlug: event.target.value })}
-                          >
-                            {orderedCategories.map((cat) => (
-                              <option key={cat.slug} value={cat.slug}>
-                                {cat.label}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            draggable={false}
-                            className="text-xs bg-transparent border border-slate-200 rounded-full px-2 py-1 min-w-[120px] max-w-[200px] w-[140px] sm:w-[180px]"
-                            placeholder="輸入文字"
-                            value={block.text ?? ""}
-                            onChange={(event) => handleUpdateBlock(block.id, { text: event.target.value })}
-                          />
-                        )}
-                        <button
-                          onClick={() => handleDeleteBlock(block.id)}
-                          className="text-[10px] text-rose-600 hover:text-rose-700"
-                          title="移除"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-                <div
-                  onDragOver={(event) => handleDragOverIndex(event, draftBlocks.length)}
-                  onDrop={(event) => handleDropAtIndex(event, draftBlocks.length)}
-                  className={`h-10 w-4 flex items-center justify-center transition ${
-                    dropIndex === draftBlocks.length ? "bg-blue-100/70 rounded-full" : ""
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-6 w-[2px] rounded-full ${
-                      dropIndex === draftBlocks.length ? "bg-blue-500" : "bg-slate-200"
-                    }`}
-                  />
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -1567,7 +1405,16 @@ const OutputComposer = ({
   );
 };
 
-const StickyTopArea = ({ previewText, charCount, onGlobalRoll, onCopy, onOpenAdmin }: StickyTopAreaProps) => {
+const StickyTopArea = ({
+  previewText,
+  charCount,
+  outputConfigs,
+  activeOutputConfigId,
+  onSelectOutputConfig,
+  onGlobalRoll,
+  onCopy,
+  onOpenAdmin,
+}: StickyTopAreaProps) => {
   return (
     <div className="sticky top-0 z-40 bg-slate-50/95 backdrop-blur border-b border-slate-200">
       <div className="max-w-5xl mx-auto px-4 pt-4 pb-3 space-y-3">
@@ -1587,6 +1434,30 @@ const StickyTopArea = ({ previewText, charCount, onGlobalRoll, onCopy, onOpenAdm
         <div className="bg-white rounded-lg p-3 border border-slate-200 min-h-[60px] max-h-[80px] overflow-y-auto text-sm font-mono text-slate-700 whitespace-pre-wrap break-all">
           {previewText || <span className="text-slate-400 italic">...</span>}
         </div>
+
+        {outputConfigs.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <span className="font-semibold">使用範本</span>
+            <select
+              className="flex-1 min-w-[200px] border rounded px-2 py-1 text-xs text-slate-700"
+              value={activeOutputConfigId ?? ""}
+              onChange={(event) => {
+                const nextId = event.target.value;
+                if (nextId) onSelectOutputConfig(nextId);
+              }}
+            >
+              <option value="" disabled>
+                選擇範本
+              </option>
+              {outputConfigs.map((config) => (
+                <option key={config.id} value={config.id}>
+                  {config.name}
+                  {config.id === activeOutputConfigId ? "（使用中）" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="flex gap-2">
           <button
@@ -2023,11 +1894,18 @@ export default function RngPromptRoute() {
   const [view, setView] = useState<"generator" | "admin">("generator");
   const toastTimerRef = useRef<number | null>(null);
   const hasAutoRolledRef = useRef(false);
+  const groupLimitsCookieRef = useRef<Record<string, GroupLimit>>({});
 
   const applyOutputConfigs = (configs: OutputConfig[]) => {
     setOutputConfigs(configs);
     const active = configs.find((config) => config.is_active);
     setActiveOutputConfigId(active?.id ?? null);
+  };
+
+  const refreshConfigData = async () => {
+    const res = await fetch("/api/data");
+    if (!res.ok) throw new Error("API not found");
+    return (await res.json()) as Category[];
   };
 
   const fetchOutputConfigs = async () => {
@@ -2042,9 +1920,7 @@ export default function RngPromptRoute() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const res = await fetch("/api/data");
-        if (!res.ok) throw new Error("API not found");
-        const data = (await res.json()) as Category[];
+        const data = await refreshConfigData();
         if (!cancelled) {
           setConfigData(data);
           setUseMock(false);
@@ -2079,6 +1955,10 @@ export default function RngPromptRoute() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    groupLimitsCookieRef.current = readGroupLimitsCookie();
   }, []);
 
   useEffect(() => {
@@ -2121,6 +2001,7 @@ export default function RngPromptRoute() {
     setGroupLimits((prev) => {
       const next = { ...prev };
       const groupCounts = new Map<string, number>();
+      const storedLimits = groupLimitsCookieRef.current;
       configData.forEach((cat) => {
         if (cat.items.length === 0) return;
         const groupId = getCategoryGroupId(cat);
@@ -2130,6 +2011,13 @@ export default function RngPromptRoute() {
 
       groupCounts.forEach((count, groupId) => {
         if (next[groupId] !== undefined) return;
+        const stored = storedLimits[groupId];
+        if (stored) {
+          const safeMin = Math.max(0, stored.min);
+          const safeMax = Math.max(safeMin, stored.max);
+          next[groupId] = { min: safeMin, max: safeMax };
+          return;
+        }
         const safeMax = Math.max(1, count);
         next[groupId] = { min: Math.min(1, safeMax), max: safeMax };
       });
@@ -2150,6 +2038,12 @@ export default function RngPromptRoute() {
       if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (Object.keys(groupLimits).length === 0) return;
+    writeGroupLimitsCookie(groupLimits);
+    groupLimitsCookieRef.current = groupLimits;
+  }, [groupLimits]);
 
   const tabs = useMemo<TabItem[]>(() => {
     const ordered = [...configData].sort((a, b) => {
@@ -2348,9 +2242,10 @@ export default function RngPromptRoute() {
     };
 
     const buildGroupSegment = (groupId: string) => {
+      const normalizedGroupId = isGeneralGroupId(groupId) ? TAB_GENERAL : groupId;
       const categories = orderedCategories.filter((cat) => {
         const resolved = isGeneralGroupId(getCategoryGroupId(cat)) ? TAB_GENERAL : getCategoryGroupId(cat);
-        return resolved === groupId;
+        return resolved === normalizedGroupId;
       });
       const segments = categories.map((cat) => buildCategorySegment(cat.slug)).filter(Boolean);
       return segments.join(", ");
@@ -2368,21 +2263,54 @@ export default function RngPromptRoute() {
       return { kind: "content" as const, value: slug ? buildCategorySegment(slug) : "" };
     });
 
-    const segments: string[] = [];
+    const segments: { kind: "text" | "content"; value: string }[] = [];
     for (let index = 0; index < resolved.length; index += 1) {
       const item = resolved[index];
       if (item.kind === "content") {
-        if (item.value && item.value.trim().length > 0) segments.push(item.value);
+        if (item.value && item.value.trim().length > 0) {
+          segments.push({ kind: "content", value: item.value });
+        }
         continue;
       }
 
-      const nextContent = resolved.slice(index + 1).find((entry) => entry.kind === "content");
-      if (nextContent && nextContent.value && nextContent.value.trim().length > 0) {
-        if (item.value && item.value.trim().length > 0) segments.push(item.value);
+      let prevIndex = -1;
+      for (let i = index - 1; i >= 0; i -= 1) {
+        if (resolved[i].kind === "content") {
+          prevIndex = i;
+          break;
+        }
+      }
+      let nextIndex = -1;
+      for (let i = index + 1; i < resolved.length; i += 1) {
+        if (resolved[i].kind === "content") {
+          nextIndex = i;
+          break;
+        }
+      }
+      const prevContent = prevIndex === -1 ? null : resolved[prevIndex];
+      const nextContent = nextIndex === -1 ? null : resolved[nextIndex];
+      const prevHas = Boolean(prevContent && prevContent.value.trim().length > 0);
+      const nextHas = Boolean(nextContent && nextContent.value.trim().length > 0);
+
+      const shouldInclude =
+        prevContent && nextContent ? prevHas && nextHas : prevContent ? prevHas : nextContent ? nextHas : false;
+
+      if (shouldInclude && item.value && item.value.length > 0) {
+        segments.push({ kind: "text", value: item.value });
       }
     }
 
-    return segments.join(" ").replace(/\s+/g, " ").trim();
+    let output = "";
+    let lastKind: "text" | "content" | null = null;
+    segments.forEach((segment) => {
+      if (segment.kind === "content" && lastKind === "content" && output && !/\s$/.test(output)) {
+        output += " ";
+      }
+      output += segment.value;
+      lastKind = segment.kind;
+    });
+
+    return output.trim();
   };
 
   const onGlobalRoll = () => {
@@ -2622,6 +2550,12 @@ export default function RngPromptRoute() {
     }
   };
 
+  const onRefreshData = async () => {
+    const data = await refreshConfigData();
+    setConfigData(data);
+    setUseMock(false);
+  };
+
   const onCopy = async () => {
     const text = buildOutputText();
 
@@ -2638,6 +2572,11 @@ export default function RngPromptRoute() {
     }, 2000);
   };
 
+  const onSelectOutputConfig = (id: string) => {
+    if (!id || id === activeOutputConfigId) return;
+    void onSetActiveOutputConfig(id);
+  };
+
   useEffect(() => {
     if (configData.length === 0 || hasAutoRolledRef.current) return;
     onGlobalRoll();
@@ -2648,13 +2587,13 @@ export default function RngPromptRoute() {
     return (
       <AdminPanel
         data={configData}
-        onUpdateData={setConfigData}
         outputConfigs={outputConfigs}
         activeOutputConfigId={activeOutputConfigId}
         onCreateOutputConfig={onCreateOutputConfig}
         onUpdateOutputConfig={onUpdateOutputConfig}
         onDeleteOutputConfig={onDeleteOutputConfig}
         onSetActiveOutputConfig={onSetActiveOutputConfig}
+        onRefreshData={onRefreshData}
         onClose={() => setView("generator")}
       />
     );
@@ -2684,6 +2623,9 @@ export default function RngPromptRoute() {
       <StickyTopArea
         previewText={previewText}
         charCount={previewText.length}
+        outputConfigs={outputConfigs}
+        activeOutputConfigId={activeOutputConfigId}
+        onSelectOutputConfig={onSelectOutputConfig}
         onGlobalRoll={onGlobalRoll}
         onCopy={onCopy}
         onOpenAdmin={() => setView("admin")}
