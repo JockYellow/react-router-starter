@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 
 import { requireBlogDb } from "../../../lib/d1.server";
-import { initMergeState } from "../../../lib/spotify-ranking";
+import { initRoyaleState } from "../../../lib/spotify-ranking";
 import { buildCorsHeaders, ensureSpotifySessionsTable, getSpotifyEnv, jsonWithCors } from "../../../lib/spotify.server";
 
 type InitPayload = {
@@ -33,7 +33,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const db = requireBlogDb(context);
   await ensureSpotifySessionsTable(db);
 
-  const state = initMergeState(artistIds);
+  const state = initRoyaleState(artistIds);
   const now = Date.now();
   await db
     .prepare(

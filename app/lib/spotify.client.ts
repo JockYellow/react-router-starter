@@ -10,82 +10,61 @@ export type SpotifyArtist = {
   images?: SpotifyImage[];
   followers?: { total: number };
   genres?: string[];
+  popularity?: number;
+  external_urls?: { spotify?: string };
 };
 
-export type SpotifyProfile = {
-  id: string;
-  display_name: string | null;
-  images?: SpotifyImage[];
+export type LatestReleaseInfo = {
+  name: string | null;
+  date: string | null;
+  precision: string | null;
 };
 
-export type FollowedArtistsProgress = {
-  count: number;
-  total: number | null;
-};
-
-const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
-
-async function spotifyFetch<T>(url: string, token: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
-    },
-  });
-
+export async function fetchStoredArtistIds(datasetKey: string) {
+  const res = await fetch(`/api/spotify/ids?dataset=${encodeURIComponent(datasetKey)}`);
   if (!res.ok) {
-    const message = await res.text();
-    throw new Error(message || `Spotify API error: ${res.status}`);
+    throw new Error(`Failed to load ids: ${res.status}`);
   }
-
-  return (await res.json()) as T;
+  const data = (await res.json()) as { artistIds?: string[] };
+  return data.artistIds ?? [];
 }
 
-export async function fetchSpotifyProfile(token: string): Promise<SpotifyProfile> {
-  return spotifyFetch<SpotifyProfile>(`${SPOTIFY_API_BASE}/me`, token);
-}
-
-export async function fetchAllFollowedArtists(
-  token: string,
-  onProgress?: (progress: FollowedArtistsProgress) => void,
-): Promise<{ ids: string[]; total: number } > {
-  let url: string | null = `${SPOTIFY_API_BASE}/me/following?type=artist&limit=50`;
-  const ids: string[] = [];
-  let total = 0;
-
-  while (url) {
-    const data = await spotifyFetch<{
-      artists: { items: SpotifyArtist[]; next: string | null; total: number };
-    }>(url, token);
-
-    const items = data.artists.items ?? [];
-    if (!total && data.artists.total) total = data.artists.total;
-    for (const artist of items) {
-      ids.push(artist.id);
-    }
-    onProgress?.({ count: ids.length, total: total || null });
-    url = data.artists.next;
-  }
-
-  return { ids, total: total || ids.length };
-}
-
-export async function fetchArtistsByIds(token: string, ids: string[]): Promise<SpotifyArtist[]> {
+export async function fetchArtistsByIds(ids: string[]): Promise<SpotifyArtist[]> {
   if (ids.length === 0) return [];
   const params = new URLSearchParams({ ids: ids.join(",") });
-  const data = await spotifyFetch<{ artists: SpotifyArtist[] }>(
-    `${SPOTIFY_API_BASE}/artists?${params.toString()}`,
-    token,
-  );
+  const res = await fetch(`/api/spotify/artists?${params.toString()}`);
+  if (!res.ok) {
+    const message = await res.text();
+    throw new Error(message || `Artists fetch failed: ${res.status}`);
+  }
+  const data = (await res.json()) as { artists?: SpotifyArtist[] };
   return data.artists ?? [];
 }
 
-export async function fetchArtistPreview(token: string, artistId: string): Promise<string | null> {
-  const data = await spotifyFetch<{ tracks: { preview_url: string | null }[] }>(
-    `${SPOTIFY_API_BASE}/artists/${artistId}/top-tracks?market=US`,
-    token,
-  );
-  const preview = data.tracks.find((track) => track.preview_url)?.preview_url ?? null;
-  return preview;
+export async function fetchArtistPreview(artistId: string): Promise<string | null> {
+  const res = await fetch(`/api/spotify/preview/${artistId}`);
+  if (!res.ok) {
+    const message = await res.text();
+    throw new Error(message || `Preview fetch failed: ${res.status}`);
+  }
+  const data = (await res.json()) as { previewUrl?: string | null };
+  return data.previewUrl ?? null;
+}
+
+export async function fetchLatestRelease(artistId: string): Promise<LatestReleaseInfo | null> {
+  const res = await fetch(`/api/spotify/latest-release/${artistId}`);
+  if (!res.ok) {
+    const message = await res.text();
+    throw new Error(message || `Latest release fetch failed: ${res.status}`);
+  }
+  const data = (await res.json()) as {
+    releaseName?: string | null;
+    releaseDate?: string | null;
+    releasePrecision?: string | null;
+  };
+  return {
+    name: data.releaseName ?? null,
+    date: data.releaseDate ?? null,
+    precision: data.releasePrecision ?? null,
+  };
 }

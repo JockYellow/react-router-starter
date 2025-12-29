@@ -9,6 +9,13 @@ type SpotifyEnv = {
   allowedOrigins: string[];
 };
 
+type SpotifyAppToken = {
+  token: string;
+  expiresAt: number;
+};
+
+let cachedAppToken: SpotifyAppToken | null = null;
+
 export function getSpotifyEnv(
   context: Context,
   requestUrl: string,
@@ -81,6 +88,58 @@ export async function ensureSpotifySessionsTable(db: D1Database) {
       )`,
     )
     .run();
+}
+
+export async function ensureSpotifyArtistsTable(db: D1Database) {
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS spotify_followed_artists (
+        dataset_key TEXT NOT NULL,
+        artist_id TEXT NOT NULL,
+        imported_at INTEGER NOT NULL,
+        PRIMARY KEY (dataset_key, artist_id)
+      )`,
+    )
+    .run();
+  await db
+    .prepare(
+      "CREATE INDEX IF NOT EXISTS idx_spotify_followed_artists_dataset ON spotify_followed_artists (dataset_key, imported_at)",
+    )
+    .run();
+}
+
+export async function getSpotifyAppToken(env: SpotifyEnv) {
+  const now = Date.now();
+  if (cachedAppToken && cachedAppToken.expiresAt > now) {
+    return cachedAppToken.token;
+  }
+
+  if (typeof btoa !== "function") {
+    throw new Response("Base64 encoder is unavailable", { status: 500 });
+  }
+
+  const credentials = `${env.clientId}:${env.clientSecret}`;
+  const encoded = btoa(credentials);
+  const body = new URLSearchParams({ grant_type: "client_credentials" });
+
+  const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${encoded}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+
+  if (!tokenRes.ok) {
+    const errorText = await tokenRes.text();
+    throw new Response(`Spotify token error: ${errorText || tokenRes.status}`, { status: 502 });
+  }
+
+  const data = (await tokenRes.json()) as { access_token: string; expires_in: number };
+  const expiresAt = now + data.expires_in * 1000 - 60_000;
+  cachedAppToken = { token: data.access_token, expiresAt };
+  return data.access_token;
 }
 
 export function parseJson<T>(value: string | null): T | null {

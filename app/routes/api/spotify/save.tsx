@@ -1,12 +1,12 @@
 import type { ActionFunctionArgs } from "react-router";
 
 import { requireBlogDb } from "../../../lib/d1.server";
-import type { MergeState } from "../../../lib/spotify-ranking";
+import type { RoyaleState } from "../../../lib/spotify-ranking";
 import { buildCorsHeaders, ensureSpotifySessionsTable, getSpotifyEnv, jsonWithCors } from "../../../lib/spotify.server";
 
 type SavePayload = {
   userId?: string;
-  state?: MergeState;
+  state?: RoyaleState;
 };
 
 export async function action({ request, context }: ActionFunctionArgs) {

@@ -2067,10 +2067,10 @@ export default function RngPromptRoute() {
     const limit = groupLimits[groupId] ?? { min: Math.min(1, fallbackMax), max: fallbackMax };
     const min = Math.max(0, limit.min);
     const max = Math.max(min, limit.max);
-    const baseBudget = max <= min ? min : Math.floor(Math.random() * (max - min + 1)) + min;
 
     const lockedCounts = new Map<string, number>();
-    const mulCounts = new Map<string, number>();
+    const preferredPool: string[] = [];
+    const fallbackPool: string[] = [];
     let totalLocked = 0;
 
     groupCategories.forEach((cat) => {
@@ -2083,24 +2083,38 @@ export default function RngPromptRoute() {
           : 0;
       lockedCounts.set(cat.slug, lockedCount);
       totalLocked += lockedCount;
-      mulCounts.set(cat.slug, getCardMulCount(cat));
-    });
 
-    const budget = Math.max(baseBudget, totalLocked);
-    const remain = Math.max(0, budget - totalLocked);
+      if (!isChecked(cat.slug) || cardLockMap[cat.slug]) return;
 
-    const pool: string[] = [];
-    groupCategories.forEach((cat) => {
-      if (!isChecked(cat.slug)) return;
-      if (cardLockMap[cat.slug]) return;
-      const lockedCount = lockedCounts.get(cat.slug) ?? 0;
-      const mulCount = mulCounts.get(cat.slug) ?? 0;
-      const tickets = Math.max(0, mulCount - lockedCount);
-      for (let i = 0; i < tickets; i += 1) {
-        pool.push(cat.slug);
+      const hasActiveItems = cat.items.some((item) => item.is_active !== false);
+      if (!hasActiveItems) return;
+
+      const override = qtyMap[cat.slug];
+      const maxCount = typeof override === "number" ? Math.max(0, override) : getMulRange(cat).max;
+      const available = Math.max(0, maxCount - lockedCount);
+      if (available === 0) return;
+
+      const desiredCount = getCardMulCount(cat);
+      const preferred = Math.min(Math.max(desiredCount - lockedCount, 0), available);
+      for (let i = 0; i < preferred; i += 1) {
+        preferredPool.push(cat.slug);
+      }
+
+      const remaining = available - preferred;
+      for (let i = 0; i < remaining; i += 1) {
+        fallbackPool.push(cat.slug);
       }
     });
 
+    const totalCapacity = preferredPool.length + fallbackPool.length;
+    const maxBudget = totalLocked + totalCapacity;
+    const minBudget = Math.max(totalLocked, Math.min(min, maxBudget));
+    const upperBudget = Math.max(minBudget, Math.min(max, maxBudget));
+    const targetBudget =
+      upperBudget <= minBudget ? minBudget : Math.floor(Math.random() * (upperBudget - minBudget + 1)) + minBudget;
+    const remain = Math.max(0, targetBudget - totalLocked);
+
+    const pool = remain > preferredPool.length ? [...preferredPool, ...fallbackPool] : preferredPool;
     const shuffledPool = pool.sort(() => 0.5 - Math.random());
     const picked = shuffledPool.slice(0, remain);
     const pickedCounts = new Map<string, number>();
