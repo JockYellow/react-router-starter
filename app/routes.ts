@@ -15,6 +15,8 @@ export default [
   route("api/admin", "routes/api/admin.tsx"),
   route("api/data", "routes/api/data.tsx"),
   route("api/output-configs", "routes/api/output-configs.tsx"),
+  route("api/rng-prompt/export", "routes/api/rng-prompt-export.tsx"),
+  route("api/rng-prompt/import", "routes/api/rng-prompt-import.tsx"),
   route("api/init", "routes/api/spotify/init.tsx"),
   route("api/save", "routes/api/spotify/save.tsx"),
   route("api/session/:userId", "routes/api/spotify/session.$userId.tsx"),

@@ -191,6 +191,9 @@ const TAB_ALL = "全部";
 const TAB_GENERAL = "一般";
 const GENERAL_GROUP_IDS = new Set(["Base", "Default", "一般", "General", "general"]);
 const GROUP_LIMITS_COOKIE = "rng_group_limits";
+const SHUFFLE_BAG_STORAGE = "rng_prompt_shuffle_bags";
+const CATEGORY_CSV_COLUMNS = "id,slug,label,ui_group,is_optional,type,min_count,max_count,sort_order";
+const PROMPT_CSV_COLUMNS = "id,category_slug,value,label,is_active";
 
 const getCategoryGroupId = (category: Category) => category.ui_group?.trim() || "Default";
 const isGeneralGroupId = (groupId: string) => GENERAL_GROUP_IDS.has(groupId);
@@ -227,6 +230,39 @@ const writeGroupLimitsCookie = (limits: Record<string, GroupLimit>) => {
   if (typeof document === "undefined") return;
   const payload = encodeURIComponent(JSON.stringify(limits));
   document.cookie = `${GROUP_LIMITS_COOKIE}=${payload}; path=/; max-age=31536000`;
+};
+
+const shuffleArray = <T,>(items: T[]) => {
+  const list = [...items];
+  for (let index = list.length - 1; index > 0; index -= 1) {
+    const pick = Math.floor(Math.random() * (index + 1));
+    [list[index], list[pick]] = [list[pick], list[index]];
+  }
+  return list;
+};
+
+const readShuffleBags = () => {
+  if (typeof window === "undefined") return {} as Record<string, { order: TagLockKey[]; index: number }>;
+  const raw = window.localStorage.getItem(SHUFFLE_BAG_STORAGE);
+  if (!raw) return {} as Record<string, { order: TagLockKey[]; index: number }>;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, { order?: TagLockKey[]; index?: number }>;
+    const normalized: Record<string, { order: TagLockKey[]; index: number }> = {};
+    Object.entries(parsed ?? {}).forEach(([key, value]) => {
+      if (!value || typeof value !== "object") return;
+      const order = Array.isArray(value.order) ? (value.order as TagLockKey[]) : [];
+      const index = typeof value.index === "number" ? Math.max(0, value.index) : 0;
+      normalized[key] = { order, index };
+    });
+    return normalized;
+  } catch (_error) {
+    return {} as Record<string, { order: TagLockKey[]; index: number }>;
+  }
+};
+
+const writeShuffleBags = (bags: Record<string, { order: TagLockKey[]; index: number }>) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SHUFFLE_BAG_STORAGE, JSON.stringify(bags));
 };
 
 // --- Mock Data ---
@@ -448,6 +484,13 @@ const AdminPanel = ({
 
   const [newCatMode, setNewCatMode] = useState(false);
   const [newPromptMode, setNewPromptMode] = useState(false);
+  const [importingType, setImportingType] = useState<"categories" | "prompts" | null>(null);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [categoriesFile, setCategoriesFile] = useState<File | null>(null);
+  const [promptsFile, setPromptsFile] = useState<File | null>(null);
+  const categoriesInputRef = useRef<HTMLInputElement | null>(null);
+  const promptsInputRef = useRef<HTMLInputElement | null>(null);
   const [catForm, setCatForm] = useState<CategoryFormState>({
     slug: "",
     label: "",
@@ -500,6 +543,59 @@ const AdminPanel = ({
     } catch (_error) {
       window.alert(errorMessage);
       return false;
+    }
+  };
+
+  const formatImportError = (payload: any) => {
+    if (!payload) return "匯入失敗";
+    const details = Array.isArray(payload.details) ? payload.details.slice(0, 3).join(" / ") : "";
+    const expected =
+      typeof payload.expected === "string" && payload.expected.length > 0 ? `（預期欄位：${payload.expected}）` : "";
+    if (payload.error && details) return `${payload.error}：${details}${expected}`;
+    if (payload.error) return `${payload.error}${expected}`;
+    return "匯入失敗";
+  };
+
+  const handleImportCsv = async (type: "categories" | "prompts") => {
+    const file = type === "categories" ? categoriesFile : promptsFile;
+    if (!file) {
+      setImportError("請先選擇 CSV 檔案");
+      return;
+    }
+    setImportingType(type);
+    setImportError(null);
+    setImportMessage(null);
+    const formData = new FormData();
+    formData.append("type", type);
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/rng-prompt/import", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        setImportError(formatImportError(payload));
+        return;
+      }
+      const created = payload?.created ?? 0;
+      const updated = payload?.updated ?? 0;
+      const backupId = payload?.backupId ?? "-";
+      const typeLabel = type === "categories" ? "Categories" : "Prompts";
+      setImportMessage(`已匯入 ${typeLabel}，更新 ${updated} 筆、建立 ${created} 筆。備份版本 #${backupId}`);
+      if (type === "categories") {
+        setCategoriesFile(null);
+        if (categoriesInputRef.current) categoriesInputRef.current.value = "";
+      } else {
+        setPromptsFile(null);
+        if (promptsInputRef.current) promptsInputRef.current.value = "";
+      }
+      await onRefreshData();
+    } catch (_error) {
+      setImportError("匯入失敗");
+    } finally {
+      setImportingType(null);
     }
   };
 
@@ -759,8 +855,85 @@ const AdminPanel = ({
 
         <div className="flex-1 bg-slate-50 flex flex-col min-h-0">
           {adminView === "categories" ? (
-            activeCategory ? (
-              <>
+            <>
+              <div className="p-4 bg-white border-b border-slate-200">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-xs">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 space-y-2">
+                    <div className="text-xs font-bold text-slate-600">CSV 匯出</div>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        className="px-3 py-1.5 rounded bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
+                        href="/api/rng-prompt/export?type=categories"
+                        download
+                      >
+                        下載 Categories CSV
+                      </a>
+                      <a
+                        className="px-3 py-1.5 rounded bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
+                        href="/api/rng-prompt/export?type=prompts"
+                        download
+                      >
+                        下載 Prompts CSV
+                      </a>
+                    </div>
+                    <p className="text-[10px] text-slate-500">Categories 欄位：{CATEGORY_CSV_COLUMNS}</p>
+                    <p className="text-[10px] text-slate-500">Prompts 欄位：{PROMPT_CSV_COLUMNS}</p>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+                    <div className="text-xs font-bold text-slate-600">CSV 匯入（自動備份上一版）</div>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          ref={categoriesInputRef}
+                          type="file"
+                          accept=".csv,text/csv"
+                          onChange={(event) => {
+                            setCategoriesFile(event.target.files?.[0] ?? null);
+                            setImportError(null);
+                            setImportMessage(null);
+                          }}
+                          className="text-xs"
+                        />
+                        <button
+                          onClick={() => handleImportCsv("categories")}
+                          disabled={!categoriesFile || importingType !== null}
+                          className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold disabled:opacity-50"
+                        >
+                          {importingType === "categories" ? "匯入中..." : "上傳 Categories"}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          ref={promptsInputRef}
+                          type="file"
+                          accept=".csv,text/csv"
+                          onChange={(event) => {
+                            setPromptsFile(event.target.files?.[0] ?? null);
+                            setImportError(null);
+                            setImportMessage(null);
+                          }}
+                          className="text-xs"
+                        />
+                        <button
+                          onClick={() => handleImportCsv("prompts")}
+                          disabled={!promptsFile || importingType !== null}
+                          className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold disabled:opacity-50"
+                        >
+                          {importingType === "prompts" ? "匯入中..." : "上傳 Prompts"}
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-slate-500">依 id/slug/組合鍵覆蓋，缺少的資料不會自動刪除。</p>
+                    <p className="text-[10px] text-slate-500">建議先匯入 Categories，再匯入 Prompts。</p>
+                    {importMessage && <p className="text-[11px] text-emerald-700">{importMessage}</p>}
+                    {importError && <p className="text-[11px] text-rose-600">{importError}</p>}
+                  </div>
+                </div>
+              </div>
+
+              {activeCategory ? (
+                <>
                 <div className="p-4 bg-white border-b border-slate-200 flex justify-between items-center shadow-sm">
                   <div>
                     <h3 className="text-lg font-bold text-slate-800">
@@ -957,9 +1130,12 @@ const AdminPanel = ({
                   </div>
                 </div>
               </>
-            ) : (
-              <div className="flex-1 flex items-center justify-center text-slate-400">請選擇左側類別以編輯內容</div>
-            )
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-slate-400">
+                  請選擇左側類別以編輯內容
+                </div>
+              )}
+            </>
           ) : (
             <OutputComposer
               categories={data}
@@ -1691,6 +1867,7 @@ const PromptCard = ({
   onSingleRefresh,
   onChangeQty,
 }: PromptCardProps) => {
+  const [showPicker, setShowPicker] = useState(false);
   const hasContent = draws.length > 0;
   const isGroup = category.type === "group";
   const isOptional = isOptionalCategory(category);
@@ -1700,6 +1877,9 @@ const PromptCard = ({
     : isOptional
       ? "bg-pink-100 text-pink-700"
       : "bg-blue-100 text-blue-700";
+
+  const selectedKey = tagLocks.size > 0 ? Array.from(tagLocks)[0] : null;
+  const selectableItems = category.items.filter((item) => item.is_active !== false);
 
   return (
     <div
@@ -1723,6 +1903,11 @@ const PromptCard = ({
         />
         <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${typeClass}`}>{typeLabel}</span>
         <span className="text-sm font-semibold text-slate-700 truncate flex-1 min-w-0">{category.label}</span>
+        {selectedKey !== null && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-semibold">
+            指定
+          </span>
+        )}
         {typeof qty === "number" && (
           <div
             onClick={(event) => event.stopPropagation()}
@@ -1732,6 +1917,61 @@ const PromptCard = ({
           </div>
         )}
       </div>
+
+      <div className="flex items-center gap-2 px-2 py-1 border-b border-slate-100 bg-slate-50/80 text-[11px]">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setShowPicker((prev) => !prev);
+          }}
+          className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
+        >
+          {showPicker ? "收起直選" : "直選"}
+        </button>
+        {selectedKey !== null && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleTagLock(category.slug, selectedKey);
+            }}
+            className="px-2 py-0.5 rounded bg-rose-50 text-rose-600 hover:bg-rose-100 transition"
+          >
+            清除指定
+          </button>
+        )}
+      </div>
+
+      {showPicker && (
+        <div className="px-2 py-2 border-b border-slate-100 bg-white max-h-[140px] overflow-y-auto flex flex-wrap gap-1">
+          {selectableItems.length === 0 ? (
+            <span className="text-xs text-slate-400">無可選項</span>
+          ) : (
+            selectableItems.map((item) => {
+              const key: TagLockKey = item.id ?? item.value;
+              const isSelected = selectedKey === key;
+              return (
+                <button
+                  type="button"
+                  key={`${category.slug}-pick-${key}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleTagLock(category.slug, key);
+                  }}
+                  className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border transition ${
+                    isSelected
+                      ? "bg-emerald-100 text-emerald-700 border-emerald-300 font-semibold"
+                      : "bg-slate-100 text-slate-700 border-slate-200"
+                  }`}
+                >
+                  {item.label || item.value}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
 
       <div
         className={`p-2 min-h-[56px] flex flex-wrap content-start gap-1 cursor-pointer transition-colors ${
@@ -1744,7 +1984,7 @@ const PromptCard = ({
         {hasContent ? (
           draws.map((item) => {
             const key: TagLockKey = item.id ?? item.value;
-            const isLocked = tagLocks.has(key);
+            const isSelected = selectedKey === key;
             return (
               <button
                 type="button"
@@ -1754,8 +1994,8 @@ const PromptCard = ({
                   onToggleTagLock(category.slug, key);
                 }}
                 className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border transition ${
-                  isLocked
-                    ? "bg-rose-50 text-rose-700 border-rose-300 font-semibold"
+                  isSelected
+                    ? "bg-emerald-100 text-emerald-700 border-emerald-300 font-semibold"
                     : "bg-slate-100 text-slate-700 border-slate-200"
                 }`}
               >
@@ -1811,6 +2051,7 @@ export default function RngPromptRoute() {
   const toastTimerRef = useRef<number | null>(null);
   const hasAutoRolledRef = useRef(false);
   const groupLimitsCookieRef = useRef<Record<string, GroupLimit>>({});
+  const shuffleBagsRef = useRef<Record<string, { order: TagLockKey[]; index: number }>>({});
 
   const applyOutputConfigs = (configs: OutputConfig[]) => {
     setOutputConfigs(configs);
@@ -1875,6 +2116,10 @@ export default function RngPromptRoute() {
 
   useEffect(() => {
     groupLimitsCookieRef.current = readGroupLimitsCookie();
+  }, []);
+
+  useEffect(() => {
+    shuffleBagsRef.current = readShuffleBags();
   }, []);
 
   useEffect(() => {
@@ -2001,6 +2246,75 @@ export default function RngPromptRoute() {
 
   const getItemKey = (item: PromptItem): TagLockKey => item.id ?? item.value;
 
+  const getActiveItems = (cat: Category) => cat.items.filter((item) => item.is_active !== false);
+
+  const hasSameMembers = (a: TagLockKey[], b: TagLockKey[]) => {
+    if (a.length !== b.length) return false;
+    const setA = new Set(a);
+    if (setA.size !== a.length) return false;
+    return b.every((key) => setA.has(key));
+  };
+
+  const ensureShuffleBag = (cat: Category, activeKeys: TagLockKey[]) => {
+    const current = shuffleBagsRef.current[cat.slug];
+    if (!current || !hasSameMembers(activeKeys, current.order)) {
+      const next = { order: shuffleArray(activeKeys), index: 0 };
+      shuffleBagsRef.current[cat.slug] = next;
+      writeShuffleBags(shuffleBagsRef.current);
+      return next;
+    }
+    const safeIndex = Math.min(Math.max(0, current.index), current.order.length);
+    if (safeIndex !== current.index) {
+      current.index = safeIndex;
+      writeShuffleBags(shuffleBagsRef.current);
+    }
+    return current;
+  };
+
+  const drawFromShuffleBag = (cat: Category, count: number, excludeKeys: Set<TagLockKey>) => {
+    if (count <= 0) return [];
+    const activeItems = getActiveItems(cat);
+    if (activeItems.length === 0) return [];
+
+    const itemMap = new Map<TagLockKey, PromptItem>();
+    const activeKeys: TagLockKey[] = [];
+    activeItems.forEach((item) => {
+      const key = getItemKey(item);
+      activeKeys.push(key);
+      itemMap.set(key, item);
+    });
+
+    const bag = ensureShuffleBag(cat, activeKeys);
+    let index = bag.index;
+    const picked: PromptItem[] = [];
+    const seen = new Set<TagLockKey>();
+    const maxAttempts = activeKeys.length * 2;
+    let attempts = 0;
+
+    while (picked.length < count && attempts < maxAttempts) {
+      if (index >= bag.order.length) {
+        bag.order = shuffleArray(activeKeys);
+        index = 0;
+      }
+      const key = bag.order[index];
+      index += 1;
+      attempts += 1;
+      if (!itemMap.has(key)) continue;
+      if (excludeKeys.has(key)) continue;
+      if (seen.has(key)) continue;
+      const item = itemMap.get(key);
+      if (item) {
+        picked.push(item);
+        seen.add(key);
+      }
+    }
+
+    bag.index = index;
+    shuffleBagsRef.current[cat.slug] = bag;
+    writeShuffleBags(shuffleBagsRef.current);
+    return picked;
+  };
+
   const getMulRange = (cat: Category) => {
     const min = Math.max(0, cat.min_count ?? 1);
     const max = Math.max(min, cat.max_count ?? min);
@@ -2022,17 +2336,18 @@ export default function RngPromptRoute() {
   };
 
   const getRandomItems = (cat: Category, count: number, excludeKeys: Set<TagLockKey>) => {
-    if (count <= 0) return [];
-    const activePool = cat.items.filter(
-      (item) => item.is_active !== false && !excludeKeys.has(getItemKey(item)),
-    );
-    if (activePool.length === 0) return [];
-    const shuffled = [...activePool].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
+    return drawFromShuffleBag(cat, count, excludeKeys);
+  };
+
+  const buildRandomDrawsForCategory = (cat: Category, targetCount: number) => {
+    const safeTarget = Math.max(0, targetCount);
+    if (safeTarget <= 0) return [];
+    return getRandomItems(cat, safeTarget, new Set<TagLockKey>());
   };
 
   const buildDrawsForCategory = (cat: Category, targetCount: number) => {
     const lockedItems = getLockedItems(cat);
+    if (lockedItems.length > 0) return lockedItems;
     const lockedKeys = new Set(lockedItems.map(getItemKey));
     const safeTarget = Math.max(targetCount, lockedItems.length);
     if (safeTarget <= 0) return lockedItems.length > 0 ? lockedItems : [];
@@ -2069,12 +2384,14 @@ export default function RngPromptRoute() {
     const max = Math.max(min, limit.max);
 
     const lockedCounts = new Map<string, number>();
+    const manualSelectionMap = new Map<string, boolean>();
     const preferredPool: string[] = [];
     const fallbackPool: string[] = [];
     let totalLocked = 0;
 
     groupCategories.forEach((cat) => {
       const lockedItems = getLockedItems(cat);
+      manualSelectionMap.set(cat.slug, lockedItems.length > 0);
       const currentCount = currentDraws[cat.slug]?.length ?? 0;
       const lockedCount = cardLockMap[cat.slug]
         ? Math.max(currentCount, lockedItems.length)
@@ -2085,6 +2402,7 @@ export default function RngPromptRoute() {
       totalLocked += lockedCount;
 
       if (!isChecked(cat.slug) || cardLockMap[cat.slug]) return;
+      if (manualSelectionMap.get(cat.slug)) return;
 
       const hasActiveItems = cat.items.some((item) => item.is_active !== false);
       if (!hasActiveItems) return;
@@ -2287,12 +2605,34 @@ export default function RngPromptRoute() {
   };
 
   const onToggleTagLock = (categorySlug: string, promptKey: TagLockKey) => {
+    const cat = configData.find((item) => item.slug === categorySlug);
+    if (!cat) return;
+    const item = cat.items.find((candidate) => getItemKey(candidate) === promptKey);
+    const hasSame = tagLockMap[categorySlug]?.size === 1 && tagLockMap[categorySlug]?.has(promptKey);
+
     setTagLockMap((prev) => {
-      const current = prev[categorySlug] ?? new Set<TagLockKey>();
-      const nextSet = new Set(current);
-      if (nextSet.has(promptKey)) nextSet.delete(promptKey);
-      else nextSet.add(promptKey);
+      const nextSet = new Set<TagLockKey>();
+      if (!hasSame && item) nextSet.add(promptKey);
       return { ...prev, [categorySlug]: nextSet };
+    });
+
+    setDraws((prev) => {
+      const next = { ...prev };
+      if (hasSame) {
+        if (!isChecked(categorySlug)) {
+          next[categorySlug] = [];
+          return next;
+        }
+        if (!cardLockMap[categorySlug]) {
+          const targetCount = getCardMulCount(cat);
+          next[categorySlug] = buildRandomDrawsForCategory(cat, targetCount);
+        }
+        return next;
+      }
+      if (item) {
+        next[categorySlug] = [item];
+      }
+      return next;
     });
   };
 

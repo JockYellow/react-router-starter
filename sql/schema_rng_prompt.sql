@@ -30,3 +30,10 @@ CREATE TABLE IF NOT EXISTS output_configs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_output_configs_active ON output_configs(is_active);
+
+CREATE TABLE IF NOT EXISTS rng_prompt_backups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  categories_csv TEXT NOT NULL,
+  prompts_csv TEXT NOT NULL
+);
