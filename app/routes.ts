@@ -17,6 +17,7 @@ export default [
   route("api/output-configs", "routes/api/output-configs.tsx"),
   route("api/rng-prompt/export", "routes/api/rng-prompt-export.tsx"),
   route("api/rng-prompt/import", "routes/api/rng-prompt-import.tsx"),
+  route("api/concert-events", "routes/api/concert-events.tsx"),
   route("api/init", "routes/api/spotify/init.tsx"),
   route("api/save", "routes/api/spotify/save.tsx"),
   route("api/session/:userId", "routes/api/spotify/session.$userId.tsx"),
@@ -34,4 +35,5 @@ export default [
   route("call_spotify", "routes/spotify/call_spotify.tsx"),
   route("vote", "routes/tools/vote.tsx"),
   route("rng_prompt", "routes/tools/rng_prompt.tsx"),
+  route("concert_events", "routes/tools/concert_events.tsx"),
 ] satisfies RouteConfig;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent } from "react";
 import {
   ArrowLeft,
   Copy,
@@ -11,49 +11,26 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { useAdminMutations } from "../../hooks/useAdminMutations";
+import { useCategoriesData } from "../../hooks/useCategoriesData";
+import { useOutputConfigs } from "../../hooks/useOutputConfigs";
+import { getCardMulCount, getMulRange } from "../../lib/rngPrompt/mul";
+import { buildOutputText } from "../../lib/rngPrompt/outputText";
+import { blocksToTemplate, getDefaultGroupBlocks, getDefaultOutputBlocks, templateToBlocks } from "../../lib/rngPrompt/outputTemplate";
+import { drawFromShuffleBag } from "../../lib/rngPrompt/shuffleBag";
+import { readGroupLimitsCookie, readShuffleBags, writeGroupLimitsCookie, writeShuffleBags, type ShuffleBags } from "../../lib/rngPrompt/storage";
+import type {
+  Category,
+  CategoryType,
+  Draws,
+  GroupLimit,
+  OutputBlock,
+  OutputConfig,
+  PromptItem,
+  TagLockKey,
+} from "../../lib/rngPrompt/types";
+import { TAB_ALL, TAB_GENERAL, getCategoryGroupId, isGeneralGroupId, isOptionalCategory } from "../../lib/rngPrompt/utils";
 
-type CategoryType = "required" | "optional" | "group";
-
-type PromptItem = {
-  id: number;
-  value: string;
-  label?: string | null;
-  is_active?: boolean;
-};
-
-type Category = {
-  id: number;
-  slug: string;
-  label: string;
-  type: CategoryType;
-  ui_group?: string | null;
-  is_optional?: boolean | null;
-  min_count?: number | null;
-  max_count?: number | null;
-  sort_order?: number;
-  items: PromptItem[];
-};
-
-type Draws = Record<string, PromptItem[]>;
-
-type TagLockKey = number | string;
-
-type OutputBlock = {
-  id: string;
-  type: "category" | "group" | "text";
-  categorySlug?: string;
-  groupId?: string;
-  text?: string;
-};
-
-type OutputConfig = {
-  id: string;
-  name: string;
-  blocks: OutputBlock[];
-  is_active: boolean;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
 
 type CategoryFormState = {
   slug: string;
@@ -106,10 +83,6 @@ type ToastState = {
   message: string;
 };
 
-type GroupLimit = {
-  min: number;
-  max: number;
-};
 
 type TabMode = "all" | "general" | "group";
 
@@ -187,83 +160,8 @@ type CopyToastProps = {
   toast: ToastState;
 };
 
-const TAB_ALL = "全部";
-const TAB_GENERAL = "一般";
-const GENERAL_GROUP_IDS = new Set(["Base", "Default", "一般", "General", "general"]);
-const GROUP_LIMITS_COOKIE = "rng_group_limits";
-const SHUFFLE_BAG_STORAGE = "rng_prompt_shuffle_bags";
 const CATEGORY_CSV_COLUMNS = "id,slug,label,ui_group,is_optional,type,min_count,max_count,sort_order";
 const PROMPT_CSV_COLUMNS = "id,category_slug,value,label,is_active";
-
-const getCategoryGroupId = (category: Category) => category.ui_group?.trim() || "Default";
-const isGeneralGroupId = (groupId: string) => GENERAL_GROUP_IDS.has(groupId);
-const isOptionalCategory = (category: Category) => category.is_optional ?? category.type === "optional";
-
-const readCookieValue = (name: string) => {
-  if (typeof document === "undefined") return "";
-  const match = document.cookie.split("; ").find((row) => row.startsWith(`${name}=`));
-  return match ? decodeURIComponent(match.slice(name.length + 1)) : "";
-};
-
-const readGroupLimitsCookie = () => {
-  const raw = readCookieValue(GROUP_LIMITS_COOKIE);
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw) as Record<string, GroupLimit>;
-    const normalized: Record<string, GroupLimit> = {};
-    Object.entries(parsed).forEach(([key, value]) => {
-      if (!value || typeof value !== "object") return;
-      const min = Number(value.min);
-      const max = Number(value.max);
-      if (Number.isNaN(min) || Number.isNaN(max)) return;
-      const safeMin = Math.max(0, min);
-      const safeMax = Math.max(safeMin, max);
-      normalized[key] = { min: safeMin, max: safeMax };
-    });
-    return normalized;
-  } catch (_error) {
-    return {};
-  }
-};
-
-const writeGroupLimitsCookie = (limits: Record<string, GroupLimit>) => {
-  if (typeof document === "undefined") return;
-  const payload = encodeURIComponent(JSON.stringify(limits));
-  document.cookie = `${GROUP_LIMITS_COOKIE}=${payload}; path=/; max-age=31536000`;
-};
-
-const shuffleArray = <T,>(items: T[]) => {
-  const list = [...items];
-  for (let index = list.length - 1; index > 0; index -= 1) {
-    const pick = Math.floor(Math.random() * (index + 1));
-    [list[index], list[pick]] = [list[pick], list[index]];
-  }
-  return list;
-};
-
-const readShuffleBags = () => {
-  if (typeof window === "undefined") return {} as Record<string, { order: TagLockKey[]; index: number }>;
-  const raw = window.localStorage.getItem(SHUFFLE_BAG_STORAGE);
-  if (!raw) return {} as Record<string, { order: TagLockKey[]; index: number }>;
-  try {
-    const parsed = JSON.parse(raw) as Record<string, { order?: TagLockKey[]; index?: number }>;
-    const normalized: Record<string, { order: TagLockKey[]; index: number }> = {};
-    Object.entries(parsed ?? {}).forEach(([key, value]) => {
-      if (!value || typeof value !== "object") return;
-      const order = Array.isArray(value.order) ? (value.order as TagLockKey[]) : [];
-      const index = typeof value.index === "number" ? Math.max(0, value.index) : 0;
-      normalized[key] = { order, index };
-    });
-    return normalized;
-  } catch (_error) {
-    return {} as Record<string, { order: TagLockKey[]; index: number }>;
-  }
-};
-
-const writeShuffleBags = (bags: Record<string, { order: TagLockKey[]; index: number }>) => {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(SHUFFLE_BAG_STORAGE, JSON.stringify(bags));
-};
 
 // --- Mock Data ---
 const MOCK_DB_DATA: Category[] = [
@@ -504,6 +402,7 @@ const AdminPanel = ({
   const [editCatForm, setEditCatForm] = useState<CategoryFormState | null>(null);
   const [editingPromptId, setEditingPromptId] = useState<number | null>(null);
   const [promptEditForm, setPromptEditForm] = useState<PromptForm>({ value: "", label: "", is_active: true });
+  const { runAdminMutation } = useAdminMutations({ onRefreshData });
 
   const activeCategory = data.find((cat) => cat.slug === activeTab);
 
@@ -528,22 +427,6 @@ const AdminPanel = ({
   const resolveCategoryType = (type: CategoryType, isOptional: boolean) => {
     if (type === "group") return "group";
     return isOptional ? "optional" : "required";
-  };
-
-  const runAdminMutation = async (payload: Record<string, unknown>, errorMessage: string) => {
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("Admin API failed");
-      await onRefreshData();
-      return true;
-    } catch (_error) {
-      window.alert(errorMessage);
-      return false;
-    }
   };
 
   const formatImportError = (payload: any) => {
@@ -1152,84 +1035,6 @@ const AdminPanel = ({
 
     </div>
   );
-};
-
-const getDefaultOutputBlocks = (categories: Category[]) => {
-  return [...categories]
-    .sort((a, b) => {
-      const orderA = a.sort_order ?? a.id;
-      const orderB = b.sort_order ?? b.id;
-      return orderA - orderB;
-    })
-    .map((cat) => ({
-      id: `cat-${cat.slug}`,
-      type: "category" as const,
-      categorySlug: cat.slug,
-    }));
-};
-
-const getDefaultGroupBlocks = (categories: Category[]) => {
-  const ordered = [...categories].sort((a, b) => {
-    const orderA = a.sort_order ?? a.id;
-    const orderB = b.sort_order ?? b.id;
-    return orderA - orderB;
-  });
-  const groupIds: string[] = [];
-  ordered.forEach((cat) => {
-    const groupId = isGeneralGroupId(getCategoryGroupId(cat)) ? TAB_GENERAL : getCategoryGroupId(cat);
-    if (!groupIds.includes(groupId)) groupIds.push(groupId);
-  });
-  return groupIds.map((groupId) => ({
-    id: `group-${groupId}`,
-    type: "group" as const,
-    groupId,
-  }));
-};
-
-const blocksToTemplate = (blocks: OutputBlock[]) => {
-  let template = "";
-  blocks.forEach((block, index) => {
-    if (block.type === "text") {
-      template += block.text ?? "";
-      return;
-    }
-    const token =
-      block.type === "group" ? `{{group:${block.groupId ?? ""}}}` : `{{cat:${block.categorySlug ?? ""}}}`;
-    const prev = blocks[index - 1];
-    if (template && prev && prev.type !== "text") template += " ";
-    template += token;
-  });
-  return template;
-};
-
-const templateToBlocks = (template: string, createId: () => string) => {
-  const blocks: OutputBlock[] = [];
-  const tokenRegex = /{{\s*(group|cat)\s*:\s*([^}]+)\s*}}/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = tokenRegex.exec(template)) !== null) {
-    const before = template.slice(lastIndex, match.index);
-    if (before) {
-      blocks.push({ id: createId(), type: "text", text: before });
-    }
-    const rawValue = match[2]?.trim();
-    if (rawValue) {
-      if (match[1] === "group") {
-        blocks.push({ id: createId(), type: "group", groupId: rawValue });
-      } else {
-        blocks.push({ id: createId(), type: "category", categorySlug: rawValue });
-      }
-    }
-    lastIndex = tokenRegex.lastIndex;
-  }
-
-  const tail = template.slice(lastIndex);
-  if (tail) {
-    blocks.push({ id: createId(), type: "text", text: tail });
-  }
-
-  return blocks;
 };
 
 const NEW_OUTPUT_CONFIG_ID = "__new__";
@@ -2033,86 +1838,131 @@ const CopyToast = ({ toast }: CopyToastProps) => {
   );
 };
 
+type RngState = {
+  draws: Draws;
+  checkedMap: Record<string, boolean>;
+  cardLockMap: Record<string, boolean>;
+  tagLockMap: Record<string, Set<TagLockKey>>;
+  qtyMap: Record<string, number>;
+  groupLimits: Record<string, GroupLimit>;
+};
+
+type RngAction =
+  | { type: "init_from_data"; data: Category[]; storedGroupLimits: Record<string, GroupLimit> }
+  | { type: "set_draws"; draws: Draws }
+  | { type: "set_checked"; slug: string; checked: boolean }
+  | { type: "set_checked_bulk"; slugs: string[]; checked: boolean }
+  | { type: "toggle_card_lock"; slug: string }
+  | { type: "set_card_lock_map"; map: Record<string, boolean> }
+  | { type: "set_tag_lock"; slug: string; locks: Set<TagLockKey> }
+  | { type: "set_tag_lock_map"; map: Record<string, Set<TagLockKey>> }
+  | { type: "set_qty"; slug: string; qty: number }
+  | { type: "set_group_limit"; groupId: string; limit: GroupLimit }
+  | { type: "set_group_limits"; groupLimits: Record<string, GroupLimit> };
+
+const initialRngState: RngState = {
+  draws: {},
+  checkedMap: {},
+  cardLockMap: {},
+  tagLockMap: {},
+  qtyMap: {},
+  groupLimits: {},
+};
+
+const rngReducer = (state: RngState, action: RngAction): RngState => {
+  switch (action.type) {
+    case "init_from_data": {
+      if (action.data.length === 0) return state;
+      const nextCheckedMap = { ...state.checkedMap };
+      const nextCardLockMap = { ...state.cardLockMap };
+      const nextTagLockMap = { ...state.tagLockMap };
+      const nextQtyMap = { ...state.qtyMap };
+      const nextGroupLimits = { ...state.groupLimits };
+      const nextDraws = { ...state.draws };
+      const storedLimits = action.storedGroupLimits;
+      const groupCounts = new Map<string, number>();
+
+      action.data.forEach((cat) => {
+        if (nextCheckedMap[cat.slug] === undefined) nextCheckedMap[cat.slug] = true;
+        if (nextCardLockMap[cat.slug] === undefined) nextCardLockMap[cat.slug] = false;
+        if (nextTagLockMap[cat.slug] === undefined) nextTagLockMap[cat.slug] = new Set<TagLockKey>();
+        if (cat.type === "group" && nextQtyMap[cat.slug] === undefined) {
+          nextQtyMap[cat.slug] = Math.max(1, cat.min_count ?? 1);
+        }
+        if (nextDraws[cat.slug] === undefined) nextDraws[cat.slug] = [];
+        if (cat.items.length === 0) return;
+        const groupId = getCategoryGroupId(cat);
+        if (isGeneralGroupId(groupId)) return;
+        groupCounts.set(groupId, (groupCounts.get(groupId) ?? 0) + 1);
+      });
+
+      groupCounts.forEach((count, groupId) => {
+        if (nextGroupLimits[groupId] !== undefined) return;
+        const stored = storedLimits[groupId];
+        if (stored) {
+          const safeMin = Math.max(0, stored.min);
+          const safeMax = Math.max(safeMin, stored.max);
+          nextGroupLimits[groupId] = { min: safeMin, max: safeMax };
+          return;
+        }
+        const safeMax = Math.max(1, count);
+        nextGroupLimits[groupId] = { min: Math.min(1, safeMax), max: safeMax };
+      });
+
+      return {
+        draws: nextDraws,
+        checkedMap: nextCheckedMap,
+        cardLockMap: nextCardLockMap,
+        tagLockMap: nextTagLockMap,
+        qtyMap: nextQtyMap,
+        groupLimits: nextGroupLimits,
+      };
+    }
+    case "set_draws":
+      return { ...state, draws: action.draws };
+    case "set_checked":
+      return { ...state, checkedMap: { ...state.checkedMap, [action.slug]: action.checked } };
+    case "set_checked_bulk": {
+      const next = { ...state.checkedMap };
+      action.slugs.forEach((slug) => {
+        next[slug] = action.checked;
+      });
+      return { ...state, checkedMap: next };
+    }
+    case "toggle_card_lock":
+      return {
+        ...state,
+        cardLockMap: { ...state.cardLockMap, [action.slug]: !state.cardLockMap[action.slug] },
+      };
+    case "set_card_lock_map":
+      return { ...state, cardLockMap: action.map };
+    case "set_tag_lock":
+      return { ...state, tagLockMap: { ...state.tagLockMap, [action.slug]: action.locks } };
+    case "set_tag_lock_map":
+      return { ...state, tagLockMap: action.map };
+    case "set_qty":
+      return { ...state, qtyMap: { ...state.qtyMap, [action.slug]: action.qty } };
+    case "set_group_limit":
+      return { ...state, groupLimits: { ...state.groupLimits, [action.groupId]: action.limit } };
+    case "set_group_limits":
+      return { ...state, groupLimits: action.groupLimits };
+    default:
+      return state;
+  }
+};
+
 export default function RngPromptRoute() {
-  const [configData, setConfigData] = useState<Category[]>([]);
-  const [draws, setDraws] = useState<Draws>({});
-  const [checkedMap, setCheckedMap] = useState<Record<string, boolean>>({});
-  const [cardLockMap, setCardLockMap] = useState<Record<string, boolean>>({});
-  const [tagLockMap, setTagLockMap] = useState<Record<string, Set<TagLockKey>>>({});
-  const [qtyMap, setQtyMap] = useState<Record<string, number>>({});
-  const [groupLimits, setGroupLimits] = useState<Record<string, GroupLimit>>({});
-  const [outputConfigs, setOutputConfigs] = useState<OutputConfig[]>([]);
-  const [activeOutputConfigId, setActiveOutputConfigId] = useState<string | null>(null);
+  const { configData, loading, useMock, refreshData } = useCategoriesData({ mockData: MOCK_DB_DATA });
+  const { outputConfigs, activeOutputConfigId, applyOutputConfigs, fetchOutputConfigs } = useOutputConfigs();
+  const [state, dispatch] = useReducer(rngReducer, initialRngState);
   const [toast, setToast] = useState<ToastState>({ visible: false, message: "" });
   const [activeTab, setActiveTab] = useState<string>(TAB_ALL);
-  const [loading, setLoading] = useState(true);
-  const [useMock, setUseMock] = useState(false);
   const [view, setView] = useState<"generator" | "admin">("generator");
   const toastTimerRef = useRef<number | null>(null);
   const hasAutoRolledRef = useRef(false);
   const groupLimitsCookieRef = useRef<Record<string, GroupLimit>>({});
-  const shuffleBagsRef = useRef<Record<string, { order: TagLockKey[]; index: number }>>({});
-
-  const applyOutputConfigs = (configs: OutputConfig[]) => {
-    setOutputConfigs(configs);
-    const active = configs.find((config) => config.is_active);
-    setActiveOutputConfigId(active?.id ?? null);
-  };
-
-  const refreshConfigData = async () => {
-    const res = await fetch("/api/data");
-    if (!res.ok) throw new Error("API not found");
-    return (await res.json()) as Category[];
-  };
-
-  const fetchOutputConfigs = async () => {
-    const res = await fetch("/api/output-configs");
-    if (!res.ok) throw new Error("Output configs API not found");
-    const payload = (await res.json()) as { configs?: OutputConfig[] };
-    return payload.configs ?? [];
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const data = await refreshConfigData();
-        if (!cancelled) {
-          setConfigData(data);
-          setUseMock(false);
-        }
-      } catch (_error) {
-        if (!cancelled) {
-          setConfigData(MOCK_DB_DATA);
-          setUseMock(true);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    fetchData();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadConfigs = async () => {
-      try {
-        const configs = await fetchOutputConfigs();
-        if (!cancelled) applyOutputConfigs(configs);
-      } catch (_error) {
-        if (!cancelled) applyOutputConfigs([]);
-      }
-    };
-    loadConfigs();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const shuffleBagsRef = useRef<ShuffleBags>({});
+  const { draws, checkedMap, cardLockMap, tagLockMap, qtyMap, groupLimits } = state;
 
   useEffect(() => {
     groupLimitsCookieRef.current = readGroupLimitsCookie();
@@ -2124,74 +1974,7 @@ export default function RngPromptRoute() {
 
   useEffect(() => {
     if (configData.length === 0) return;
-
-    setCheckedMap((prev) => {
-      const next = { ...prev };
-      configData.forEach((cat) => {
-        if (next[cat.slug] === undefined) next[cat.slug] = true;
-      });
-      return next;
-    });
-
-    setCardLockMap((prev) => {
-      const next = { ...prev };
-      configData.forEach((cat) => {
-        if (next[cat.slug] === undefined) next[cat.slug] = false;
-      });
-      return next;
-    });
-
-    setTagLockMap((prev) => {
-      const next = { ...prev };
-      configData.forEach((cat) => {
-        if (next[cat.slug] === undefined) next[cat.slug] = new Set<TagLockKey>();
-      });
-      return next;
-    });
-
-    setQtyMap((prev) => {
-      const next = { ...prev };
-      configData.forEach((cat) => {
-        if (cat.type === "group" && next[cat.slug] === undefined) {
-          next[cat.slug] = Math.max(1, cat.min_count ?? 1);
-        }
-      });
-      return next;
-    });
-
-    setGroupLimits((prev) => {
-      const next = { ...prev };
-      const groupCounts = new Map<string, number>();
-      const storedLimits = groupLimitsCookieRef.current;
-      configData.forEach((cat) => {
-        if (cat.items.length === 0) return;
-        const groupId = getCategoryGroupId(cat);
-        if (isGeneralGroupId(groupId)) return;
-        groupCounts.set(groupId, (groupCounts.get(groupId) ?? 0) + 1);
-      });
-
-      groupCounts.forEach((count, groupId) => {
-        if (next[groupId] !== undefined) return;
-        const stored = storedLimits[groupId];
-        if (stored) {
-          const safeMin = Math.max(0, stored.min);
-          const safeMax = Math.max(safeMin, stored.max);
-          next[groupId] = { min: safeMin, max: safeMax };
-          return;
-        }
-        const safeMax = Math.max(1, count);
-        next[groupId] = { min: Math.min(1, safeMax), max: safeMax };
-      });
-      return next;
-    });
-
-    setDraws((prev) => {
-      const next = { ...prev };
-      configData.forEach((cat) => {
-        if (next[cat.slug] === undefined) next[cat.slug] = [];
-      });
-      return next;
-    });
+    dispatch({ type: "init_from_data", data: configData, storedGroupLimits: groupLimitsCookieRef.current });
   }, [configData]);
 
   useEffect(() => {
@@ -2248,87 +2031,6 @@ export default function RngPromptRoute() {
 
   const getActiveItems = (cat: Category) => cat.items.filter((item) => item.is_active !== false);
 
-  const hasSameMembers = (a: TagLockKey[], b: TagLockKey[]) => {
-    if (a.length !== b.length) return false;
-    const setA = new Set(a);
-    if (setA.size !== a.length) return false;
-    return b.every((key) => setA.has(key));
-  };
-
-  const ensureShuffleBag = (cat: Category, activeKeys: TagLockKey[]) => {
-    const current = shuffleBagsRef.current[cat.slug];
-    if (!current || !hasSameMembers(activeKeys, current.order)) {
-      const next = { order: shuffleArray(activeKeys), index: 0 };
-      shuffleBagsRef.current[cat.slug] = next;
-      writeShuffleBags(shuffleBagsRef.current);
-      return next;
-    }
-    const safeIndex = Math.min(Math.max(0, current.index), current.order.length);
-    if (safeIndex !== current.index) {
-      current.index = safeIndex;
-      writeShuffleBags(shuffleBagsRef.current);
-    }
-    return current;
-  };
-
-  const drawFromShuffleBag = (cat: Category, count: number, excludeKeys: Set<TagLockKey>) => {
-    if (count <= 0) return [];
-    const activeItems = getActiveItems(cat);
-    if (activeItems.length === 0) return [];
-
-    const itemMap = new Map<TagLockKey, PromptItem>();
-    const activeKeys: TagLockKey[] = [];
-    activeItems.forEach((item) => {
-      const key = getItemKey(item);
-      activeKeys.push(key);
-      itemMap.set(key, item);
-    });
-
-    const bag = ensureShuffleBag(cat, activeKeys);
-    let index = bag.index;
-    const picked: PromptItem[] = [];
-    const seen = new Set<TagLockKey>();
-    const maxAttempts = activeKeys.length * 2;
-    let attempts = 0;
-
-    while (picked.length < count && attempts < maxAttempts) {
-      if (index >= bag.order.length) {
-        bag.order = shuffleArray(activeKeys);
-        index = 0;
-      }
-      const key = bag.order[index];
-      index += 1;
-      attempts += 1;
-      if (!itemMap.has(key)) continue;
-      if (excludeKeys.has(key)) continue;
-      if (seen.has(key)) continue;
-      const item = itemMap.get(key);
-      if (item) {
-        picked.push(item);
-        seen.add(key);
-      }
-    }
-
-    bag.index = index;
-    shuffleBagsRef.current[cat.slug] = bag;
-    writeShuffleBags(shuffleBagsRef.current);
-    return picked;
-  };
-
-  const getMulRange = (cat: Category) => {
-    const min = Math.max(0, cat.min_count ?? 1);
-    const max = Math.max(min, cat.max_count ?? min);
-    return { min, max };
-  };
-
-  const getCardMulCount = (cat: Category) => {
-    const override = qtyMap[cat.slug];
-    if (typeof override === "number") return Math.max(0, override);
-    const { min, max } = getMulRange(cat);
-    if (max <= min) return min;
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-  };
-
   const getLockedItems = (cat: Category) => {
     const locks = tagLockMap[cat.slug];
     if (!locks || locks.size === 0) return [];
@@ -2336,7 +2038,18 @@ export default function RngPromptRoute() {
   };
 
   const getRandomItems = (cat: Category, count: number, excludeKeys: Set<TagLockKey>) => {
-    return drawFromShuffleBag(cat, count, excludeKeys);
+    const activeItems = getActiveItems(cat);
+    const { picked, bags } = drawFromShuffleBag(
+      shuffleBagsRef.current,
+      cat.slug,
+      activeItems,
+      getItemKey,
+      count,
+      excludeKeys,
+    );
+    shuffleBagsRef.current = bags;
+    writeShuffleBags(shuffleBagsRef.current);
+    return picked;
   };
 
   const buildRandomDrawsForCategory = (cat: Category, targetCount: number) => {
@@ -2372,7 +2085,7 @@ export default function RngPromptRoute() {
           next[cat.slug] = [];
           return;
         }
-        const targetCount = getCardMulCount(cat);
+        const targetCount = getCardMulCount(cat, qtyMap[cat.slug]);
         next[cat.slug] = buildDrawsForCategory(cat, targetCount);
       });
       return next;
@@ -2412,7 +2125,7 @@ export default function RngPromptRoute() {
       const available = Math.max(0, maxCount - lockedCount);
       if (available === 0) return;
 
-      const desiredCount = getCardMulCount(cat);
+      const desiredCount = getCardMulCount(cat, qtyMap[cat.slug]);
       const preferred = Math.min(Math.max(desiredCount - lockedCount, 0), available);
       for (let i = 0; i < preferred; i += 1) {
         preferredPool.push(cat.slug);
@@ -2470,138 +2183,48 @@ export default function RngPromptRoute() {
     return next;
   };
 
-  const buildOutputText = () => {
-    const activeConfig = outputConfigs.find((config) => config.id === activeOutputConfigId);
-    const activeBlocks = activeConfig?.blocks ?? [];
-    const blocks = activeBlocks.length > 0 ? activeBlocks : getDefaultOutputBlocks(configData);
-    const orderedCategories = [...configData].sort((a, b) => {
-      const orderA = a.sort_order ?? a.id;
-      const orderB = b.sort_order ?? b.id;
-      return orderA - orderB;
+  const onGlobalRoll = () => {
+    let next: Draws = { ...draws };
+    const groupIds = new Set<string>();
+    let hasGeneral = false;
+
+    configData.forEach((cat) => {
+      const groupId = getCategoryGroupId(cat);
+      if (isGeneralGroupId(groupId)) {
+        hasGeneral = true;
+      } else {
+        groupIds.add(groupId);
+      }
     });
 
-    const buildCategorySegment = (slug: string) => {
-      const cat = configData.find((item) => item.slug === slug);
-      if (!cat) return "";
-      if (!isChecked(slug) && !cardLockMap[slug]) return "";
-      const values = draws[slug] ?? [];
-      if (values.length === 0) return "";
-      return values.map((item) => item.value).join(", ");
-    };
-
-    const buildGroupSegment = (groupId: string) => {
-      const normalizedGroupId = isGeneralGroupId(groupId) ? TAB_GENERAL : groupId;
-      const categories = orderedCategories.filter((cat) => {
-        const resolved = isGeneralGroupId(getCategoryGroupId(cat)) ? TAB_GENERAL : getCategoryGroupId(cat);
-        return resolved === normalizedGroupId;
-      });
-      const segments = categories.map((cat) => buildCategorySegment(cat.slug)).filter(Boolean);
-      return segments.join(", ");
-    };
-
-    const resolved = blocks.map((block) => {
-      if (block.type === "text") {
-        return { kind: "text" as const, value: block.text ?? "" };
-      }
-      if (block.type === "group") {
-        const groupId = block.groupId ?? "";
-        return { kind: "content" as const, value: groupId ? buildGroupSegment(groupId) : "" };
-      }
-      const slug = block.categorySlug;
-      return { kind: "content" as const, value: slug ? buildCategorySegment(slug) : "" };
+    groupIds.forEach((groupId) => {
+      next = applyGroupRefresh(next, groupId);
     });
 
-    const segments: { kind: "text" | "content"; value: string }[] = [];
-    for (let index = 0; index < resolved.length; index += 1) {
-      const item = resolved[index];
-      if (item.kind === "content") {
-        if (item.value && item.value.trim().length > 0) {
-          segments.push({ kind: "content", value: item.value });
-        }
-        continue;
-      }
-
-      let prevIndex = -1;
-      for (let i = index - 1; i >= 0; i -= 1) {
-        if (resolved[i].kind === "content") {
-          prevIndex = i;
-          break;
-        }
-      }
-      let nextIndex = -1;
-      for (let i = index + 1; i < resolved.length; i += 1) {
-        if (resolved[i].kind === "content") {
-          nextIndex = i;
-          break;
-        }
-      }
-      const prevContent = prevIndex === -1 ? null : resolved[prevIndex];
-      const nextContent = nextIndex === -1 ? null : resolved[nextIndex];
-      const prevHas = Boolean(prevContent && prevContent.value.trim().length > 0);
-      const nextHas = Boolean(nextContent && nextContent.value.trim().length > 0);
-
-      const shouldInclude =
-        prevContent && nextContent ? prevHas && nextHas : prevContent ? prevHas : nextContent ? nextHas : false;
-
-      if (shouldInclude && item.value && item.value.length > 0) {
-        segments.push({ kind: "text", value: item.value });
-      }
+    if (hasGeneral) {
+      next = applyGroupRefresh(next, TAB_GENERAL);
     }
 
-    let output = "";
-    let lastKind: "text" | "content" | null = null;
-    segments.forEach((segment) => {
-      if (segment.kind === "content" && lastKind === "content" && output && !/\s$/.test(output)) {
-        output += " ";
-      }
-      output += segment.value;
-      lastKind = segment.kind;
-    });
-
-    return output.trim();
-  };
-
-  const onGlobalRoll = () => {
-    setDraws((prev) => {
-      let next: Draws = { ...prev };
-      const groupIds = new Set<string>();
-      let hasGeneral = false;
-
-      configData.forEach((cat) => {
-        const groupId = getCategoryGroupId(cat);
-        if (isGeneralGroupId(groupId)) {
-          hasGeneral = true;
-        } else {
-          groupIds.add(groupId);
-        }
-      });
-
-      groupIds.forEach((groupId) => {
-        next = applyGroupRefresh(next, groupId);
-      });
-
-      if (hasGeneral) {
-        next = applyGroupRefresh(next, TAB_GENERAL);
-      }
-
-      return next;
-    });
+    dispatch({ type: "set_draws", draws: next });
   };
 
   const onSingleRefresh = (categorySlug: string) => {
     const cat = configData.find((item) => item.slug === categorySlug);
     if (!cat || cardLockMap[categorySlug]) return;
     if (!isChecked(categorySlug)) return;
-    const targetCount = getCardMulCount(cat);
-    setDraws((prev) => ({ ...prev, [categorySlug]: buildDrawsForCategory(cat, targetCount) }));
+    const targetCount = getCardMulCount(cat, qtyMap[cat.slug]);
+    dispatch({
+      type: "set_draws",
+      draws: { ...draws, [categorySlug]: buildDrawsForCategory(cat, targetCount) },
+    });
   };
 
   const onRefreshGroup = (groupId: string) => {
-    setDraws((prev) => applyGroupRefresh(prev, groupId));
+    dispatch({ type: "set_draws", draws: applyGroupRefresh(draws, groupId) });
   };
 
   const onToggleCardLock = (categorySlug: string) => {
-    setCardLockMap((prev) => ({ ...prev, [categorySlug]: !prev[categorySlug] }));
+    dispatch({ type: "toggle_card_lock", slug: categorySlug });
   };
 
   const onToggleTagLock = (categorySlug: string, promptKey: TagLockKey) => {
@@ -2609,50 +2232,49 @@ export default function RngPromptRoute() {
     if (!cat) return;
     const item = cat.items.find((candidate) => getItemKey(candidate) === promptKey);
     const hasSame = tagLockMap[categorySlug]?.size === 1 && tagLockMap[categorySlug]?.has(promptKey);
+    const nextSet = new Set<TagLockKey>();
+    if (!hasSame && item) nextSet.add(promptKey);
+    dispatch({ type: "set_tag_lock", slug: categorySlug, locks: nextSet });
 
-    setTagLockMap((prev) => {
-      const nextSet = new Set<TagLockKey>();
-      if (!hasSame && item) nextSet.add(promptKey);
-      return { ...prev, [categorySlug]: nextSet };
-    });
-
-    setDraws((prev) => {
-      const next = { ...prev };
-      if (hasSame) {
-        if (!isChecked(categorySlug)) {
-          next[categorySlug] = [];
-          return next;
-        }
-        if (!cardLockMap[categorySlug]) {
-          const targetCount = getCardMulCount(cat);
-          next[categorySlug] = buildRandomDrawsForCategory(cat, targetCount);
-        }
-        return next;
+    const next = { ...draws };
+    if (hasSame) {
+      if (!isChecked(categorySlug)) {
+        next[categorySlug] = [];
+        dispatch({ type: "set_draws", draws: next });
+        return;
       }
-      if (item) {
-        next[categorySlug] = [item];
+      if (!cardLockMap[categorySlug]) {
+        const targetCount = getCardMulCount(cat, qtyMap[cat.slug]);
+        next[categorySlug] = buildRandomDrawsForCategory(cat, targetCount);
       }
-      return next;
-    });
+      dispatch({ type: "set_draws", draws: next });
+      return;
+    }
+    if (item) {
+      next[categorySlug] = [item];
+    }
+    dispatch({ type: "set_draws", draws: next });
   };
 
   const onToggleChecked = (categorySlug: string, checked: boolean) => {
     const cat = configData.find((item) => item.slug === categorySlug);
-    setCheckedMap((prev) => ({ ...prev, [categorySlug]: checked }));
+    dispatch({ type: "set_checked", slug: categorySlug, checked });
     if (!cat) return;
-    setDraws((prev) => {
-      const next = { ...prev };
-      if (!checked) {
-        next[categorySlug] = [];
-        return next;
-      }
-      if (cardLockMap[categorySlug]) return next;
-      if ((prev[categorySlug] ?? []).length === 0) {
-        const targetCount = getCardMulCount(cat);
-        next[categorySlug] = buildDrawsForCategory(cat, targetCount);
-      }
-      return next;
-    });
+    const next = { ...draws };
+    if (!checked) {
+      next[categorySlug] = [];
+      dispatch({ type: "set_draws", draws: next });
+      return;
+    }
+    if (cardLockMap[categorySlug]) {
+      dispatch({ type: "set_draws", draws: next });
+      return;
+    }
+    if ((draws[categorySlug] ?? []).length === 0) {
+      const targetCount = getCardMulCount(cat, qtyMap[cat.slug]);
+      next[categorySlug] = buildDrawsForCategory(cat, targetCount);
+    }
+    dispatch({ type: "set_draws", draws: next });
   };
 
   const onToggleGroupChecked = (groupId: string, checked: boolean) => {
@@ -2662,100 +2284,76 @@ export default function RngPromptRoute() {
       return getCategoryGroupId(cat) === groupId;
     });
 
-    setCheckedMap((prev) => {
-      const next = { ...prev };
-      targets.forEach((cat) => {
-        next[cat.slug] = checked;
-      });
-      return next;
-    });
+    dispatch({ type: "set_checked_bulk", slugs: targets.map((cat) => cat.slug), checked });
 
-    setDraws((prev) => {
-      const next = { ...prev };
-      targets.forEach((cat) => {
-        if (!checked) {
-          next[cat.slug] = [];
-          return;
-        }
-        if (cardLockMap[cat.slug]) return;
-        if ((prev[cat.slug] ?? []).length === 0) {
-          const targetCount = getCardMulCount(cat);
-          next[cat.slug] = buildDrawsForCategory(cat, targetCount);
-        }
-      });
-      return next;
+    const next = { ...draws };
+    targets.forEach((cat) => {
+      if (!checked) {
+        next[cat.slug] = [];
+        return;
+      }
+      if (cardLockMap[cat.slug]) return;
+      if ((draws[cat.slug] ?? []).length === 0) {
+        const targetCount = getCardMulCount(cat, qtyMap[cat.slug]);
+        next[cat.slug] = buildDrawsForCategory(cat, targetCount);
+      }
     });
+    dispatch({ type: "set_draws", draws: next });
   };
 
   const onToggleAllOptional = (checked: boolean) => {
     const optionalCats = configData.filter((cat) => isOptionalCategory(cat));
-    setCheckedMap((prev) => {
-      const next = { ...prev };
-      optionalCats.forEach((cat) => {
-        next[cat.slug] = checked;
-      });
-      return next;
-    });
+    dispatch({ type: "set_checked_bulk", slugs: optionalCats.map((cat) => cat.slug), checked });
 
-    setDraws((prev) => {
-      const next = { ...prev };
-      optionalCats.forEach((cat) => {
-        if (!checked) {
-          next[cat.slug] = [];
-          return;
-        }
-        if (cardLockMap[cat.slug]) return;
-        if ((prev[cat.slug] ?? []).length === 0) {
-          const targetCount = getCardMulCount(cat);
-          next[cat.slug] = buildDrawsForCategory(cat, targetCount);
-        }
-      });
-      return next;
+    const next = { ...draws };
+    optionalCats.forEach((cat) => {
+      if (!checked) {
+        next[cat.slug] = [];
+        return;
+      }
+      if (cardLockMap[cat.slug]) return;
+      if ((draws[cat.slug] ?? []).length === 0) {
+        const targetCount = getCardMulCount(cat, qtyMap[cat.slug]);
+        next[cat.slug] = buildDrawsForCategory(cat, targetCount);
+      }
     });
+    dispatch({ type: "set_draws", draws: next });
   };
 
   const onUnlockAll = () => {
-    setCardLockMap((prev) => {
-      const next = { ...prev };
-      Object.keys(next).forEach((key) => {
-        next[key] = false;
-      });
-      return next;
+    const nextCardLocks = { ...cardLockMap };
+    Object.keys(nextCardLocks).forEach((key) => {
+      nextCardLocks[key] = false;
     });
+    dispatch({ type: "set_card_lock_map", map: nextCardLocks });
 
-    setTagLockMap(() => {
-      const next: Record<string, Set<TagLockKey>> = {};
-      configData.forEach((cat) => {
-        next[cat.slug] = new Set<TagLockKey>();
-      });
-      return next;
+    const nextTagLocks: Record<string, Set<TagLockKey>> = {};
+    configData.forEach((cat) => {
+      nextTagLocks[cat.slug] = new Set<TagLockKey>();
     });
+    dispatch({ type: "set_tag_lock_map", map: nextTagLocks });
   };
 
   const onChangeQty = (categorySlug: string, delta: 1 | -1) => {
-    setQtyMap((prev) => {
-      const current = prev[categorySlug] ?? 0;
-      const nextValue = Math.max(0, current + delta);
-      return { ...prev, [categorySlug]: nextValue };
-    });
+    const current = qtyMap[categorySlug] ?? 0;
+    const nextValue = Math.max(0, current + delta);
+    dispatch({ type: "set_qty", slug: categorySlug, qty: nextValue });
   };
 
   const onChangeGroupLimit = (groupId: string, type: "min" | "max", delta: 1 | -1) => {
-    setGroupLimits((prev) => {
-      const current = prev[groupId] ?? { min: 0, max: 0 };
-      let nextMin = current.min;
-      let nextMax = current.max;
+    const current = groupLimits[groupId] ?? { min: 0, max: 0 };
+    let nextMin = current.min;
+    let nextMax = current.max;
 
-      if (type === "min") {
-        nextMin = Math.max(0, current.min + delta);
-        if (nextMin > nextMax) nextMax = nextMin;
-      } else {
-        nextMax = Math.max(0, current.max + delta);
-        if (nextMax < nextMin) nextMin = nextMax;
-      }
+    if (type === "min") {
+      nextMin = Math.max(0, current.min + delta);
+      if (nextMin > nextMax) nextMax = nextMin;
+    } else {
+      nextMax = Math.max(0, current.max + delta);
+      if (nextMax < nextMin) nextMin = nextMax;
+    }
 
-      return { ...prev, [groupId]: { min: nextMin, max: nextMax } };
-    });
+    dispatch({ type: "set_group_limit", groupId, limit: { min: nextMin, max: nextMax } });
   };
 
   const onCreateOutputConfig = async (name: string, blocks: OutputBlock[]) => {
@@ -2821,13 +2419,18 @@ export default function RngPromptRoute() {
   };
 
   const onRefreshData = async () => {
-    const data = await refreshConfigData();
-    setConfigData(data);
-    setUseMock(false);
+    await refreshData();
   };
 
   const onCopy = async () => {
-    const text = buildOutputText();
+    const text = buildOutputText({
+      configData,
+      draws,
+      checkedMap,
+      cardLockMap,
+      outputConfigs,
+      activeOutputConfigId,
+    });
 
     try {
       await navigator.clipboard.writeText(text);
@@ -2877,7 +2480,14 @@ export default function RngPromptRoute() {
     );
   }
 
-  const previewText = buildOutputText();
+  const previewText = buildOutputText({
+    configData,
+    draws,
+    checkedMap,
+    cardLockMap,
+    outputConfigs,
+    activeOutputConfigId,
+  });
 
   const activeTabMode = activeTab === TAB_ALL ? "all" : activeTab === TAB_GENERAL ? "general" : "group";
   const groupTabs = tabs.filter((tab) => tab.mode === "group");

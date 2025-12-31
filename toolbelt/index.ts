@@ -65,6 +65,119 @@ const BLOG_DIR = resolve(REPO, "app/content/blog");
 const BLOG_CATEGORIES_FILE = resolve(BLOG_DIR, "categories.json");
 const BLOG_POSTS_DIR = resolve(BLOG_DIR, "posts");
 const BLOG_POST_NAME_RE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9\-]+\.json$/i;
+const KKTIX_BASE = "https://kktix.com/events";
+const KKTIX_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const KKTIX_SOURCE = "kktix";
+const KKTIX_MAX_PAGES = 5;
+
+type ConcertEventInput = {
+  source: string;
+  source_id: string;
+  title: string;
+  event_at: string;
+  url: string;
+};
+
+const decodeHtmlEntities = (value: string) =>
+  value.replace(/&(#\d+|#x[0-9a-fA-F]+|quot|amp|lt|gt|apos);/g, (full, entity) => {
+    switch (entity) {
+      case "quot":
+        return "\"";
+      case "amp":
+        return "&";
+      case "lt":
+        return "<";
+      case "gt":
+        return ">";
+      case "apos":
+        return "'";
+      default:
+        break;
+    }
+
+    if (entity.startsWith("#x")) {
+      const code = Number.parseInt(entity.slice(2), 16);
+      return Number.isNaN(code) ? full : String.fromCharCode(code);
+    }
+
+    if (entity.startsWith("#")) {
+      const code = Number.parseInt(entity.slice(1), 10);
+      return Number.isNaN(code) ? full : String.fromCharCode(code);
+    }
+
+    return full;
+  });
+
+const parseKktixPayload = (html: string) => {
+  const doubleMatch = html.match(/data-react-props="([^"]+)"/);
+  const singleMatch = html.match(/data-react-props='([^']+)'/);
+  const raw = doubleMatch?.[1] ?? singleMatch?.[1];
+  if (!raw) return null;
+
+  const decoded = decodeHtmlEntities(raw);
+  try {
+    return JSON.parse(decoded) as { data?: any[] };
+  } catch {
+    return null;
+  }
+};
+
+const toIsoFromEpoch = (value: number) => new Date(value * 1000).toISOString();
+
+const parseKktixEvents = (html: string): ConcertEventInput[] => {
+  const payload = parseKktixPayload(html);
+  const rows = Array.isArray(payload?.data) ? payload?.data : [];
+  const events: ConcertEventInput[] = [];
+
+  for (const row of rows) {
+    const title = typeof row?.name === "string" ? row.name.trim() : "";
+    const url = typeof row?.public_url === "string" ? row.public_url.trim() : "";
+    if (!title || !url) continue;
+
+    let sourceId = typeof row?.slug === "string" ? row.slug.trim() : "";
+    if (!sourceId) {
+      sourceId = url.split("/").filter(Boolean).pop() ?? "";
+    }
+
+    const startAt =
+      typeof row?.start_at === "number" ? row.start_at : Number.parseInt(String(row?.start_at ?? ""), 10);
+    if (!sourceId || Number.isNaN(startAt)) continue;
+
+    events.push({
+      source: KKTIX_SOURCE,
+      source_id: sourceId,
+      title,
+      event_at: toIsoFromEpoch(startAt),
+      url,
+    });
+  }
+
+  return events;
+};
+
+const buildKktixUrl = (startAt: string, endAt: string, page: number) => {
+  const target = new URL(KKTIX_BASE);
+  target.searchParams.set("event_tag_ids_in", "1");
+  if (startAt) target.searchParams.set("start_at", startAt);
+  if (endAt) target.searchParams.set("end_at", endAt);
+  target.searchParams.set("page", String(page));
+  return target.toString();
+};
+
+const ensureKktixProfileDir = () => {
+  const dir = resolve(REPO, ".toolbelt", "kktix-profile");
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+};
+
+const clampPageCount = (value: unknown) => {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  if (Number.isNaN(parsed)) return KKTIX_MAX_PAGES;
+  return Math.min(Math.max(parsed, 1), 10);
+};
 
 // 基礎
 app.get("/", (_req, res) => res.json({ ok: true, message: "Toolbelt is running!" }));
@@ -164,6 +277,71 @@ app.post("/ops/git/commit-push", (req, res) => {
       stderr: pushResult.stderr,
     },
   });
+});
+
+app.post("/ops/concert-events/scrape", async (req, res) => {
+  const startAt = typeof req.body?.start_at === "string" ? req.body.start_at : "";
+  const endAt = typeof req.body?.end_at === "string" ? req.body.end_at : "";
+  const maxPages = clampPageCount(req.body?.max_pages);
+  const headless = req.body?.headless === false ? false : process.env.KKTIX_HEADLESS !== "0";
+  let context: any = null;
+
+  try {
+    const playwright = await import("playwright");
+    const userDataDir = ensureKktixProfileDir();
+    context = await playwright.chromium.launchPersistentContext(userDataDir, {
+      headless,
+      viewport: { width: 1280, height: 800 },
+      userAgent: KKTIX_USER_AGENT,
+    });
+    await context.setExtraHTTPHeaders({
+      "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+    });
+
+    const page = await context.newPage();
+    const eventsByKey = new Map<string, ConcertEventInput>();
+    let pagesFetched = 0;
+
+    for (let pageIndex = 1; pageIndex <= maxPages; pageIndex += 1) {
+      const targetUrl = buildKktixUrl(startAt, endAt, pageIndex);
+      await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+      const html = await page.content();
+      const events = parseKktixEvents(html);
+      pagesFetched += 1;
+
+      if (events.length === 0 && html.includes("Attention Required")) {
+        throw new Error("Blocked by Cloudflare challenge. Try KKTIX_HEADLESS=0.");
+      }
+
+      for (const event of events) {
+        const key = `${event.source}:${event.source_id}`;
+        if (!eventsByKey.has(key)) {
+          eventsByKey.set(key, event);
+        }
+      }
+
+      if (events.length === 0) {
+        break;
+      }
+    }
+
+    const events = Array.from(eventsByKey.values());
+    return res.json({
+      ok: true,
+      total: events.length,
+      pagesFetched,
+      events,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      ok: false,
+      error: error?.message ? String(error.message) : "Scrape failed",
+    });
+  } finally {
+    if (context) {
+      await context.close();
+    }
+  }
 });
 
 

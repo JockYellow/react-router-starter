@@ -1,0 +1,31 @@
+2025/12/31-18:38:44.042 50d4 Reusing MANIFEST D:\CloudflarePage\react-router-starter\.toolbelt\kktix-profile\Default\IndexedDB\https_kktix.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/12/31-18:38:44.043 50d4 Recovering log #33
+2025/12/31-18:38:44.043 50d4 Reusing old log D:\CloudflarePage\react-router-starter\.toolbelt\kktix-profile\Default\IndexedDB\https_kktix.com_0.indexeddb.leveldb/000033.log 
+2025/12/31-18:38:44.043 50d4 Delete type=2 #32
+2025/12/31-18:38:44.045 a050 Level-0 table #38: started
+2025/12/31-18:38:44.045 a050 Level-0 table #38: 0 bytes OK
+2025/12/31-18:38:44.046 a050 Delete type=0 #33
+2025/12/31-18:38:44.046 af40 Manual compaction at level-0 from '\x00\x0b\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x0c\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/31-18:38:44.446 50d4 Level-0 table #40: started
+2025/12/31-18:38:44.460 50d4 Level-0 table #40: 569 bytes OK
+2025/12/31-18:38:44.460 50d4 Delete type=0 #37
+2025/12/31-18:38:44.461 50d4 Manual compaction at level-0 from '\x00\x0c\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x0d\x00\x00\x00' @ 0 : 0; will stop at '\x00\x0c\x00\x00\x05' @ 214 : 1
+2025/12/31-18:38:44.461 50d4 Compacting 1@0 + 1@1 files
+2025/12/31-18:38:44.473 50d4 Generated table #41@0: 33 keys, 939 bytes
+2025/12/31-18:38:44.474 50d4 Compacted 1@0 + 1@1 files => 939 bytes
+2025/12/31-18:38:44.474 50d4 compacted to: files[ 0 1 1 0 0 0 0 ]
+2025/12/31-18:38:44.474 50d4 Delete type=2 #40
+2025/12/31-18:38:44.475 50d4 Manual compaction at level-0 from '\x00\x0c\x00\x00\x05' @ 214 : 1 .. '\x00\x0d\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/31-18:38:44.868 50d4 Level-0 table #43: started
+2025/12/31-18:38:44.880 50d4 Level-0 table #43: 569 bytes OK
+2025/12/31-18:38:44.881 50d4 Delete type=2 #35
+2025/12/31-18:38:44.881 50d4 Delete type=0 #39
+2025/12/31-18:38:44.881 50d4 Manual compaction at level-0 from '\x00\x0d\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x0e\x00\x00\x00' @ 0 : 0; will stop at '\x00\x0d\x00\x00\x05' @ 233 : 1
+2025/12/31-18:38:44.881 50d4 Compacting 1@0 + 1@1 files
+2025/12/31-18:38:44.894 50d4 Generated table #44@0: 34 keys, 955 bytes
+2025/12/31-18:38:44.894 50d4 Compacted 1@0 + 1@1 files => 955 bytes
+2025/12/31-18:38:44.894 50d4 compacted to: files[ 0 1 1 0 0 0 0 ]
+2025/12/31-18:38:44.895 50d4 Delete type=2 #43
+2025/12/31-18:38:44.895 50d4 Manual compaction at level-0 from '\x00\x0d\x00\x00\x05' @ 233 : 1 .. '\x00\x0e\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/31-18:38:45.414 a050 Manual compaction at level-0 from '\x00\x0e\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x0f\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/31-18:38:46.186 af40 Manual compaction at level-0 from '\x00\x0f\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x10\x00\x00\x00' @ 0 : 0; will stop at (end)
