@@ -1,8 +1,8 @@
 import type { ActionFunctionArgs } from "react-router";
 
 import { requireBlogDb } from "../../../lib/d1.server";
-import { initRoyaleState } from "../../../lib/spotify-ranking";
-import { buildCorsHeaders, ensureSpotifySessionsTable, getSpotifyEnv, jsonWithCors } from "../../../lib/spotify.server";
+import { initRoyaleState } from "../../../features/spotify/spotify-ranking";
+import { buildCorsHeaders, ensureSpotifySessionsTable, getSpotifyEnv, jsonWithCors } from "../../../features/spotify/spotify.server";
 
 type InitPayload = {
   userId?: string;

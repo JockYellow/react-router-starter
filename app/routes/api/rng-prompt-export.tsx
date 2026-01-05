@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from "react-router";
 
 import { requireBlogDb } from "../../lib/d1.server";
-import { buildCategoriesCsv, buildPromptsCsv } from "../../lib/rng-prompt-csv.server";
+import { buildCategoriesCsv, buildPromptsCsv } from "../../features/rng-prompt/rng-prompt-csv.server";
 
 export async function loader({ request, context }: LoaderFunctionArgs) {
   const url = new URL(request.url);

@@ -2,11 +2,11 @@ import { type CSSProperties, useMemo } from "react";
 import { Link, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
-import { loadBlogCategories, loadBlogPosts } from "../../lib/blog.server";
-import type { BlogPost, BlogCategory } from "../../lib/blog.types";
+import { loadBlogCategories, loadBlogPosts } from "../../features/blog/blog.server";
+import type { BlogPost, BlogCategory } from "../../features/blog/blog.types";
 import { requireBlogDb } from "../../lib/d1.server";
-import { getBlogPostBySlug } from "../../lib/blog.d1.server";
-import { deriveAccentColor } from "../../lib/blog-accent";
+import { getBlogPostBySlug } from "../../features/blog/blog.d1.server";
+import { deriveAccentColor } from "../../features/blog/blog-accent";
 
 type LoaderData = {
   post: BlogPost;

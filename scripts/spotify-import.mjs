@@ -75,7 +75,7 @@ for (let i = 0; i < ids.length; i += chunkSize) {
   sqlLines.push(`INSERT INTO spotify_followed_artists (dataset_key, artist_id, imported_at) VALUES ${values};`);
 }
 
-const sqlPath = path.join(process.cwd(), "sql", "spotify_followed_artists_import.sql");
+const sqlPath = path.join(process.cwd(), "sql", "spotify", "spotify_followed_artists_import.sql");
 await fs.mkdir(path.dirname(sqlPath), { recursive: true });
 await fs.writeFile(sqlPath, `${sqlLines.join("\n")}\n`, "utf8");
 

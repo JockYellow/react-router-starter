@@ -6,7 +6,7 @@ import {
   PROMPT_HEADERS,
   buildCategoriesCsv,
   buildPromptsCsv,
-} from "../../lib/rng-prompt-csv.server";
+} from "../../features/rng-prompt/rng-prompt-csv.server";
 
 type CategoryLookup = {
   id: number;

@@ -1,8 +1,8 @@
 import type { ActionFunctionArgs } from "react-router";
 
 import { requireBlogDb } from "../../../lib/d1.server";
-import type { RoyaleState } from "../../../lib/spotify-ranking";
-import { buildCorsHeaders, ensureSpotifySessionsTable, getSpotifyEnv, jsonWithCors } from "../../../lib/spotify.server";
+import type { RoyaleState } from "../../../features/spotify/spotify-ranking";
+import { buildCorsHeaders, ensureSpotifySessionsTable, getSpotifyEnv, jsonWithCors } from "../../../features/spotify/spotify.server";
 
 type SavePayload = {
   userId?: string;

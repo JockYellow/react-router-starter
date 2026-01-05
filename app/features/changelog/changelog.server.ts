@@ -21,7 +21,7 @@ export async function loadChangelogItems(_args?: LoaderFunctionArgs) {
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = path.dirname(__filename);
       const candidates = [
-        path.resolve(__dirname, "../content/changelog"),
+        path.resolve(__dirname, "../../content/changelog"),
         path.resolve(process.cwd(), "app/content/changelog"),
       ];
 
@@ -59,7 +59,7 @@ export async function loadChangelogItems(_args?: LoaderFunctionArgs) {
     }
   }
 
-  const modules = import.meta.glob("../content/changelog/*.json", { eager: true });
+  const modules = import.meta.glob("../../content/changelog/*.json", { eager: true });
   const items: ChangelogItem[] = Object.entries(modules).map(([p, m]: any) => {
     const data = m.default ?? m;
     const filename = p.split("/").pop();

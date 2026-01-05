@@ -3,7 +3,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { Lock, Gift as GiftIcon, CheckCircle2, Sparkles } from "lucide-react";
 import type { D1Database } from "@cloudflare/workers-types";
 
-import { getGifts, toggleLock, type Gift } from "../../lib/gift.server";
+import { getGifts, toggleLock, type Gift } from "../../features/gift/gift.server";
 import { requireBlogDb } from "../../lib/d1.server";
 import { buildPublicImageUrl, requireBlogImagesPublicBase } from "../../lib/r2.server";
 

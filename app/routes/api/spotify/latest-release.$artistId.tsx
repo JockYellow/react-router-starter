@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 
-import { buildCorsHeaders, getSpotifyAppToken, getSpotifyEnv, jsonWithCors } from "../../../lib/spotify.server";
+import { buildCorsHeaders, getSpotifyAppToken, getSpotifyEnv, jsonWithCors } from "../../../features/spotify/spotify.server";
 
 type AlbumItem = {
   name: string;

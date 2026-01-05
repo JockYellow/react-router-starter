@@ -124,7 +124,7 @@ VALUES (${values.join(", ")});`;
   const sql = statements.join("\n");
 
   // SQL 檔案輸出在專案根目錄
-  const sqlFile = resolve(ROOT, "blog-migrate.sql");
+  const sqlFile = resolve(ROOT, "sql/blog/blog-migrate.sql");
   writeFileSync(sqlFile, sql, "utf8");
 
   console.log(`匯入 ${posts.length} 篇文章到 blog_posts ...`);

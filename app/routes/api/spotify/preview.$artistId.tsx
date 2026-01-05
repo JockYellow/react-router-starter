@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 
-import { buildCorsHeaders, getSpotifyAppToken, getSpotifyEnv, jsonWithCors } from "../../../lib/spotify.server";
+import { buildCorsHeaders, getSpotifyAppToken, getSpotifyEnv, jsonWithCors } from "../../../features/spotify/spotify.server";
 
 export async function loader({ request, context, params }: LoaderFunctionArgs) {
   const env = getSpotifyEnv(context, request.url);

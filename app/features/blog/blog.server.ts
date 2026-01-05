@@ -12,7 +12,7 @@ export async function loadBlogCategories() {
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = path.dirname(__filename);
       const candidates = [
-        path.resolve(__dirname, "../content/blog/categories.json"),
+        path.resolve(__dirname, "../../content/blog/categories.json"),
         path.resolve(process.cwd(), "app/content/blog/categories.json"),
       ];
       for (const candidate of candidates) {
@@ -28,7 +28,7 @@ export async function loadBlogCategories() {
       // ignore
     }
   }
-  const mod: any = await import("../content/blog/categories.json");
+  const mod: any = await import("../../content/blog/categories.json");
   const data = mod.default ?? mod;
   return (data.categories || []) as BlogCategory[];
 }
@@ -53,7 +53,7 @@ export async function loadBlogPosts() {
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = path.dirname(__filename);
       const candidates = [
-        path.resolve(__dirname, "../content/blog/posts"),
+        path.resolve(__dirname, "../../content/blog/posts"),
         path.resolve(process.cwd(), "app/content/blog/posts"),
       ];
       let dir: string | null = null;
@@ -84,7 +84,7 @@ export async function loadBlogPosts() {
     }
   }
   if (!posts.length) {
-    const modules = import.meta.glob("../content/blog/posts/*.json", { eager: true });
+    const modules = import.meta.glob("../../content/blog/posts/*.json", { eager: true });
     for (const [p, mod] of Object.entries(modules)) {
       const data = (mod as any).default ?? (mod as any);
       const filename = p.split("/").pop();

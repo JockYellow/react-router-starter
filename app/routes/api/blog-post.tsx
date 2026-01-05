@@ -1,9 +1,9 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 
 import { requireBlogDb } from "../../lib/d1.server";
-import { getBlogPostBySlug } from "../../lib/blog.d1.server";
-import type { BlogPost } from "../../lib/blog.types";
-import { requireAdmin } from "../../lib/admin-auth.server";
+import { getBlogPostBySlug } from "../../features/blog/blog.d1.server";
+import type { BlogPost } from "../../features/blog/blog.types";
+import { requireAdmin } from "../../features/admin/admin-auth.server";
 import { processCoverImage } from "../../lib/image-processing.server";
 import { buildPublicImageUrl, requireBlogImagesBucket, requireBlogImagesPublicBase } from "../../lib/r2.server";
 

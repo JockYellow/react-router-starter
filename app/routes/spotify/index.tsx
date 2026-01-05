@@ -6,7 +6,7 @@ import {
   getRoyaleProgress,
   isRoyaleState,
   type RoyaleState,
-} from "../../lib/spotify-ranking";
+} from "../../features/spotify/spotify-ranking";
 import {
   fetchArtistPreview,
   fetchArtistsByIds,
@@ -14,7 +14,7 @@ import {
   fetchStoredArtistIds,
   type LatestReleaseInfo,
   type SpotifyArtist,
-} from "../../lib/spotify.client";
+} from "../../features/spotify/spotify.client";
 
 type SessionResponse = {
   status: "IDLE" | "ROUND_1" | "ROUND_2" | "ROUND_3" | "FINISHED";

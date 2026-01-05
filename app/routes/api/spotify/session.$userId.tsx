@@ -1,8 +1,8 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 
 import { requireBlogDb } from "../../../lib/d1.server";
-import type { MergeState } from "../../../lib/spotify-ranking";
-import { buildCorsHeaders, ensureSpotifySessionsTable, getSpotifyEnv, jsonWithCors, parseJson } from "../../../lib/spotify.server";
+import type { MergeState } from "../../../features/spotify/spotify-ranking";
+import { buildCorsHeaders, ensureSpotifySessionsTable, getSpotifyEnv, jsonWithCors, parseJson } from "../../../features/spotify/spotify.server";
 
 type SessionRow = {
   user_id: string;

@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "react-router";
 
-import { getSpotifyEnv } from "../../lib/spotify.server";
+import { getSpotifyEnv } from "../../features/spotify/spotify.server";
 
 function renderHtml(message: string, script?: string) {
   return `<!DOCTYPE html>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { OutputConfig } from "../lib/rngPrompt/types";
+import type { OutputConfig } from "../lib/types";
 
 export const useOutputConfigs = () => {
   const [outputConfigs, setOutputConfigs] = useState<OutputConfig[]>([]);

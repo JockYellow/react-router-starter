@@ -2,11 +2,11 @@ import { type CSSProperties } from "react";
 import { Link, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
-import { loadBlogCategories, loadBlogPosts } from "../../lib/blog.server";
-import type { BlogCategory, BlogPost } from "../../lib/blog.types";
-import { getAllBlogPosts } from "../../lib/blog.d1.server";
+import { loadBlogCategories, loadBlogPosts } from "../../features/blog/blog.server";
+import type { BlogCategory, BlogPost } from "../../features/blog/blog.types";
+import { getAllBlogPosts } from "../../features/blog/blog.d1.server";
 import { requireBlogDb } from "../../lib/d1.server";
-import { deriveAccentColor } from "../../lib/blog-accent";
+import { deriveAccentColor } from "../../features/blog/blog-accent";
 
 function formatDate(date: string) {
   try {

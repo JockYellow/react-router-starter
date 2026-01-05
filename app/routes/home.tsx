@@ -185,7 +185,7 @@ export default function Index() {
       meta: "PROFILE",
       content: (
          <div className="text-sm text-gray-600 space-y-3 leading-relaxed">
-            <p>你好！我是一名專注於前端技術的開發者。我喜歡探索新工具，並致力於打造流暢的使用者體驗。</p>
+            <p>你好！這是一個專注於Vibe coding的個人專案集錦。我喜歡探索新工具，並致力於打造流暢的使用者體驗。</p>
             <div className="flex flex-wrap gap-2 pt-2">
                 {["React", "Remix", "TypeScript", "Tailwind", "Vite"].map(tag => (
                     <span key={tag} className="px-2 py-1 rounded-md bg-white border border-violet-100 text-violet-600 text-xs font-medium">

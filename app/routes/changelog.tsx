@@ -1,7 +1,7 @@
 // app/routes/changelog.tsx
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, Link } from "react-router";
-import { loadChangelogItems, type ChangelogItem } from "../lib/changelog.server";
+import { loadChangelogItems, type ChangelogItem } from "../features/changelog/changelog.server";
 
 export async function loader(args: LoaderFunctionArgs) {
   return loadChangelogItems(args);

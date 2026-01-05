@@ -5,7 +5,7 @@ import {
   createAdminSessionCookie,
   getAdminPassword,
   isAdmin,
-} from "../../lib/admin-auth.server";
+} from "../../features/admin/admin-auth.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   if (isAdmin(request)) {

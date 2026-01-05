@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Category } from "../lib/rngPrompt/types";
+import type { Category } from "../lib/types";
 
 type UseCategoriesDataArgs = {
   mockData: Category[];

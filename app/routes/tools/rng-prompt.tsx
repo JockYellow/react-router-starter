@@ -11,14 +11,14 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useAdminMutations } from "../../hooks/useAdminMutations";
-import { useCategoriesData } from "../../hooks/useCategoriesData";
-import { useOutputConfigs } from "../../hooks/useOutputConfigs";
-import { getCardMulCount, getMulRange } from "../../lib/rngPrompt/mul";
-import { buildOutputText } from "../../lib/rngPrompt/outputText";
-import { blocksToTemplate, getDefaultGroupBlocks, getDefaultOutputBlocks, templateToBlocks } from "../../lib/rngPrompt/outputTemplate";
-import { drawFromShuffleBag } from "../../lib/rngPrompt/shuffleBag";
-import { readGroupLimitsCookie, readShuffleBags, writeGroupLimitsCookie, writeShuffleBags, type ShuffleBags } from "../../lib/rngPrompt/storage";
+import { useAdminMutations } from "../../features/rng-prompt/hooks/useAdminMutations";
+import { useCategoriesData } from "../../features/rng-prompt/hooks/useCategoriesData";
+import { useOutputConfigs } from "../../features/rng-prompt/hooks/useOutputConfigs";
+import { getCardMulCount, getMulRange } from "../../features/rng-prompt/lib/mul";
+import { buildOutputText } from "../../features/rng-prompt/lib/outputText";
+import { blocksToTemplate, getDefaultGroupBlocks, getDefaultOutputBlocks, templateToBlocks } from "../../features/rng-prompt/lib/outputTemplate";
+import { drawFromShuffleBag } from "../../features/rng-prompt/lib/shuffleBag";
+import { readGroupLimitsCookie, readShuffleBags, writeGroupLimitsCookie, writeShuffleBags, type ShuffleBags } from "../../features/rng-prompt/lib/storage";
 import type {
   Category,
   CategoryType,
@@ -28,8 +28,8 @@ import type {
   OutputConfig,
   PromptItem,
   TagLockKey,
-} from "../../lib/rngPrompt/types";
-import { TAB_ALL, TAB_GENERAL, getCategoryGroupId, isGeneralGroupId, isOptionalCategory } from "../../lib/rngPrompt/utils";
+} from "../../features/rng-prompt/lib/types";
+import { TAB_ALL, TAB_GENERAL, getCategoryGroupId, isGeneralGroupId, isOptionalCategory } from "../../features/rng-prompt/lib/utils";
 
 
 type CategoryFormState = {
@@ -679,357 +679,362 @@ const AdminPanel = ({
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        <div className="w-full lg:w-1/4 lg:min-w-[250px] min-w-0 bg-white border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col max-h-[45vh] lg:max-h-none">
-          <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">類別列表</span>
-            <button
-              onClick={() => setNewCatMode(true)}
-              className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
-              title="新增類別"
-            >
-              <Plus size={16} />
-            </button>
-          </div>
-
-          <div className="overflow-y-auto flex-1 min-h-0">
-            {newCatMode && (
-              <div className="p-3 bg-blue-50 border-b border-blue-100 animate-in slide-in-from-top-2">
-                <CategoryForm
-                  mode="create"
-                  value={catForm}
-                  onChange={setCatForm}
-                  onSubmit={handleAddCategory}
-                  onCancel={() => setNewCatMode(false)}
-                />
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-6xl mx-auto w-full p-4 pb-10">
+          <div className="grid gap-4 lg:grid-cols-[260px_1fr] lg:items-start">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">類別列表</span>
+                <button
+                  onClick={() => setNewCatMode(true)}
+                  className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  title="新增類別"
+                >
+                  <Plus size={16} />
+                </button>
               </div>
-            )}
 
-            {data.map((cat) => (
-              <div
-                key={cat.id}
-                onClick={() => setActiveTab(cat.slug)}
-                className={`p-3 border-b border-slate-50 cursor-pointer flex justify-between items-center hover:bg-slate-50 transition-colors ${
-                  activeTab === cat.slug ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
-                }`}
-              >
-                <div>
-                  <div className="font-bold text-sm text-slate-800">{cat.label}</div>
-                  <div className="text-[10px] text-slate-400 font-mono">
-                    {cat.slug} • {cat.ui_group ?? "Default"} • {isOptionalCategory(cat) ? "opt" : "req"} •{" "}
-                    {cat.type}
+              <div className="divide-y divide-slate-100">
+                {newCatMode && (
+                  <div className="p-3 bg-blue-50/80 animate-in slide-in-from-top-2">
+                    <CategoryForm
+                      mode="create"
+                      value={catForm}
+                      onChange={setCatForm}
+                      onSubmit={handleAddCategory}
+                      onCancel={() => setNewCatMode(false)}
+                    />
                   </div>
-                </div>
-                {activeTab === cat.slug && (
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleDeleteCategory(cat.slug);
-                    }}
-                    className="text-slate-300 hover:text-red-500"
+                )}
+
+                {data.map((cat) => (
+                  <div
+                    key={cat.id}
+                    onClick={() => setActiveTab(cat.slug)}
+                    className={`p-3 cursor-pointer flex justify-between items-center hover:bg-slate-50 transition-colors ${
+                      activeTab === cat.slug ? "bg-blue-50 ring-1 ring-blue-200" : ""
+                    }`}
                   >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex-1 bg-slate-50 flex flex-col min-h-0">
-          {adminView === "categories" ? (
-            <>
-              <div className="p-4 bg-white border-b border-slate-200">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-xs">
-                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 space-y-2">
-                    <div className="text-xs font-bold text-slate-600">CSV 匯出</div>
-                    <div className="flex flex-wrap gap-2">
-                      <a
-                        className="px-3 py-1.5 rounded bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
-                        href="/api/rng-prompt/export?type=categories"
-                        download
-                      >
-                        下載 Categories CSV
-                      </a>
-                      <a
-                        className="px-3 py-1.5 rounded bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
-                        href="/api/rng-prompt/export?type=prompts"
-                        download
-                      >
-                        下載 Prompts CSV
-                      </a>
-                    </div>
-                    <p className="text-[10px] text-slate-500">Categories 欄位：{CATEGORY_CSV_COLUMNS}</p>
-                    <p className="text-[10px] text-slate-500">Prompts 欄位：{PROMPT_CSV_COLUMNS}</p>
-                  </div>
-
-                  <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
-                    <div className="text-xs font-bold text-slate-600">CSV 匯入（自動備份上一版）</div>
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <input
-                          ref={categoriesInputRef}
-                          type="file"
-                          accept=".csv,text/csv"
-                          onChange={(event) => {
-                            setCategoriesFile(event.target.files?.[0] ?? null);
-                            setImportError(null);
-                            setImportMessage(null);
-                          }}
-                          className="text-xs"
-                        />
-                        <button
-                          onClick={() => handleImportCsv("categories")}
-                          disabled={!categoriesFile || importingType !== null}
-                          className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold disabled:opacity-50"
-                        >
-                          {importingType === "categories" ? "匯入中..." : "上傳 Categories"}
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <input
-                          ref={promptsInputRef}
-                          type="file"
-                          accept=".csv,text/csv"
-                          onChange={(event) => {
-                            setPromptsFile(event.target.files?.[0] ?? null);
-                            setImportError(null);
-                            setImportMessage(null);
-                          }}
-                          className="text-xs"
-                        />
-                        <button
-                          onClick={() => handleImportCsv("prompts")}
-                          disabled={!promptsFile || importingType !== null}
-                          className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold disabled:opacity-50"
-                        >
-                          {importingType === "prompts" ? "匯入中..." : "上傳 Prompts"}
-                        </button>
+                    <div>
+                      <div className="font-bold text-sm text-slate-800">{cat.label}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        {cat.slug} • {cat.ui_group ?? "Default"} • {isOptionalCategory(cat) ? "opt" : "req"} •{" "}
+                        {cat.type}
                       </div>
                     </div>
-                    <p className="text-[10px] text-slate-500">依 id/slug/組合鍵覆蓋，缺少的資料不會自動刪除。</p>
-                    <p className="text-[10px] text-slate-500">建議先匯入 Categories，再匯入 Prompts。</p>
-                    {importMessage && <p className="text-[11px] text-emerald-700">{importMessage}</p>}
-                    {importError && <p className="text-[11px] text-rose-600">{importError}</p>}
+                    {activeTab === cat.slug && (
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDeleteCategory(cat.slug);
+                        }}
+                        className="text-slate-300 hover:text-red-500"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
-                </div>
+                ))}
               </div>
+            </div>
 
-              {activeCategory ? (
+            <div className="min-w-0 space-y-4">
+              {adminView === "categories" ? (
                 <>
-                <div className="p-4 bg-white border-b border-slate-200 flex justify-between items-center shadow-sm">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-800">
-                      {activeCategory.label}{" "}
-                      <span className="text-slate-400 font-normal text-sm">({activeCategory.items.length} items)</span>
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      群組: {activeCategory.ui_group ?? "Default"} ・{" "}
-                      {isOptionalCategory(activeCategory) ? "Optional" : "Required"} ・
-                      {" "}
-                      {activeCategory.type} ・ mul {activeCategory.min_count ?? 1}~{activeCategory.max_count ?? 1}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setNewPromptMode(true)}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-bold flex items-center gap-2 shadow-sm"
-                    >
-                      <Plus size={16} /> 新增 Prompt
-                    </button>
-                    <button
-                      onClick={handleUpdateCategory}
-                      className="px-3 py-1.5 rounded text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800"
-                    >
-                      儲存類別
-                    </button>
-                  </div>
-                </div>
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 text-xs">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 space-y-2">
+                        <div className="text-xs font-bold text-slate-600">CSV 匯出</div>
+                        <div className="flex flex-wrap gap-2">
+                          <a
+                            className="px-3 py-1.5 rounded bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
+                            href="/api/rng-prompt/export?type=categories"
+                            download
+                          >
+                            下載 Categories CSV
+                          </a>
+                          <a
+                            className="px-3 py-1.5 rounded bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
+                            href="/api/rng-prompt/export?type=prompts"
+                            download
+                          >
+                            下載 Prompts CSV
+                          </a>
+                        </div>
+                        <p className="text-[10px] text-slate-500">Categories 欄位：{CATEGORY_CSV_COLUMNS}</p>
+                        <p className="text-[10px] text-slate-500">Prompts 欄位：{PROMPT_CSV_COLUMNS}</p>
+                      </div>
 
-                {editCatForm && (
-                  <div className="p-4 bg-white border-b border-slate-100">
-                    <CategoryForm mode="edit" value={editCatForm} onChange={(next) => setEditCatForm(next)} />
-                  </div>
-                )}
-
-                {newPromptMode && (
-                  <div className="p-4 bg-emerald-50 border-b border-emerald-100 flex flex-col md:flex-row gap-2 items-end animate-in fade-in">
-                    <div className="flex-1 w-full">
-                      <label className="text-[10px] text-emerald-700 font-bold uppercase">Prompt Value (English)</label>
-                      <input
-                        autoFocus
-                        className="w-full p-2 border border-emerald-300 rounded text-sm"
-                        placeholder="e.g. oil painting"
-                        value={promptForm.value}
-                        onChange={(event) => setPromptForm({ ...promptForm, value: event.target.value })}
-                      />
-                    </div>
-                    <div className="flex-1 w-full">
-                      <label className="text-[10px] text-emerald-700 font-bold uppercase">顯示名稱 (Chinese)</label>
-                      <input
-                        className="w-full p-2 border border-emerald-300 rounded text-sm"
-                        placeholder="e.g. 油畫"
-                        value={promptForm.label}
-                        onChange={(event) => setPromptForm({ ...promptForm, label: event.target.value })}
-                      />
-                    </div>
-                    <label className="flex items-center gap-2 text-xs text-emerald-700 font-semibold">
-                      <input
-                        type="checkbox"
-                        checked={promptForm.is_active ?? true}
-                        onChange={(event) => setPromptForm({ ...promptForm, is_active: event.target.checked })}
-                      />
-                      啟用
-                    </label>
-                    <button
-                      onClick={handleAddPrompt}
-                      className="bg-emerald-600 text-white p-2 rounded hover:bg-emerald-700 h-[38px] w-[38px] flex items-center justify-center"
-                    >
-                      <Save size={18} />
-                    </button>
-                    <button
-                      onClick={() => setNewPromptMode(false)}
-                      className="bg-slate-200 text-slate-600 p-2 rounded hover:bg-slate-300 h-[38px] w-[38px] flex items-center justify-center"
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
-                )}
-
-                <div className="p-4 overflow-y-auto flex-1 min-h-0">
-                  <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
-                          <tr>
-                            <th className="p-3 w-16 text-center">ID</th>
-                            <th className="p-3">Prompt Value</th>
-                            <th className="p-3">標籤 (Label)</th>
-                            <th className="p-3 w-20 text-center">狀態</th>
-                            <th className="p-3 w-28 text-center">操作</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                        {activeCategory.items.map((item) => {
-                          const isEditing = editingPromptId === item.id;
-                          return (
-                            <tr key={item.id} className="hover:bg-slate-50 group">
-                              <td className="p-3 text-center text-slate-400 font-mono text-xs">{item.id}</td>
-                              <td className="p-3 font-mono text-slate-700">
-                                {isEditing ? (
-                                  <input
-                                    className="w-full border rounded px-2 py-1 text-xs font-mono"
-                                    value={promptEditForm.value}
-                                    onChange={(event) =>
-                                      setPromptEditForm({ ...promptEditForm, value: event.target.value })
-                                    }
-                                  />
-                                ) : (
-                                  item.value
-                                )}
-                              </td>
-                              <td className="p-3 text-slate-600">
-                                {isEditing ? (
-                                  <input
-                                    className="w-full border rounded px-2 py-1 text-xs"
-                                    value={promptEditForm.label}
-                                    onChange={(event) =>
-                                      setPromptEditForm({ ...promptEditForm, label: event.target.value })
-                                    }
-                                  />
-                                ) : (
-                                  item.label
-                                )}
-                              </td>
-                              <td className="p-3 text-center">
-                                {isEditing ? (
-                                  <label className="inline-flex items-center gap-1 text-xs text-slate-600">
-                                    <input
-                                      type="checkbox"
-                                      checked={promptEditForm.is_active ?? true}
-                                      onChange={(event) =>
-                                        setPromptEditForm({ ...promptEditForm, is_active: event.target.checked })
-                                      }
-                                    />
-                                    啟用
-                                  </label>
-                                ) : (
-                                  <button
-                                    onClick={() => handleTogglePromptActive(item.id)}
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition ${
-                                      item.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                                    }`}
-                                  >
-                                    {item.is_active ? "Active" : "Disabled"}
-                                  </button>
-                                )}
-                              </td>
-                              <td className="p-3 text-center">
-                                {isEditing ? (
-                                  <div className="flex items-center justify-center gap-2">
-                                    <button
-                                      onClick={handleSavePrompt}
-                                      className="text-emerald-600 hover:text-emerald-700"
-                                    >
-                                      <Save size={16} />
-                                    </button>
-                                    <button
-                                      onClick={handleCancelEditPrompt}
-                                      className="text-slate-400 hover:text-slate-600"
-                                    >
-                                      <X size={16} />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center justify-center gap-2">
-                                    <button
-                                      onClick={() => handleStartEditPrompt(item)}
-                                      className="text-slate-400 hover:text-slate-600"
-                                    >
-                                      <Settings size={16} />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeletePrompt(item.id)}
-                                      className="text-slate-300 hover:text-red-500 transition-colors"
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {activeCategory.items.length === 0 && (
-                          <tr>
-                            <td colSpan={5} className="p-8 text-center text-slate-400 italic">
-                              此類別尚無 Prompt，請點擊右上方新增。
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                      </table>
+                      <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+                        <div className="text-xs font-bold text-slate-600">CSV 匯入（自動備份上一版）</div>
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              ref={categoriesInputRef}
+                              type="file"
+                              accept=".csv,text/csv"
+                              onChange={(event) => {
+                                setCategoriesFile(event.target.files?.[0] ?? null);
+                                setImportError(null);
+                                setImportMessage(null);
+                              }}
+                              className="text-xs"
+                            />
+                            <button
+                              onClick={() => handleImportCsv("categories")}
+                              disabled={!categoriesFile || importingType !== null}
+                              className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold disabled:opacity-50"
+                            >
+                              {importingType === "categories" ? "匯入中..." : "上傳 Categories"}
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              ref={promptsInputRef}
+                              type="file"
+                              accept=".csv,text/csv"
+                              onChange={(event) => {
+                                setPromptsFile(event.target.files?.[0] ?? null);
+                                setImportError(null);
+                                setImportMessage(null);
+                              }}
+                              className="text-xs"
+                            />
+                            <button
+                              onClick={() => handleImportCsv("prompts")}
+                              disabled={!promptsFile || importingType !== null}
+                              className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold disabled:opacity-50"
+                            >
+                              {importingType === "prompts" ? "匯入中..." : "上傳 Prompts"}
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-slate-500">依 id/slug/組合鍵覆蓋，缺少的資料不會自動刪除。</p>
+                        <p className="text-[10px] text-slate-500">建議先匯入 Categories，再匯入 Prompts。</p>
+                        {importMessage && <p className="text-[11px] text-emerald-700">{importMessage}</p>}
+                        {importError && <p className="text-[11px] text-rose-600">{importError}</p>}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </>
+
+                  {activeCategory ? (
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/70">
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-800">
+                            {activeCategory.label}{" "}
+                            <span className="text-slate-400 font-normal text-sm">
+                              ({activeCategory.items.length} items)
+                            </span>
+                          </h3>
+                          <p className="text-xs text-slate-500">
+                            群組: {activeCategory.ui_group ?? "Default"} ・{" "}
+                            {isOptionalCategory(activeCategory) ? "Optional" : "Required"} ・{" "}
+                            {activeCategory.type} ・ mul {activeCategory.min_count ?? 1}~{activeCategory.max_count ?? 1}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setNewPromptMode(true)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-bold flex items-center gap-2 shadow-sm"
+                          >
+                            <Plus size={16} /> 新增 Prompt
+                          </button>
+                          <button
+                            onClick={handleUpdateCategory}
+                            className="px-3 py-1.5 rounded text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800"
+                          >
+                            儲存類別
+                          </button>
+                        </div>
+                      </div>
+
+                      {editCatForm && (
+                        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                          <CategoryForm mode="edit" value={editCatForm} onChange={(next) => setEditCatForm(next)} />
+                        </div>
+                      )}
+
+                      {newPromptMode && (
+                        <div className="p-4 border-b border-emerald-100 bg-emerald-50/60 flex flex-col lg:flex-row gap-3 items-end animate-in fade-in">
+                          <div className="flex-1 w-full">
+                            <label className="text-[10px] text-emerald-700 font-bold uppercase">
+                              Prompt Value (English)
+                            </label>
+                            <input
+                              autoFocus
+                              className="w-full p-2 border border-emerald-300 rounded text-sm"
+                              placeholder="e.g. oil painting"
+                              value={promptForm.value}
+                              onChange={(event) => setPromptForm({ ...promptForm, value: event.target.value })}
+                            />
+                          </div>
+                          <div className="flex-1 w-full">
+                            <label className="text-[10px] text-emerald-700 font-bold uppercase">顯示名稱 (Chinese)</label>
+                            <input
+                              className="w-full p-2 border border-emerald-300 rounded text-sm"
+                              placeholder="e.g. 油畫"
+                              value={promptForm.label}
+                              onChange={(event) => setPromptForm({ ...promptForm, label: event.target.value })}
+                            />
+                          </div>
+                          <label className="flex items-center gap-2 text-xs text-emerald-700 font-semibold">
+                            <input
+                              type="checkbox"
+                              checked={promptForm.is_active ?? true}
+                              onChange={(event) => setPromptForm({ ...promptForm, is_active: event.target.checked })}
+                            />
+                            啟用
+                          </label>
+                          <button
+                            onClick={handleAddPrompt}
+                            className="bg-emerald-600 text-white p-2 rounded hover:bg-emerald-700 h-[38px] w-[38px] flex items-center justify-center"
+                          >
+                            <Save size={18} />
+                          </button>
+                          <button
+                            onClick={() => setNewPromptMode(false)}
+                            className="bg-slate-200 text-slate-600 p-2 rounded hover:bg-slate-300 h-[38px] w-[38px] flex items-center justify-center"
+                          >
+                            <X size={18} />
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="p-4">
+                        <div className="overflow-x-auto rounded-lg border border-slate-200">
+                          <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                              <tr>
+                                <th className="p-3 w-16 text-center">ID</th>
+                                <th className="p-3">Prompt Value</th>
+                                <th className="p-3">標籤 (Label)</th>
+                                <th className="p-3 w-20 text-center">狀態</th>
+                                <th className="p-3 w-28 text-center">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {activeCategory.items.map((item) => {
+                                const isEditing = editingPromptId === item.id;
+                                return (
+                                  <tr key={item.id} className="hover:bg-slate-50 group">
+                                    <td className="p-3 text-center text-slate-400 font-mono text-xs">{item.id}</td>
+                                    <td className="p-3 font-mono text-slate-700">
+                                      {isEditing ? (
+                                        <input
+                                          className="w-full border rounded px-2 py-1 text-xs font-mono"
+                                          value={promptEditForm.value}
+                                          onChange={(event) =>
+                                            setPromptEditForm({ ...promptEditForm, value: event.target.value })
+                                          }
+                                        />
+                                      ) : (
+                                        item.value
+                                      )}
+                                    </td>
+                                    <td className="p-3 text-slate-600">
+                                      {isEditing ? (
+                                        <input
+                                          className="w-full border rounded px-2 py-1 text-xs"
+                                          value={promptEditForm.label}
+                                          onChange={(event) =>
+                                            setPromptEditForm({ ...promptEditForm, label: event.target.value })
+                                          }
+                                        />
+                                      ) : (
+                                        item.label
+                                      )}
+                                    </td>
+                                    <td className="p-3 text-center">
+                                      {isEditing ? (
+                                        <label className="inline-flex items-center gap-1 text-xs text-slate-600">
+                                          <input
+                                            type="checkbox"
+                                            checked={promptEditForm.is_active ?? true}
+                                            onChange={(event) =>
+                                              setPromptEditForm({ ...promptEditForm, is_active: event.target.checked })
+                                            }
+                                          />
+                                          啟用
+                                        </label>
+                                      ) : (
+                                        <button
+                                          onClick={() => handleTogglePromptActive(item.id)}
+                                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition ${
+                                            item.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                          }`}
+                                        >
+                                          {item.is_active ? "Active" : "Disabled"}
+                                        </button>
+                                      )}
+                                    </td>
+                                    <td className="p-3 text-center">
+                                      {isEditing ? (
+                                        <div className="flex items-center justify-center gap-2">
+                                          <button
+                                            onClick={handleSavePrompt}
+                                            className="text-emerald-600 hover:text-emerald-700"
+                                          >
+                                            <Save size={16} />
+                                          </button>
+                                          <button
+                                            onClick={handleCancelEditPrompt}
+                                            className="text-slate-400 hover:text-slate-600"
+                                          >
+                                            <X size={16} />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center justify-center gap-2">
+                                          <button
+                                            onClick={() => handleStartEditPrompt(item)}
+                                            className="text-slate-400 hover:text-slate-600"
+                                          >
+                                            <Settings size={16} />
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeletePrompt(item.id)}
+                                            className="text-slate-300 hover:text-red-500 transition-colors"
+                                          >
+                                            <Trash2 size={16} />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                              {activeCategory.items.length === 0 && (
+                                <tr>
+                                  <td colSpan={5} className="p-8 text-center text-slate-400 italic">
+                                    此類別尚無 Prompt，請點擊右上方新增。
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-white/70 p-10 text-center text-slate-400">
+                      請選擇左側類別以編輯內容
+                    </div>
+                  )}
+                </>
               ) : (
-                <div className="flex-1 flex items-center justify-center text-slate-400">
-                  請選擇左側類別以編輯內容
-                </div>
+                <OutputComposer
+                  categories={data}
+                  configs={outputConfigs}
+                  activeConfigId={activeOutputConfigId}
+                  onCreateConfig={onCreateOutputConfig}
+                  onUpdateConfig={onUpdateOutputConfig}
+                  onDeleteConfig={onDeleteOutputConfig}
+                  onSetActiveConfig={onSetActiveOutputConfig}
+                />
               )}
-            </>
-          ) : (
-            <OutputComposer
-              categories={data}
-              configs={outputConfigs}
-              activeConfigId={activeOutputConfigId}
-              onCreateConfig={onCreateOutputConfig}
-              onUpdateConfig={onUpdateOutputConfig}
-              onDeleteConfig={onDeleteOutputConfig}
-              onSetActiveConfig={onSetActiveOutputConfig}
-            />
-          )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1173,16 +1178,16 @@ const OutputComposer = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="p-4 bg-white border-b border-slate-200">
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
         <h3 className="text-lg font-bold text-slate-800">輸出編排</h3>
         <p className="text-xs text-slate-500 mt-1">
           使用範本拼接文字與群組變數，輸入 <span className="font-mono">{`{{group:群組名}}`}</span> 即可插入。
         </p>
       </div>
 
-      <div className="p-4 space-y-4 overflow-y-auto flex-1">
-        <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4 space-y-3">
+      <div className="space-y-4">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <select
               className="text-sm border rounded p-2 flex-1 min-w-[220px]"
@@ -1242,7 +1247,7 @@ const OutputComposer = ({
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4 space-y-3">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span className="font-semibold">範本編輯器</span>
             <span>點選群組或直接輸入文字</span>
@@ -1313,66 +1318,64 @@ const StickyTopArea = ({
   onOpenAdmin,
 }: StickyTopAreaProps) => {
   return (
-    <div className="sticky top-0 z-40 bg-slate-50/95 backdrop-blur border-b border-slate-200">
-      <div className="max-w-5xl mx-auto px-4 pt-4 pb-3 space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Prompt Generator</div>
-          </div>
-          <button
-            onClick={onOpenAdmin}
-            className="p-2 rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
-            title="資料庫管理"
-          >
-            <Settings size={16} />
-          </button>
+    <div className="max-w-5xl mx-auto px-4 pt-4 pb-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Prompt Generator</div>
         </div>
-
-        <div className="bg-white rounded-lg p-3 border border-slate-200 min-h-[60px] max-h-[80px] overflow-y-auto text-sm font-mono text-slate-700 whitespace-pre-wrap break-all">
-          {previewText || <span className="text-slate-400 italic">...</span>}
-        </div>
-
-        {outputConfigs.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span className="font-semibold">使用範本</span>
-            <select
-              className="flex-1 min-w-[200px] border rounded px-2 py-1 text-xs text-slate-700"
-              value={activeOutputConfigId ?? ""}
-              onChange={(event) => {
-                const nextId = event.target.value;
-                if (nextId) onSelectOutputConfig(nextId);
-              }}
-            >
-              <option value="" disabled>
-                選擇範本
-              </option>
-              {outputConfigs.map((config) => (
-                <option key={config.id} value={config.id}>
-                  {config.name}
-                  {config.id === activeOutputConfigId ? "（使用中）" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <div className="flex gap-2">
-          <button
-            onClick={onGlobalRoll}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md flex items-center justify-center gap-2 shadow-sm active:translate-y-px active:shadow-none transition-all"
-          >
-            <Dice5 size={18} /> 隨機生成
-          </button>
-          <button
-            onClick={onCopy}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-md flex items-center justify-center gap-2 shadow-sm active:translate-y-px active:shadow-none transition-all"
-          >
-            <Copy size={18} /> 複製
-          </button>
-        </div>
-
-        <div className="text-right text-[10px] text-slate-400">字數 {charCount}</div>
+        <button
+          onClick={onOpenAdmin}
+          className="p-2 rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+          title="資料庫管理"
+        >
+          <Settings size={16} />
+        </button>
       </div>
+
+      <div className="bg-white rounded-lg p-3 border border-slate-200 min-h-[60px] max-h-[80px] overflow-y-auto text-sm font-mono text-slate-700 whitespace-pre-wrap break-all">
+        {previewText || <span className="text-slate-400 italic">...</span>}
+      </div>
+
+      {outputConfigs.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <span className="font-semibold">使用範本</span>
+          <select
+            className="flex-1 min-w-[200px] border rounded px-2 py-1 text-xs text-slate-700"
+            value={activeOutputConfigId ?? ""}
+            onChange={(event) => {
+              const nextId = event.target.value;
+              if (nextId) onSelectOutputConfig(nextId);
+            }}
+          >
+            <option value="" disabled>
+              選擇範本
+            </option>
+            {outputConfigs.map((config) => (
+              <option key={config.id} value={config.id}>
+                {config.name}
+                {config.id === activeOutputConfigId ? "（使用中）" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          onClick={onGlobalRoll}
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md flex items-center justify-center gap-2 shadow-sm active:translate-y-px active:shadow-none transition-all"
+        >
+          <Dice5 size={18} /> 隨機生成
+        </button>
+        <button
+          onClick={onCopy}
+          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-md flex items-center justify-center gap-2 shadow-sm active:translate-y-px active:shadow-none transition-all"
+        >
+          <Copy size={18} /> 複製
+        </button>
+      </div>
+
+      <div className="text-right text-[10px] text-slate-400">字數 {charCount}</div>
     </div>
   );
 };
@@ -2451,6 +2454,49 @@ export default function RngPromptRoute() {
   };
 
   useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (view !== "generator") return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.repeat) return;
+
+      if (event.key === "Tab") {
+        if (tabs.length <= 1) return;
+        event.preventDefault();
+        const direction = event.shiftKey ? -1 : 1;
+        const index = tabs.findIndex((tab) => tab.id === activeTab);
+        const safeIndex = index === -1 ? 0 : index;
+        const nextIndex = (safeIndex + direction + tabs.length) % tabs.length;
+        setActiveTab(tabs[nextIndex].id);
+        return;
+      }
+
+      if (event.key === " " || event.key === "Spacebar" || event.code === "Space") {
+        event.preventDefault();
+        onGlobalRoll();
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (key === "c") {
+        event.preventDefault();
+        void onCopy();
+        return;
+      }
+      if (key === "r") {
+        event.preventDefault();
+        if (activeTab === TAB_ALL) {
+          onGlobalRoll();
+          return;
+        }
+        onRefreshGroup(activeTab);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => document.removeEventListener("keydown", handleKeyDown, { capture: true });
+  }, [view, tabs, activeTab, onGlobalRoll, onCopy, onRefreshGroup]);
+
+  useEffect(() => {
     if (configData.length === 0 || hasAutoRolledRef.current) return;
     onGlobalRoll();
     hasAutoRolledRef.current = true;
@@ -2500,31 +2546,33 @@ export default function RngPromptRoute() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-16">
-      <StickyTopArea
-        previewText={previewText}
-        charCount={previewText.length}
-        outputConfigs={outputConfigs}
-        activeOutputConfigId={activeOutputConfigId}
-        onSelectOutputConfig={onSelectOutputConfig}
-        onGlobalRoll={onGlobalRoll}
-        onCopy={onCopy}
-        onOpenAdmin={() => setView("admin")}
-      />
+      <div className="sticky top-0 z-40 bg-slate-50/95 backdrop-blur border-b border-slate-200">
+        <StickyTopArea
+          previewText={previewText}
+          charCount={previewText.length}
+          outputConfigs={outputConfigs}
+          activeOutputConfigId={activeOutputConfigId}
+          onSelectOutputConfig={onSelectOutputConfig}
+          onGlobalRoll={onGlobalRoll}
+          onCopy={onCopy}
+          onOpenAdmin={() => setView("admin")}
+        />
 
-      <TabsBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+        <TabsBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <ToolbarWrapper
-        mode={activeTabMode}
-        groups={toolbarGroups}
-        activeGroupId={activeTabMode === "group" ? activeTab : undefined}
-        activeGroupLabel={activeTabLabel}
-        groupLimit={activeTabMode === "group" ? groupLimits[activeTab] : undefined}
-        onToggleAllOptional={onToggleAllOptional}
-        onToggleGroupChecked={onToggleGroupChecked}
-        onRefreshGroup={onRefreshGroup}
-        onUnlockAll={onUnlockAll}
-        onChangeGroupLimit={onChangeGroupLimit}
-      />
+        <ToolbarWrapper
+          mode={activeTabMode}
+          groups={toolbarGroups}
+          activeGroupId={activeTabMode === "group" ? activeTab : undefined}
+          activeGroupLabel={activeTabLabel}
+          groupLimit={activeTabMode === "group" ? groupLimits[activeTab] : undefined}
+          onToggleAllOptional={onToggleAllOptional}
+          onToggleGroupChecked={onToggleGroupChecked}
+          onRefreshGroup={onRefreshGroup}
+          onUnlockAll={onUnlockAll}
+          onChangeGroupLimit={onChangeGroupLimit}
+        />
+      </div>
 
       <CardGrid
         categories={configData}

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
-import { loadBlogCategories } from "../../lib/blog.server";
-import type { BlogCategory, BlogPost } from "../../lib/blog.types";
-import { requireAdmin } from "../../lib/admin-auth.server";
+import { loadBlogCategories } from "../../features/blog/blog.server";
+import type { BlogCategory, BlogPost } from "../../features/blog/blog.types";
+import { requireAdmin } from "../../features/admin/admin-auth.server";
 
 type LoaderData = Awaited<ReturnType<typeof loader>>;
 

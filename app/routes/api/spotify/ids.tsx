@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 
 import { requireBlogDb } from "../../../lib/d1.server";
-import { buildCorsHeaders, ensureSpotifyArtistsTable, getSpotifyEnv, jsonWithCors } from "../../../lib/spotify.server";
+import { buildCorsHeaders, ensureSpotifyArtistsTable, getSpotifyEnv, jsonWithCors } from "../../../features/spotify/spotify.server";
 
 export async function loader({ request, context }: LoaderFunctionArgs) {
   const { allowedOrigins } = getSpotifyEnv(context, request.url, { requireSecrets: false });

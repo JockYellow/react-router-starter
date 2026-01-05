@@ -4,7 +4,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { AlertTriangle, CheckCircle2, Clock3, Gift as GiftIcon, Lock, Unlock, Users } from "lucide-react";
 
 import { requireBlogDb } from "../../lib/d1.server";
-import { getGifts, type Gift as GiftType } from "../../lib/gift.server";
+import { getGifts, type Gift as GiftType } from "../../features/gift/gift.server";
 import { buildPublicImageUrl, requireBlogImagesPublicBase } from "../../lib/r2.server";
 
 const STAGES = ["idle", "r1_pick", "pk_result", "s1_vote", "s2_swap", "lock_prompt"] as const;

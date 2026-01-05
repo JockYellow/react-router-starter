@@ -12,7 +12,7 @@
 ---
 
 ## 1. 資料庫設計 (D1 Schema)
-請建立一個 SQL 檔案 `schema.sql`，我們需要一張表來存使用者的賽局狀態。
+請建立一個 SQL 檔案 `sql/spotify/schema.sql`，我們需要一張表來存使用者的賽局狀態。
 
 ```sql
 DROP TABLE IF EXISTS game_sessions;

@@ -1,4 +1,4 @@
-// app/lib/gift.server.ts
+// app/features/gift/gift.server.ts
 import type { D1Database } from "@cloudflare/workers-types";
 
 export type Gift = {
