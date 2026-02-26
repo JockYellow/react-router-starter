@@ -1,6 +1,9 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { load } from "cheerio";
 
 import { requireBlogDb } from "../../lib/d1.server";
+
+type ConcertSource = "kktix" | "indievox";
 
 type KktixEvent = {
   slug?: string | null;
@@ -21,11 +24,30 @@ type ConcertEventInput = {
   url: string;
 };
 
-const MAX_PAGES = 5;
-const SOURCE = "kktix";
+type SourceResult = {
+  source: ConcertSource;
+  total: number;
+  saved: number;
+  pagesFetched?: number;
+  error?: string;
+};
+
+type FetchResult = {
+  events: ConcertEventInput[];
+  pagesFetched: number;
+};
+
+const SOURCES = ["kktix", "indievox"] as const;
+const DEFAULT_SOURCE: ConcertSource = "kktix";
+const MAX_KKTIX_PAGES = 5;
+const MAX_INDIEVOX_PAGES = 10;
+const KKTIX_SOURCE = "kktix";
+const INDIEVOX_SOURCE = "indievox";
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const KKTIX_BASE = "https://kktix.com/events";
+const INDIEVOX_BASE = "https://www.indievox.com";
+const INDIEVOX_LIST_URL = "https://www.indievox.com/activity/get-more-game-list";
 
 const buildKktixHeaders = () =>
   ({
@@ -37,6 +59,35 @@ const buildKktixHeaders = () =>
     "Cache-Control": "no-cache",
     Pragma: "no-cache",
   }) satisfies HeadersInit;
+
+const buildIndievoxHeaders = () =>
+  ({
+    "User-Agent": USER_AGENT,
+    "X-Requested-With": "XMLHttpRequest",
+    Referer: "https://www.indievox.com/activity",
+    Accept: "text/html, */*; q=0.9",
+    "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+  }) satisfies HeadersInit;
+
+const isConcertSource = (value: string): value is ConcertSource =>
+  SOURCES.includes(value as ConcertSource);
+
+const parseSourceParams = (params: URLSearchParams): ConcertSource[] => {
+  const raw = [...params.getAll("source"), ...params.getAll("sources")];
+  if (raw.length === 0) return [DEFAULT_SOURCE];
+
+  const tokens = raw
+    .flatMap((entry) => entry.split(","))
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (tokens.includes("all")) {
+    return [...SOURCES];
+  }
+
+  const selected = tokens.filter(isConcertSource);
+  return selected.length > 0 ? Array.from(new Set(selected)) : [DEFAULT_SOURCE];
+};
 
 const decodeHtmlEntities = (value: string) =>
   value.replace(/&(#\d+|#x[0-9a-fA-F]+|quot|amp|lt|gt|apos);/g, (full, entity) => {
@@ -104,7 +155,7 @@ const parseKktixEvents = (html: string): ConcertEventInput[] => {
     if (!sourceId || Number.isNaN(startAt)) continue;
 
     events.push({
-      source: SOURCE,
+      source: KKTIX_SOURCE,
       source_id: sourceId,
       title,
       event_at: toIsoFromEpoch(startAt),
@@ -117,7 +168,8 @@ const parseKktixEvents = (html: string): ConcertEventInput[] => {
 
 const normalizeEventInput = (input: Partial<ConcertEventInput> & { start_at?: number | string | null }) => {
   if (!input || typeof input !== "object") return null;
-  const source = typeof input.source === "string" && input.source.trim() ? input.source.trim() : SOURCE;
+  const source =
+    typeof input.source === "string" && input.source.trim() ? input.source.trim() : KKTIX_SOURCE;
   const title = typeof input.title === "string" ? input.title.trim() : "";
   const url = typeof input.url === "string" ? input.url.trim() : "";
 
@@ -152,6 +204,47 @@ const normalizeEventInput = (input: Partial<ConcertEventInput> & { start_at?: nu
     event_at: eventAt,
     url,
   };
+};
+
+const parseIndievoxDate = (value: string) => {
+  const match = value.match(/(\d{4})\/(\d{2})\/(\d{2})/);
+  if (!match) return "";
+  const [, year, month, day] = match;
+  const date = new Date(`${year}-${month}-${day}T00:00:00+08:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString();
+};
+
+const parseIndievoxEvents = (html: string): ConcertEventInput[] => {
+  const $ = load(html);
+  const events: ConcertEventInput[] = [];
+
+  $("a[href*='/activity/detail/']").each((_, element) => {
+    const link = $(element).attr("href")?.trim() ?? "";
+    if (!link) return;
+    const url = new URL(link, INDIEVOX_BASE).toString();
+    const pathSegments = new URL(url).pathname.split("/").filter(Boolean);
+    const sourceId = pathSegments[pathSegments.length - 1] ?? "";
+    const title =
+      $(element).find(".multi_ellipsis").text().trim() ||
+      $(element).find("img").attr("alt")?.trim() ||
+      $(element).text().trim();
+    const dateText =
+      $(element).find(".date").text().trim() ||
+      $(element).closest(".panel-body").prev(".panel-heading").text().trim();
+    const eventAt = parseIndievoxDate(dateText);
+    if (!sourceId || !title || !eventAt) return;
+
+    events.push({
+      source: INDIEVOX_SOURCE,
+      source_id: sourceId,
+      title,
+      event_at: eventAt,
+      url,
+    });
+  });
+
+  return events;
 };
 
 const dedupeEvents = (events: ConcertEventInput[]) => {
@@ -202,85 +295,192 @@ const resolveFetchUrl = (target: string, proxyPrefix: string) => {
   return `${trimmed}${encodeURIComponent(target)}`;
 };
 
-export async function loader({ request, context }: LoaderFunctionArgs) {
-  const db = requireBlogDb(context);
-  await ensureConcertEventsTable(db);
+const normalizeSlashDate = (value: string) => (value.includes("-") ? value.replace(/-/g, "/") : value);
 
-  const url = new URL(request.url);
-  const startAt = url.searchParams.get("start_at") ?? "";
-  const endAt = url.searchParams.get("end_at") ?? "";
-  const env = (context as any)?.cloudflare?.env ?? (context as any)?.env ?? {};
-  const proxyPrefix = typeof env.KKTIX_PROXY_PREFIX === "string" ? env.KKTIX_PROXY_PREFIX : "";
-
+const fetchKktixEvents = async (
+  startAt: string,
+  endAt: string,
+  proxyPrefix: string,
+  maxPages = MAX_KKTIX_PAGES,
+): Promise<FetchResult> => {
   const eventsByKey = new Map<string, ConcertEventInput>();
   let page = 1;
   let pagesFetched = 0;
 
-  try {
-    while (page <= MAX_PAGES) {
-      const pageUrl = new URL(KKTIX_BASE);
-      pageUrl.searchParams.set("event_tag_ids_in", "1");
-      if (startAt) pageUrl.searchParams.set("start_at", startAt);
-      if (endAt) pageUrl.searchParams.set("end_at", endAt);
-      pageUrl.searchParams.set("page", String(page));
+  while (page <= maxPages) {
+    const pageUrl = new URL(KKTIX_BASE);
+    pageUrl.searchParams.set("event_tag_ids_in", "1");
+    if (startAt) pageUrl.searchParams.set("start_at", startAt);
+    if (endAt) pageUrl.searchParams.set("end_at", endAt);
+    pageUrl.searchParams.set("page", String(page));
 
-      const targetUrl = resolveFetchUrl(pageUrl.toString(), proxyPrefix);
-      const response = await fetch(targetUrl, {
-        headers: buildKktixHeaders(),
-        redirect: "follow",
-      });
+    const targetUrl = resolveFetchUrl(pageUrl.toString(), proxyPrefix);
+    const response = await fetch(targetUrl, {
+      headers: buildKktixHeaders(),
+      redirect: "follow",
+    });
 
-      if (!response.ok) {
-        const cfMitigated = response.headers.get("cf-mitigated");
-        const hint = response.headers.get("content-type")?.includes("text/html")
-          ? " (HTML response)"
-          : "";
-        return Response.json(
-          {
-            success: false,
-            error: `KKTIX fetch failed (${response.status})${hint}`,
-            cfMitigated,
-          },
-          { status: 502 },
-        );
-      }
-
-      const html = await response.text();
-      const events = parseKktixEvents(html);
-      pagesFetched += 1;
-
-      for (const event of events) {
-        const key = `${event.source}:${event.source_id}`;
-        if (!eventsByKey.has(key)) {
-          eventsByKey.set(key, event);
-        }
-      }
-
-      if (events.length === 0) {
-        break;
-      }
-
-      page += 1;
+    if (!response.ok) {
+      const cfMitigated = response.headers.get("cf-mitigated");
+      const hint = response.headers.get("content-type")?.includes("text/html") ? " (HTML response)" : "";
+      const mitigation = cfMitigated ? ` cf-mitigated=${cfMitigated}` : "";
+      throw new Error(`KKTIX fetch failed (${response.status})${hint}${mitigation}`);
     }
-  } catch (error) {
+
+    const html = await response.text();
+    const events = parseKktixEvents(html);
+    pagesFetched += 1;
+
+    for (const event of events) {
+      const key = `${event.source}:${event.source_id}`;
+      if (!eventsByKey.has(key)) {
+        eventsByKey.set(key, event);
+      }
+    }
+
+    if (events.length === 0) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return { events: Array.from(eventsByKey.values()), pagesFetched };
+};
+
+const fetchIndievoxEvents = async (
+  startAt: string,
+  endAt: string,
+  maxPages = MAX_INDIEVOX_PAGES,
+): Promise<FetchResult> => {
+  const eventsByKey = new Map<string, ConcertEventInput>();
+  let offset = 1;
+  let pagesFetched = 0;
+
+  while (offset <= maxPages) {
+    const pageUrl = new URL(INDIEVOX_LIST_URL);
+    pageUrl.searchParams.set("type", "card");
+    if (startAt) pageUrl.searchParams.set("startDate", startAt);
+    if (endAt) pageUrl.searchParams.set("endDate", endAt);
+    pageUrl.searchParams.set("offset", String(offset));
+
+    const response = await fetch(pageUrl.toString(), {
+      headers: buildIndievoxHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Indievox fetch failed (${response.status})`);
+    }
+
+    const html = await response.text();
+    const events = parseIndievoxEvents(html);
+    pagesFetched += 1;
+
+    for (const event of events) {
+      const key = `${event.source}:${event.source_id}`;
+      if (!eventsByKey.has(key)) {
+        eventsByKey.set(key, event);
+      }
+    }
+
+    if (events.length === 0) {
+      break;
+    }
+
+    offset += 1;
+  }
+
+  return { events: Array.from(eventsByKey.values()), pagesFetched };
+};
+
+/**
+ * Fetches KKTIX/iNDIEVOX events server-side and upserts them into D1.
+ *
+ * @param request - HTTP request containing query params like `start_at`, `end_at`, and `source`.
+ * @param context - Loader context providing the D1 binding.
+ * @returns JSON payload describing scan results and saved counts.
+ */
+export async function loader({ request, context }: LoaderFunctionArgs): Promise<Response> {
+  const db = requireBlogDb(context);
+  await ensureConcertEventsTable(db);
+
+  const url = new URL(request.url);
+  const startAt = normalizeSlashDate(url.searchParams.get("start_at") ?? "");
+  const endAt = normalizeSlashDate(url.searchParams.get("end_at") ?? "");
+  const sources = parseSourceParams(url.searchParams);
+  const env = (context as any)?.cloudflare?.env ?? (context as any)?.env ?? {};
+  const proxyPrefix = typeof env.KKTIX_PROXY_PREFIX === "string" ? env.KKTIX_PROXY_PREFIX : "";
+
+  const sourceResults: SourceResult[] = [];
+  const allEvents: ConcertEventInput[] = [];
+
+  for (const source of sources) {
+    try {
+      let result: FetchResult;
+      if (source === KKTIX_SOURCE) {
+        result = await fetchKktixEvents(startAt, endAt, proxyPrefix);
+      } else {
+        result = await fetchIndievoxEvents(startAt, endAt);
+      }
+
+      const { saved, total } = await saveEvents(db, result.events);
+      sourceResults.push({
+        source,
+        total,
+        saved,
+        pagesFetched: result.pagesFetched,
+      });
+      allEvents.push(...result.events);
+    } catch (error) {
+      sourceResults.push({
+        source,
+        total: 0,
+        saved: 0,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  const errorResults = sourceResults.filter((result) => result.error);
+  const successResults = sourceResults.filter((result) => !result.error);
+  const total = sourceResults.reduce((sum, result) => sum + result.total, 0);
+  const saved = sourceResults.reduce((sum, result) => sum + result.saved, 0);
+  const pagesFetched = sourceResults.reduce((sum, result) => sum + (result.pagesFetched ?? 0), 0);
+  const dedupedEvents = dedupeEvents(allEvents);
+
+  if (successResults.length === 0) {
     return Response.json(
-      { success: false, error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 },
+      {
+        success: false,
+        ok: false,
+        error: errorResults.map((result) => `${result.source}: ${result.error}`).join("; ") || "Scan failed",
+        sourceResults,
+      },
+      { status: 502 },
     );
   }
 
-  const { saved } = await saveEvents(db, Array.from(eventsByKey.values()));
-
   return Response.json({
     success: true,
-    total: eventsByKey.size,
+    ok: true,
+    partial: errorResults.length > 0,
+    total,
     saved,
-    pagesFetched,
-    data: Array.from(eventsByKey.values()),
+    pagesFetched: pagesFetched > 0 ? pagesFetched : undefined,
+    sourceResults,
+    data: dedupedEvents,
+    errors: errorResults.length > 0 ? errorResults : undefined,
   });
 }
 
-export async function action({ request, context }: ActionFunctionArgs) {
+/**
+ * Imports pre-parsed event payloads into D1.
+ *
+ * @param request - HTTP request with JSON payload of events or raw HTML.
+ * @param context - Action context providing the D1 binding.
+ * @returns JSON payload describing save counts.
+ */
+export async function action({ request, context }: ActionFunctionArgs): Promise<Response> {
   const db = requireBlogDb(context);
   await ensureConcertEventsTable(db);
   const body = (await request.json().catch(() => null)) as
@@ -288,7 +488,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     | null;
 
   if (!body || typeof body !== "object") {
-    return Response.json({ success: false, error: "Invalid payload" }, { status: 400 });
+    return Response.json({ success: false, ok: false, error: "Invalid payload" }, { status: 400 });
   }
 
   let events: ConcertEventInput[] = [];
@@ -298,17 +498,18 @@ export async function action({ request, context }: ActionFunctionArgs) {
   } else if (typeof body.html === "string") {
     events = parseKktixEvents(body.html);
   } else {
-    return Response.json({ success: false, error: "Missing events or html" }, { status: 400 });
+    return Response.json({ success: false, ok: false, error: "Missing events or html" }, { status: 400 });
   }
 
   if (events.length === 0) {
-    return Response.json({ success: false, error: "No events parsed" }, { status: 422 });
+    return Response.json({ success: false, ok: false, error: "No events parsed" }, { status: 422 });
   }
 
   const { saved, total } = await saveEvents(db, events);
 
   return Response.json({
     success: true,
+    ok: true,
     total,
     saved,
   });

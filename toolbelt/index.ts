@@ -1,8 +1,10 @@
 // toolbelt/index.ts
 import express from "express";
-import { join, dirname, resolve } from "node:path";
+import { load } from "cheerio";
+import type { BrowserContext } from "playwright";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { spawnSync } from "node:child_process"; // for git use
 
 const app = express();
@@ -29,23 +31,6 @@ function runCmd(cmd: string, args: string[] = []) {
   };
 }
 
-function slugify(value: string, fallbackPrefix = "item") {
-  const base = (value || "")
-    .toString()
-    .trim()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[\s_]+/g, "-")
-    .replace(/[^a-z0-9\-]+/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  if (base) return base;
-  const rand = Math.random().toString(36).slice(2, 8);
-  return `${fallbackPrefix}-${Date.now().toString(36)}-${rand}`;
-}
-
-
 
 app.use(express.json({ limit: "2mb" }));
 
@@ -60,16 +45,18 @@ app.use((req, res, next) => {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(__dirname, "..");
-const CHANGELOG_DIR = resolve(REPO, "app/content/changelog");
-const BLOG_DIR = resolve(REPO, "app/content/blog");
-const BLOG_CATEGORIES_FILE = resolve(BLOG_DIR, "categories.json");
-const BLOG_POSTS_DIR = resolve(BLOG_DIR, "posts");
-const BLOG_POST_NAME_RE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9\-]+\.json$/i;
 const KKTIX_BASE = "https://kktix.com/events";
 const KKTIX_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const KKTIX_SOURCE = "kktix";
 const KKTIX_MAX_PAGES = 5;
+const INDIEVOX_BASE = "https://www.indievox.com";
+const INDIEVOX_SOURCE = "indievox";
+const INDIEVOX_MAX_PAGES = 10;
+const MAX_PAGES_LIMIT = 10;
+const CONCERT_SOURCES = [KKTIX_SOURCE, INDIEVOX_SOURCE] as const;
+
+type ConcertSource = (typeof CONCERT_SOURCES)[number];
 
 type ConcertEventInput = {
   source: string;
@@ -77,6 +64,18 @@ type ConcertEventInput = {
   title: string;
   event_at: string;
   url: string;
+};
+
+type SourceResult = {
+  source: ConcertSource;
+  total: number;
+  pagesFetched?: number;
+  error?: string;
+};
+
+type ScrapeResult = {
+  events: ConcertEventInput[];
+  pagesFetched: number;
 };
 
 const decodeHtmlEntities = (value: string) =>
@@ -156,12 +155,72 @@ const parseKktixEvents = (html: string): ConcertEventInput[] => {
   return events;
 };
 
+const parseIndievoxDate = (value: string) => {
+  const match = value.match(/(\d{4})\/(\d{2})\/(\d{2})/);
+  if (!match) return "";
+  const [, year, month, day] = match;
+  const date = new Date(`${year}-${month}-${day}T00:00:00+08:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString();
+};
+
+const parseIndievoxEvents = (html: string): ConcertEventInput[] => {
+  const $ = load(html);
+  const events: ConcertEventInput[] = [];
+
+  $("a[href*='/activity/detail/']").each((_, element) => {
+    const link = $(element).attr("href")?.trim() ?? "";
+    if (!link) return;
+    const url = new URL(link, INDIEVOX_BASE).toString();
+    const pathSegments = new URL(url).pathname.split("/").filter(Boolean);
+    const sourceId = pathSegments[pathSegments.length - 1] ?? "";
+    const title =
+      $(element).find(".multi_ellipsis").text().trim() ||
+      $(element).find("img").attr("alt")?.trim() ||
+      $(element).text().trim();
+    const dateText =
+      $(element).find(".date").text().trim() ||
+      $(element).closest(".panel-body").prev(".panel-heading").text().trim();
+    const eventAt = parseIndievoxDate(dateText);
+    if (!sourceId || !title || !eventAt) return;
+
+    events.push({
+      source: INDIEVOX_SOURCE,
+      source_id: sourceId,
+      title,
+      event_at: eventAt,
+      url,
+    });
+  });
+
+  return events;
+};
+
+const dedupeEvents = (events: ConcertEventInput[]) => {
+  const map = new Map<string, ConcertEventInput>();
+  for (const event of events) {
+    const key = `${event.source}:${event.source_id}`;
+    if (!map.has(key)) {
+      map.set(key, event);
+    }
+  }
+  return Array.from(map.values());
+};
+
 const buildKktixUrl = (startAt: string, endAt: string, page: number) => {
   const target = new URL(KKTIX_BASE);
   target.searchParams.set("event_tag_ids_in", "1");
   if (startAt) target.searchParams.set("start_at", startAt);
   if (endAt) target.searchParams.set("end_at", endAt);
   target.searchParams.set("page", String(page));
+  return target.toString();
+};
+
+const buildIndievoxActivityUrl = (startAt: string, endAt: string) => {
+  const target = new URL(`${INDIEVOX_BASE}/activity`);
+  target.searchParams.set("type", "card");
+  if (startAt) target.searchParams.set("startDate", startAt);
+  if (endAt) target.searchParams.set("endDate", endAt);
   return target.toString();
 };
 
@@ -173,10 +232,132 @@ const ensureKktixProfileDir = () => {
   return dir;
 };
 
-const clampPageCount = (value: unknown) => {
+const clampPageCount = (value: unknown, defaultValue: number) => {
   const parsed = Number.parseInt(String(value ?? ""), 10);
-  if (Number.isNaN(parsed)) return KKTIX_MAX_PAGES;
-  return Math.min(Math.max(parsed, 1), 10);
+  if (Number.isNaN(parsed)) return defaultValue;
+  return Math.min(Math.max(parsed, 1), MAX_PAGES_LIMIT);
+};
+
+const parseSourceInput = (value: unknown): ConcertSource[] => {
+  if (value === undefined || value === null) return [KKTIX_SOURCE];
+  const tokens = Array.isArray(value)
+    ? value.map((entry) => String(entry))
+    : String(value).split(",");
+  const cleaned = tokens.map((token) => token.trim().toLowerCase()).filter(Boolean);
+  if (cleaned.includes("all")) {
+    return [...CONCERT_SOURCES];
+  }
+  const selected = cleaned.filter((token) => CONCERT_SOURCES.includes(token as ConcertSource));
+  return selected.length > 0 ? Array.from(new Set(selected)) : [KKTIX_SOURCE];
+};
+
+const scrapeKktixWithPlaywright = async (
+  context: BrowserContext,
+  startAt: string,
+  endAt: string,
+  maxPages: number,
+): Promise<ScrapeResult> => {
+  const page = await context.newPage();
+  const eventsByKey = new Map<string, ConcertEventInput>();
+  let pagesFetched = 0;
+
+  try {
+    for (let pageIndex = 1; pageIndex <= maxPages; pageIndex += 1) {
+      const targetUrl = buildKktixUrl(startAt, endAt, pageIndex);
+      await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+      const html = await page.content();
+      const events = parseKktixEvents(html);
+      pagesFetched += 1;
+
+      if (events.length === 0 && html.includes("Attention Required")) {
+        throw new Error("Blocked by Cloudflare challenge. Try KKTIX_HEADLESS=0.");
+      }
+
+      for (const event of events) {
+        const key = `${event.source}:${event.source_id}`;
+        if (!eventsByKey.has(key)) {
+          eventsByKey.set(key, event);
+        }
+      }
+
+      if (events.length === 0) {
+        break;
+      }
+    }
+  } finally {
+    await page.close();
+  }
+
+  return { events: Array.from(eventsByKey.values()), pagesFetched };
+};
+
+const scrapeIndievoxWithPlaywright = async (
+  context: BrowserContext,
+  startAt: string,
+  endAt: string,
+  maxPages: number,
+): Promise<ScrapeResult> => {
+  const page = await context.newPage();
+  const eventsByKey = new Map<string, ConcertEventInput>();
+  let pagesFetched = 0;
+
+  try {
+    const targetUrl = buildIndievoxActivityUrl(startAt, endAt);
+    await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+    await page
+      .waitForSelector("a[href*='/activity/detail/']", {
+        timeout: 8000,
+      })
+      .catch(() => null);
+
+    const countItems = async () => page.locator("a[href*='/activity/detail/']").count();
+    let previousCount = await countItems();
+    pagesFetched = previousCount > 0 ? 1 : 0;
+
+    while (pagesFetched < maxPages) {
+      const loadMore = page.locator(".page-show-more a");
+      const visible = await loadMore.isVisible().catch(() => false);
+      if (!visible) break;
+
+      await loadMore.scrollIntoViewIfNeeded();
+      await loadMore.click();
+
+      const increased = await page
+        .waitForFunction(
+          (prev) => document.querySelectorAll("a[href*='/activity/detail/']").length > prev,
+          previousCount,
+          { timeout: 8000 },
+        )
+        .then(() => true)
+        .catch(() => false);
+
+      if (!increased) {
+        await page.waitForTimeout(800);
+      }
+
+      const nextCount = await countItems();
+      if (nextCount <= previousCount) {
+        break;
+      }
+
+      previousCount = nextCount;
+      pagesFetched += 1;
+    }
+
+    const html = await page.content();
+    const events = parseIndievoxEvents(html);
+
+    for (const event of events) {
+      const key = `${event.source}:${event.source_id}`;
+      if (!eventsByKey.has(key)) {
+        eventsByKey.set(key, event);
+      }
+    }
+  } finally {
+    await page.close();
+  }
+
+  return { events: Array.from(eventsByKey.values()), pagesFetched };
 };
 
 // 基礎
@@ -189,13 +370,11 @@ app.get("/config", (_req, res) =>
   }),
 );
 
-// Admin 靜態站（本機後台）
-app.use("/admin", express.static(join(__dirname, "admin"), { extensions: ["html"] }));
 app.use((req, res, next) => { res.setHeader("X-Frame-Options", "DENY"); res.setHeader("Referrer-Policy", "no-referrer"); next(); });
 
-// 授權保護（/admin 與 /key 除外）
+// 授權保護（/、/key、/config 除外）
 app.use((req, res, next) => {
-  if (req.path.startsWith("/admin") || req.path === "/key" || req.path === "/") return next();
+  if (req.path === "/key" || req.path === "/" || req.path === "/config") return next();
   if (req.headers["x-toolbelt-key"] !== TOOLBELT_KEY) return res.status(401).send("Unauthorized");
   next();
 });
@@ -282,9 +461,9 @@ app.post("/ops/git/commit-push", (req, res) => {
 app.post("/ops/concert-events/scrape", async (req, res) => {
   const startAt = typeof req.body?.start_at === "string" ? req.body.start_at : "";
   const endAt = typeof req.body?.end_at === "string" ? req.body.end_at : "";
-  const maxPages = clampPageCount(req.body?.max_pages);
+  const sources = parseSourceInput(req.body?.source ?? req.body?.sources);
   const headless = req.body?.headless === false ? false : process.env.KKTIX_HEADLESS !== "0";
-  let context: any = null;
+  let context: BrowserContext | null = null;
 
   try {
     const playwright = await import("playwright");
@@ -298,39 +477,57 @@ app.post("/ops/concert-events/scrape", async (req, res) => {
       "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
     });
 
-    const page = await context.newPage();
-    const eventsByKey = new Map<string, ConcertEventInput>();
+    const sourceResults: SourceResult[] = [];
+    const allEvents: ConcertEventInput[] = [];
     let pagesFetched = 0;
 
-    for (let pageIndex = 1; pageIndex <= maxPages; pageIndex += 1) {
-      const targetUrl = buildKktixUrl(startAt, endAt, pageIndex);
-      await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
-      const html = await page.content();
-      const events = parseKktixEvents(html);
-      pagesFetched += 1;
-
-      if (events.length === 0 && html.includes("Attention Required")) {
-        throw new Error("Blocked by Cloudflare challenge. Try KKTIX_HEADLESS=0.");
-      }
-
-      for (const event of events) {
-        const key = `${event.source}:${event.source_id}`;
-        if (!eventsByKey.has(key)) {
-          eventsByKey.set(key, event);
-        }
-      }
-
-      if (events.length === 0) {
-        break;
+    for (const source of sources) {
+      try {
+        const maxPages =
+          source === KKTIX_SOURCE
+            ? clampPageCount(req.body?.max_pages, KKTIX_MAX_PAGES)
+            : clampPageCount(req.body?.max_pages, INDIEVOX_MAX_PAGES);
+        const result =
+          source === KKTIX_SOURCE
+            ? await scrapeKktixWithPlaywright(context, startAt, endAt, maxPages)
+            : await scrapeIndievoxWithPlaywright(context, startAt, endAt, maxPages);
+        sourceResults.push({
+          source,
+          total: result.events.length,
+          pagesFetched: result.pagesFetched,
+        });
+        allEvents.push(...result.events);
+        pagesFetched += result.pagesFetched;
+      } catch (error: any) {
+        sourceResults.push({
+          source,
+          total: 0,
+          pagesFetched: 0,
+          error: error?.message ? String(error.message) : "Scrape failed",
+        });
       }
     }
 
-    const events = Array.from(eventsByKey.values());
+    const successResults = sourceResults.filter((result) => !result.error);
+    if (successResults.length === 0) {
+      return res.status(500).json({
+        ok: false,
+        error: sourceResults.map((result) => `${result.source}: ${result.error}`).join("; ") || "Scrape failed",
+        sourceResults,
+      });
+    }
+
+    const dedupedEvents = dedupeEvents(allEvents);
+    const errorResults = sourceResults.filter((result) => result.error);
+
     return res.json({
       ok: true,
-      total: events.length,
+      total: dedupedEvents.length,
       pagesFetched,
-      events,
+      events: dedupedEvents,
+      sourceResults,
+      partial: errorResults.length > 0,
+      errors: errorResults.length > 0 ? errorResults : undefined,
     });
   } catch (error: any) {
     return res.status(500).json({
@@ -345,373 +542,7 @@ app.post("/ops/concert-events/scrape", async (req, res) => {
 });
 
 
-// ── Changelog 檔案式 CRUD ──
-const NAME_RE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9\-]+\.json$/i;
-function ensureDir() { if (!existsSync(CHANGELOG_DIR)) mkdirSync(CHANGELOG_DIR, { recursive: true }); }
-function filePath(name: string) {
-  if (!NAME_RE.test(name)) throw new Error("Invalid filename");
-  const full = resolve(CHANGELOG_DIR, name);
-  if (!full.startsWith(CHANGELOG_DIR)) throw new Error("Path traversal");
-  return full;
-}
-function validateData(d: any) {
-  if (!d || typeof d !== "object") throw new Error("Invalid body");
-  if (typeof d.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) throw new Error("date must be YYYY-MM-DD");
-  if (typeof d.title !== "string" || !d.title.trim()) throw new Error("title required");
-  if (d.notes && (!Array.isArray(d.notes) || !d.notes.every((s: any) => typeof s === "string"))) throw new Error("notes must be string[]");
-  if (d.tag && !["add","fix","change","docs"].includes(d.tag)) throw new Error("tag invalid");
-}
-
-function ensureBlogStructure() {
-  if (!existsSync(BLOG_DIR)) mkdirSync(BLOG_DIR, { recursive: true });
-  if (!existsSync(BLOG_POSTS_DIR)) mkdirSync(BLOG_POSTS_DIR, { recursive: true });
-  if (!existsSync(BLOG_CATEGORIES_FILE)) {
-    writeFileSync(BLOG_CATEGORIES_FILE, JSON.stringify({ categories: [] }, null, 2) + "\n", "utf8");
-  }
-}
-
-function readBlogCategoriesFile() {
-  ensureBlogStructure();
-  try {
-    const raw = readFileSync(BLOG_CATEGORIES_FILE, "utf8");
-    const data = JSON.parse(raw);
-    if (Array.isArray(data?.categories)) {
-      return data.categories.map((cat: any) => ({
-        id: cat.id,
-        title: cat.title,
-        description: cat.description,
-        children: Array.isArray(cat.children) ? cat.children : [],
-      }));
-    }
-  } catch {
-    // ignore broken file
-  }
-  return [];
-}
-
-function writeBlogCategoriesFile(categories: any[]) {
-  ensureBlogStructure();
-  writeFileSync(BLOG_CATEGORIES_FILE, JSON.stringify({ categories }, null, 2) + "\n", "utf8");
-}
-
-function blogPostFullPath(name: string) {
-  if (!BLOG_POST_NAME_RE.test(name)) throw new Error("invalid filename");
-  const full = resolve(BLOG_POSTS_DIR, name);
-  if (!full.startsWith(BLOG_POSTS_DIR)) throw new Error("path traversal");
-  return full;
-}
-
-function readBlogPostsFile() {
-  ensureBlogStructure();
-  const items: any[] = [];
-  if (!existsSync(BLOG_POSTS_DIR)) return items;
-  const files = readdirSync(BLOG_POSTS_DIR).filter((f) => BLOG_POST_NAME_RE.test(f));
-  for (const file of files) {
-    try {
-      const raw = readFileSync(resolve(BLOG_POSTS_DIR, file), "utf8");
-      items.push({ ...(JSON.parse(raw) ?? {}), filename: file });
-    } catch {
-      // ignore broken file
-    }
-  }
-  items.sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
-  return items;
-}
-
-function normalizeBlogPostInput(input: any, categories: any[], existing?: any) {
-  if (!input || typeof input !== "object") throw new Error("invalid post");
-  const title = (input.title ?? "").toString().trim();
-  const body = (input.body ?? "").toString().trim();
-  const categoryId = (input.categoryId ?? "").toString().trim();
-  const subcategoryId = (input.subcategoryId ?? "").toString().trim();
-  const imageUrl = (input.imageUrl ?? existing?.imageUrl ?? "").toString().trim();
-  const publishedAtInput = input.publishedAt ?? new Date().toISOString();
-  if (!title) throw new Error("title required");
-  if (!body) throw new Error("body required");
-  if (!categoryId) throw new Error("categoryId required");
-  const category = categories.find((c) => c.id === categoryId);
-  if (!category) throw new Error("找不到分類");
-  let validatedSub: string | undefined;
-  if (subcategoryId) {
-    const subcat = category.children?.find((c: any) => c.id === subcategoryId);
-    if (!subcat) throw new Error("子分類不存在");
-    validatedSub = subcat.id;
-  }
-  const publishedAt = new Date(publishedAtInput);
-  if (Number.isNaN(publishedAt.valueOf())) throw new Error("publishedAt invalid");
-  const slugSource = (input.slug ?? title).toString();
-  const slug = slugify(slugSource, "post");
-  const now = new Date().toISOString();
-  const createdAt = existing?.createdAt || input.createdAt || now;
-  const updatedAt = now;
-  return {
-    title,
-    body,
-    categoryId: category.id,
-    subcategoryId: validatedSub,
-    publishedAt: publishedAt.toISOString(),
-    slug,
-    createdAt,
-    updatedAt,
-    imageUrl: imageUrl || undefined,
-  };
-}
-
-app.get("/fs/changelog/list", (_req, res) => {
-  ensureDir();
-  const files = readdirSync(CHANGELOG_DIR).filter(f => NAME_RE.test(f)).sort((a,b)=>a<b?1:-1);
-  const items = files.map(f => { const raw = readFileSync(join(CHANGELOG_DIR, f), "utf8"); return { filename: f, ...JSON.parse(raw) }; });
-  res.json(items);
-});
-
-app.post("/fs/changelog/create", (req, res) => {
-  ensureDir();
-  try {
-    const { data, slug } = req.body as { data: any; slug?: string };
-    validateData(data);
-    const s = (slug || data.title || "update").toString().trim().toLowerCase()
-      .replace(/[\s_]+/g,"-").replace(/[^a-z0-9\-]+/g,"").replace(/\-+/g,"-").replace(/^\-+|\-+$/g,"");
-    const name = `${data.date}-${s || "update"}.json`;
-    writeFileSync(filePath(name), JSON.stringify(data, null, 2) + "\n", "utf8");
-    res.json({ ok: true, filename: name });
-  } catch (e: any) { res.status(400).send(e.message || String(e)); }
-});
-
-app.put("/fs/changelog/update", (req, res) => {
-  ensureDir();
-  try {
-    const { filename, data } = req.body as { filename: string; data: any };
-    if (!filename) throw new Error("filename required");
-    validateData(data);
-    const full = filePath(filename);
-    if (!existsSync(full)) return res.status(404).send("file not found");
-    writeFileSync(full, JSON.stringify(data, null, 2) + "\n", "utf8");
-    res.json({ ok: true, filename });
-  } catch (e: any) { res.status(400).send(e.message || String(e)); }
-});
-
-app.delete("/fs/changelog/delete", (req, res) => {
-  ensureDir();
-  try {
-    const { filename } = req.body as { filename: string };
-    if (!filename) throw new Error("filename required");
-    const full = filePath(filename);
-    if (!existsSync(full)) return res.status(404).send("file not found");
-    rmSync(full);
-    res.json({ ok: true, filename });
-  } catch (e: any) { res.status(400).send(e.message || String(e)); }
-});
-
-// ── Blog 模組 CRUD ──
-app.get("/fs/blog/categories", (_req, res) => {
-  const categories = readBlogCategoriesFile();
-  res.json({ categories });
-});
-
-app.post("/fs/blog/category", (req, res) => {
-  try {
-    const { parentId, title, description } = req.body as {
-      parentId?: string;
-      title?: string;
-      description?: string;
-    };
-    const name = (title ?? "").toString().trim();
-    if (!name) throw new Error("title required");
-    const categories = readBlogCategoriesFile();
-    const id = slugify(name, parentId ? "subcat" : "cat");
-    if (!id) throw new Error("無法產生 slug");
-    const desc = (description ?? "").toString().trim() || undefined;
-
-    if (parentId) {
-      const parent = categories.find((cat: any) => cat.id === parentId);
-      if (!parent) return res.status(404).send("父分類不存在");
-      if (parent.children.some((child: any) => child.id === id)) {
-        throw new Error("子分類 slug 重複");
-      }
-      parent.children.push({ id, title: name, description: desc });
-    } else {
-      if (categories.some((cat: any) => cat.id === id)) throw new Error("分類 slug 重複");
-      categories.push({ id, title: name, description: desc, children: [] });
-    }
-
-    writeBlogCategoriesFile(categories);
-    res.json({ ok: true, id });
-  } catch (e: any) {
-    res.status(400).send(e.message || String(e));
-  }
-});
-
-app.put("/fs/blog/category", (req, res) => {
-  try {
-    const { id, parentId, title, description } = req.body as {
-      id?: string;
-      parentId?: string;
-      title?: string;
-      description?: string;
-    };
-    if (!id) throw new Error("id required");
-    const categories = readBlogCategoriesFile();
-    const name = (title ?? "").toString().trim();
-    const desc = (description ?? "").toString().trim() || undefined;
-    if (parentId) {
-      const parent = categories.find((cat: any) => cat.id === parentId);
-      if (!parent) return res.status(404).send("父分類不存在");
-      const child = parent.children.find((c: any) => c.id === id);
-      if (!child) return res.status(404).send("子分類不存在");
-      if (name) child.title = name;
-      child.description = desc;
-    } else {
-      const category = categories.find((cat: any) => cat.id === id);
-      if (!category) return res.status(404).send("分類不存在");
-      if (name) category.title = name;
-      category.description = desc;
-    }
-    writeBlogCategoriesFile(categories);
-    res.json({ ok: true, id });
-  } catch (e: any) {
-    res.status(400).send(e.message || String(e));
-  }
-});
-
-app.delete("/fs/blog/category", (req, res) => {
-  try {
-    const { id, parentId } = req.body as { id?: string; parentId?: string };
-    if (!id) throw new Error("id required");
-    const categories = readBlogCategoriesFile();
-    const posts = readBlogPostsFile();
-    if (parentId) {
-      if (posts.some((post: any) => post.subcategoryId === id)) {
-        return res.status(400).send("仍有文章屬於此子分類");
-      }
-      const parent = categories.find((cat: any) => cat.id === parentId);
-      if (!parent) return res.status(404).send("父分類不存在");
-      parent.children = parent.children.filter((child: any) => child.id !== id);
-    } else {
-      if (posts.some((post: any) => post.categoryId === id)) {
-        return res.status(400).send("仍有文章屬於此分類");
-      }
-      const next = categories.filter((cat: any) => cat.id !== id);
-      if (next.length === categories.length) return res.status(404).send("分類不存在");
-      writeBlogCategoriesFile(next);
-      return res.json({ ok: true, id });
-    }
-    writeBlogCategoriesFile(categories);
-    res.json({ ok: true, id });
-  } catch (e: any) {
-    res.status(400).send(e.message || String(e));
-  }
-});
-
-app.get("/fs/blog/posts", (_req, res) => {
-  const posts = readBlogPostsFile();
-  res.json({ posts });
-});
-
-app.post("/fs/blog/post", (req, res) => {
-  try {
-    const { post } = req.body as { post?: any };
-    if (!post) throw new Error("post payload required");
-    const categories = readBlogCategoriesFile();
-    const normalized = normalizeBlogPostInput(post, categories);
-    ensureBlogStructure();
-    const date = normalized.publishedAt.slice(0, 10);
-    let filenameBase = `${date}-${normalized.slug}`;
-    let filename = `${filenameBase}.json`;
-    let counter = 1;
-    while (existsSync(blogPostFullPath(filename))) {
-      filename = `${filenameBase}-${counter++}.json`;
-    }
-    writeFileSync(blogPostFullPath(filename), JSON.stringify(normalized, null, 2) + "\n", "utf8");
-    res.json({ ok: true, filename });
-  } catch (e: any) {
-    res.status(400).send(e.message || String(e));
-  }
-});
-
-app.put("/fs/blog/post", (req, res) => {
-  try {
-    const { filename, post } = req.body as { filename?: string; post?: any };
-    if (!filename) throw new Error("filename required");
-    if (!post) throw new Error("post payload required");
-    const full = blogPostFullPath(filename);
-    if (!existsSync(full)) return res.status(404).send("找不到文章");
-    const categories = readBlogCategoriesFile();
-    let existingData: any = null;
-    try {
-      existingData = JSON.parse(readFileSync(full, "utf8"));
-    } catch {
-      existingData = null;
-    }
-    const normalized = normalizeBlogPostInput(post, categories, existingData || undefined);
-    if (existingData?.createdAt) normalized.createdAt = existingData.createdAt;
-    writeFileSync(full, JSON.stringify(normalized, null, 2) + "\n", "utf8");
-    res.json({ ok: true, filename });
-  } catch (e: any) {
-    res.status(400).send(e.message || String(e));
-  }
-});
-
-app.delete("/fs/blog/post", (req, res) => {
-  try {
-    const { filename } = req.body as { filename?: string };
-    if (!filename) throw new Error("filename required");
-    const full = blogPostFullPath(filename);
-    if (!existsSync(full)) return res.status(404).send("找不到文章");
-    rmSync(full);
-    res.json({ ok: true, filename });
-  } catch (e: any) {
-    res.status(400).send(e.message || String(e));
-  }
-});
-
-app.post("/proxy/blog-post", async (req, res) => {
-  if (!FRONTEND_API_BASE) return res.status(400).send("缺少 FRONTEND_API_BASE");
-  try {
-    const { method, post, file } = req.body as {
-      method?: string;
-      post?: any;
-      file?: { name: string; type?: string; data: string };
-    };
-    if (!post) throw new Error("post payload required");
-    const verb = (method ?? "POST").toUpperCase() === "PUT" ? "PUT" : "POST";
-    const form = new FormData();
-    form.append("title", (post.title ?? "").toString());
-    form.append("body", (post.body ?? "").toString());
-    if (post.summary) form.append("summary", post.summary.toString());
-    if (post.slug) form.append("slug", post.slug.toString());
-    if (post.categoryId) form.append("categoryId", post.categoryId.toString());
-    if (post.subcategoryId) form.append("subcategoryId", post.subcategoryId.toString());
-    if (post.publishedAt) form.append("publishedAt", post.publishedAt.toString());
-    if (post.updatedAtBase && verb === "PUT") form.append("updatedAtBase", post.updatedAtBase.toString());
-    if (Array.isArray(post.tags)) {
-      form.append("tags", post.tags.join(","));
-    }
-    if (file?.data) {
-      const buffer = Buffer.from(file.data, "base64");
-      const mime = file.type || "application/octet-stream";
-      const name = file.name || "upload.bin";
-      const f = new File([buffer], name, { type: mime });
-      form.append("image", f);
-    }
-    const target =
-      verb === "PUT" && post.slug
-        ? `${FRONTEND_API_BASE.replace(/\/$/, "")}/api/blog-post?slug=${encodeURIComponent(post.slug)}`
-        : `${FRONTEND_API_BASE.replace(/\/$/, "")}/api/blog-post`;
-    const resp = await fetch(target, {
-      method: verb,
-      headers: { cookie: "admin_session=1" },
-      body: form,
-    });
-    const text = await resp.text();
-    if (!resp.ok) {
-      return res.status(resp.status).send(text);
-    }
-    const data = text ? JSON.parse(text) : {};
-    res.json(data);
-  } catch (e: any) {
-    res.status(400).send(e.message || String(e));
-  }
-});
+// ── Toolbelt 僅保留 API（scrape + git ops）──
 
 app.listen(PORT, HOST, () => {
   console.log(`[toolbelt] http://${HOST}:${PORT}`);

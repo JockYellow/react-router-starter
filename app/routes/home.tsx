@@ -1,59 +1,30 @@
 import { useState, useEffect } from "react";
 import { Link, useLoaderData } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
+
+import { isAdmin } from "../features/admin/admin-auth.server";
+import { requireBlogDb } from "../lib/d1.server";
+import { getAllBlogPosts } from "../features/blog/blog.d1.server";
+import { getAllChangelogs } from "../features/changelog/changelog.d1.server";
+import type { BlogPost } from "../features/blog/blog.types";
+import type { Changelog } from "../features/changelog/changelog.d1.server";
 
 // -----------------------------------------------------------------------------
-// 1. 真實資料讀取邏輯 (Server/Build Time)
+// 1. 資料讀取（D1 雲端優先）
 // -----------------------------------------------------------------------------
 
-// 定義資料型別 (根據你的檔案名稱與推測結構)
-interface Post {
-  slug: string;
-  title: string;
-  date: string;
-  description?: string;
-}
-
-interface Changelog {
-  slug: string;
-  date: string;
-  title?: string;
-  items?: string[]; // 假設內容是條列式
-}
-
-export async function loader() {
-  // 使用 Vite 的 import.meta.glob 一次讀取所有 JSON 檔案
-  // 這樣無論你在 Local 還是 Cloudflare Pages 都能完美運作
-  const postModules = import.meta.glob("../content/blog/posts/*.json", { eager: true });
-  const changelogModules = import.meta.glob("../content/changelog/*.json", { eager: true });
-
-  // 處理部落格文章
-  const posts: Post[] = Object.entries(postModules).map(([path, mod]: any) => {
-    // 從檔名或 JSON 內容解析
-    const fileName = path.split("/").pop()?.replace(".json", "") || "";
-    return {
-      slug: fileName,
-      title: mod.title || fileName, // 如果沒標題就用檔名
-      date: mod.date || "2025-01-01",
-      description: mod.description || "點擊閱讀更多...",
-    };
-  });
-
-  // 處理更新日誌
-  const changelogs: Changelog[] = Object.entries(changelogModules).map(([path, mod]: any) => {
-    const fileName = path.split("/").pop()?.replace(".json", "") || "";
-    return {
-      slug: fileName,
-      date: mod.date || fileName.split("-").slice(0, 3).join("-"), // 嘗試從檔名抓日期
-      title: mod.title || `Update ${fileName}`,
-      items: mod.items || [],
-    };
-  });
-
-  // 依照日期排序 (新到舊) 並只取前 5 筆
-  const sortedPosts = posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
-  const sortedChangelogs = changelogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
-
-  return { posts: sortedPosts, changelogs: sortedChangelogs };
+export async function loader({ request, context }: LoaderFunctionArgs) {
+  const db = requireBlogDb(context);
+  const [allPosts, allChangelogs, isAdminUser] = await Promise.all([
+    getAllBlogPosts(db),
+    getAllChangelogs(db).catch(() => [] as Changelog[]),
+    Promise.resolve(isAdmin(request)),
+  ]);
+  return {
+    posts: allPosts.slice(0, 5),
+    changelogs: allChangelogs.slice(0, 5),
+    isAdminUser,
+  };
 }
 
 // -----------------------------------------------------------------------------
@@ -61,7 +32,11 @@ export async function loader() {
 // -----------------------------------------------------------------------------
 
 export default function Index() {
-  const { posts, changelogs } = useLoaderData<typeof loader>();
+  const { posts, changelogs, isAdminUser } = useLoaderData<typeof loader>() as {
+    posts: BlogPost[];
+    changelogs: Changelog[];
+    isAdminUser: boolean;
+  };
   const [activeSection, setActiveSection] = useState("hero");
 
   // 切換時瞬間回頂，保持乾淨俐落
@@ -108,9 +83,9 @@ export default function Index() {
               <Link key={post.slug} to={`/blog/${post.slug}`} className="group block bg-white/60 hover:bg-white p-4 rounded-xl border border-transparent hover:border-amber-200 transition-all shadow-sm hover:shadow-md">
                 <div className="flex justify-between items-start">
                   <h3 className="font-bold text-gray-800 group-hover:text-amber-600 transition-colors">{post.title}</h3>
-                  <span className="text-xs font-mono text-gray-400 whitespace-nowrap ml-2">{post.date}</span>
+                  <span className="text-xs font-mono text-gray-400 whitespace-nowrap ml-2">{post.publishedAt?.slice(0, 10)}</span>
                 </div>
-                {post.description && <p className="text-sm text-gray-500 mt-1 line-clamp-1">{post.description}</p>}
+                {post.summary && <p className="text-sm text-gray-500 mt-1 line-clamp-1">{post.summary}</p>}
               </Link>
             ))
           ) : (
@@ -159,14 +134,20 @@ export default function Index() {
         <div className="relative border-l-2 border-pink-100 ml-3 space-y-6 py-2">
             {changelogs.length > 0 ? (
                 changelogs.map((log) => (
-                    <div key={log.slug} className="relative pl-6">
+                    <div key={log.id} className="relative pl-6">
                         <div className="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-white border-2 border-pink-200" />
                         <div className="text-xs font-mono text-pink-500 mb-1">{log.date}</div>
                         <h4 className="font-bold text-gray-800 text-sm">{log.title}</h4>
-                        {/* 這裡簡單顯示內容摘要 */}
-                        <div className="text-xs text-gray-500 mt-1">
-                             已更新相關內容
-                        </div>
+                        {log.notes.length > 0 && (
+                            <ul className="text-xs text-gray-500 mt-1 space-y-0.5 list-disc list-inside">
+                                {log.notes.slice(0, 2).map((note, i) => (
+                                    <li key={i} className="line-clamp-1">{note}</li>
+                                ))}
+                                {log.notes.length > 2 && (
+                                    <li className="text-gray-400">…還有 {log.notes.length - 2} 條</li>
+                                )}
+                            </ul>
+                        )}
                     </div>
                 ))
             ) : (
@@ -202,10 +183,10 @@ export default function Index() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 min-h-screen">
-      
+
       {/* 1. 頂部標題與島嶼導覽 (Floating Island Nav) */}
       <div className="sticky top-6 z-50 flex flex-col items-center gap-4 mb-6">
-        
+
         {/* 島嶼選單：懸浮膠囊設計，徹底移除白色長條背景 */}
         <nav className="p-1.5 bg-white/80 backdrop-blur-xl border border-white/40 shadow-lg shadow-black/5 rounded-full flex gap-1 transition-all hover:scale-[1.02]">
           {Object.values(sections).map((section) => {
@@ -231,17 +212,25 @@ export default function Index() {
               </button>
             );
           })}
+          {isAdminUser && (
+            <Link
+              to="/admin"
+              className="px-3 py-2 rounded-full text-xs font-bold text-neutral-400 hover:text-neutral-600 hover:bg-black/5 transition-all"
+            >
+              後台
+            </Link>
+          )}
         </nav>
       </div>
 
       {/* 2. 主內容區塊 (無縫滑入) */}
       <main className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div 
+        <div
             className="relative overflow-hidden rounded-3xl border border-white/60 bg-white/40 backdrop-blur-sm shadow-xl shadow-indigo-500/5 p-6 md:p-8 transition-colors duration-500"
             style={{ backgroundColor: activeData.bg }}
         >
             {/* 裝飾背景光暈 */}
-            <div 
+            <div
                 className="absolute -top-20 -right-20 w-60 h-60 rounded-full blur-3xl opacity-30 mix-blend-multiply transition-colors duration-700 pointer-events-none"
                 style={{ backgroundColor: activeData.accent }}
             />
@@ -251,7 +240,7 @@ export default function Index() {
                     <span className="h-px w-4 bg-current" style={{ color: activeData.accent }}/>
                     <span className="text-[10px] font-bold tracking-widest" style={{ color: activeData.accent }}>{activeData.meta}</span>
                 </div>
-                
+
                 <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-2">{activeData.title}</h2>
                 <p className="text-slate-500 text-sm mb-6">{activeData.description}</p>
 

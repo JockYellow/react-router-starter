@@ -4,7 +4,9 @@ import {
   Links,
   Outlet,
   Scripts,
+  isRouteErrorResponse,
   useLocation,
+  useRouteError,
 } from "react-router";
 import { useEffect, useRef, useState } from "react";
 import "./app.css";
@@ -108,6 +110,53 @@ export function Layout() {
         <Scripts />
       </body>
     </html>
+  );
+}
+
+export function ErrorBoundary() {
+  const error = useRouteError();
+  const showDetails = Boolean(import.meta.env?.DEV);
+
+  let title = "發生錯誤";
+  let message = "請稍後再試一次。";
+  let details: string | undefined;
+
+  if (isRouteErrorResponse(error)) {
+    title = `${error.status} ${error.statusText}`;
+    if (typeof error.data === "string" && error.data.trim()) {
+      message = error.data;
+    } else if (error.data && typeof error.data === "object" && "message" in (error.data as any)) {
+      const dataMessage = (error.data as any).message;
+      if (typeof dataMessage === "string" && dataMessage.trim()) message = dataMessage;
+    }
+  } else if (error instanceof Error) {
+    message = error.message || message;
+    details = error.stack;
+  } else if (typeof error === "string") {
+    message = error;
+  }
+
+  return (
+    <div className="min-h-screen bg-[--color-warm-50] text-neutral-900">
+      <div className="mx-auto max-w-3xl px-4 py-16 space-y-4">
+        <p className="eyebrow text-neutral-500">Error</p>
+        <h1 className="text-3xl font-bold text-neutral-900">{title}</h1>
+        <p className="text-neutral-700">{message}</p>
+        <div className="flex items-center gap-3">
+          <Link to="/jock_space" className="btn-ghost">
+            回首頁
+          </Link>
+          <Link to="/admin/login" className="btn-ghost">
+            前往登入
+          </Link>
+        </div>
+        {showDetails && details ? (
+          <pre className="mt-6 whitespace-pre-wrap rounded-xl border border-neutral-200 bg-white/80 p-4 text-xs text-neutral-700">
+            {details}
+          </pre>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

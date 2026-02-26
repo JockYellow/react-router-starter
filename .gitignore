@@ -206,3 +206,6 @@ dist
 # Local migration SQL & DB dumps – content lives in D1,不用跟著版本控制
 blog-migrate.sql
 dumps/*.sql
+
+### Local docs ###
+/docs/

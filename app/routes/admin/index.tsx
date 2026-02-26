@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Form, Link, useLoaderData, useNavigation } from "react-router";
+import { Form, useLoaderData, useNavigation } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { AdminNav } from "../../components/AdminNav";
 
 import { requireAdmin } from "../../features/admin/admin-auth.server";
 import { requireBlogDb } from "../../lib/d1.server";
@@ -204,15 +205,13 @@ export default function AdminPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 space-y-8">
-      <header className="flex items-center justify-between gap-4">
+      <header className="space-y-4">
         <div>
           <p className="eyebrow text-neutral-500">Admin</p>
           <h1 className="text-3xl font-bold text-neutral-900">Blog 管理</h1>
           <p className="text-sm text-neutral-600">新增 / 更新 / 刪除部落格文章，直接寫入 D1。</p>
         </div>
-        <Link to="/jock_space" className="btn-ghost">
-          返回前台
-        </Link>
+        <AdminNav active="blog" />
       </header>
 
       <section className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
