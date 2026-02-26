@@ -249,7 +249,7 @@ const PROJECTS = [
     description:
       "為 SaaS 客戶建置六維度分析報告（2200+ 行 HTML），涵蓋費用趨勢、內控健康度、簽核效率、憑證合規、企業卡分析與效益摘要。從 SQL 取數到 Chart.js 視覺化的完整產出流程。",
     tags: ["SQL", "Python", "Chart.js", "Tailwind CSS", "Jinja2"],
-    externalUrl: "",
+    externalUrl: "/resume/custom-impact-report",
     blogSlug: "",
   },
   {

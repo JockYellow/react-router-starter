@@ -1,6 +1,6 @@
-import { Link, useLoaderData } from "react-router";
+import { useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
-import { ChevronLeft, ChevronRight, Lightbulb, Heart, Briefcase, MessageSquare } from "lucide-react";
+import { ChevronRight, Lightbulb, Heart, Briefcase, MessageSquare } from "lucide-react";
 
 import { requireBlogDb } from "../../lib/d1.server";
 import { getCompanyPage } from "../../features/resume/resume.server";
@@ -59,15 +59,6 @@ export default function CompanyResumePage() {
   return (
     <div className="min-h-screen py-12 px-4">
       <div className="max-w-3xl mx-auto">
-        {/* 返回連結 */}
-        <Link
-          to="/resume"
-          className="btn-ghost inline-flex items-center gap-2 mb-8 text-sm"
-        >
-          <ChevronLeft size={15} />
-          主履歷
-        </Link>
-
         {/* 標題 */}
         <div className="module-panel module-hero mb-8">
           <p className="eyebrow mb-2">客製化履歷</p>
@@ -124,14 +115,6 @@ export default function CompanyResumePage() {
               </div>
             );
           })}
-        </div>
-
-        {/* 底部 footer */}
-        <div className="mt-10 text-center">
-          <Link to="/resume" className="btn-ghost inline-flex items-center gap-2">
-            <ChevronLeft size={14} />
-            回到主履歷
-          </Link>
         </div>
       </div>
     </div>

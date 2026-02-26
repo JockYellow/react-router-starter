@@ -69,6 +69,8 @@ function App() {
 
   const isStandalone =
     pathname === "/" ||
+    pathname === "/resume" ||
+    pathname.startsWith("/resume/") ||
     pathname === "/gift" ||
     pathname.startsWith("/gift/") ||
     pathname === "/spotify" ||

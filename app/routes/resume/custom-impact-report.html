@@ -1,0 +1,2267 @@
+<!DOCTYPE html><html lang="zh-Hant"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>軟體研發公司 A 費用管理平台 X 系統使用成效分析</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-autocolors"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&amp;display=swap" rel="stylesheet">
+  
+  <!-- 定義企業色 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            corporate: {
+              main: '#425563',    // 深岩灰 (主色)
+              accent: '#6B5CA0',  // 活力橘 (強調色)
+              bg: '#F6F5F2',      // 冷灰白 (背景)
+              light: '#EEECE6',   // 邊框灰
+              success: '#10B981', // 成功綠 (輔助)
+              danger: '#EF4444',  // 警示紅 (輔助)
+              info: '#B9923E'     // 資訊藍 (輔助)
+            }
+          },
+          boxShadow: {
+            'soft': '0 4px 20px -2px rgba(66, 85, 99, 0.08)',
+            'card': '0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1)',
+            'glow': '0 0 15px rgba(239, 122, 0, 0.15)'
+          },
+          animation: {
+            'fade-in-down': 'fadeInDown 0.3s ease-out'
+          },
+          keyframes: {
+            fadeInDown: {
+                '0%': { opacity: '0', transform: 'translateY(-10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Noto Sans TC', sans-serif; scroll-behavior: smooth; }
+    .chart-container { position: relative; width: 100%; height: 350px; width: 100%; margin: auto; }
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    /* 自訂進度條動畫 */
+    .progress-bar { transition: width 1s ease-in-out; }
+    #s6_summary .summary-suggestion a {
+        color: #6B5CA0;
+        text-decoration: underline;
+    }
+    #s6_summary .summary-suggestion a:hover {
+        color: #4C3D81;
+    }
+    /* 隱藏列印時的元素 */
+    @media print {
+        .no-print { display: none !important; }
+        body { background-color: white; }
+        .shadow-soft { box-shadow: none; border: 1px solid #eee; }
+    }
+  </style>
+</head>
+<body class="bg-corporate-bg text-corporate-main tracking-wide leading-relaxed selection:bg-corporate-accent selection:text-white">
+
+  <!-- 頂部導覽列 -->
+  <nav class="bg-white sticky top-0 z-50 shadow-sm border-b border-gray-100/50 backdrop-blur-md bg-white/90">
+    <div class="container mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
+      <div class="font-bold text-xl flex items-center gap-2">
+        <span class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-corporate-main text-white text-xs font-bold shadow-soft" aria-label="費用管理平台 X">FX</span>
+        <span class="text-gray-400 font-normal text-sm">| 系統使用成效報告</span>
+      </div>
+      <div class="hidden md:flex text-sm text-gray-500">
+        統計期間：2025-02-01 ~ 2026-01-31
+      </div>
+    </div>
+  </nav>
+
+  <main class="container mx-auto p-4 md:p-8 max-w-6xl space-y-8">
+    
+    <!-- Header 區域 -->
+    <header class="text-center py-8 md:py-12">
+      <div class="inline-block px-3 py-1 bg-blue-50 text-corporate-info rounded-full text-xs font-semibold tracking-wider mb-3">系統使用成效報告</div>
+      <h1 class="text-3xl md:text-5xl font-bold text-corporate-main mb-4">軟體研發公司 A</h1>
+      <p class="text-lg text-gray-500 max-w-2xl mx-auto">展現流程效率提升與使用價值成長的正向成效</p>
+    </header>
+
+    <!-- 快速導覽 (Pills) -->
+    <section class="no-print">
+        <div class="bg-white p-4 rounded-2xl shadow-soft flex flex-wrap justify-center gap-3">
+            <a href="#s1_overview" class="px-4 py-2 rounded-lg bg-gray-50 hover:bg-corporate-accent hover:text-white transition-all text-sm font-medium text-gray-600">1. 價值概覽</a>
+            <a href="#s2_submission" class="px-4 py-2 rounded-lg bg-gray-50 hover:bg-corporate-accent hover:text-white transition-all text-sm font-medium text-gray-600">2. 費用趨勢</a>
+            <a href="#s3_controls" class="px-4 py-2 rounded-lg bg-gray-50 hover:bg-corporate-accent hover:text-white transition-all text-sm font-medium text-gray-600">3. 內控儀表</a>
+            <a href="#s3_efficiency" class="px-4 py-2 rounded-lg bg-gray-50 hover:bg-corporate-accent hover:text-white transition-all text-sm font-medium text-gray-600">4. 簽核效率</a>
+            <a href="#s4_compliance" class="px-4 py-2 rounded-lg bg-gray-50 hover:bg-corporate-accent hover:text-white transition-all text-sm font-medium text-gray-600">5. 憑證合規</a>
+            <a href="#s5_card_usage" class="px-4 py-2 rounded-lg bg-gray-50 hover:bg-corporate-accent hover:text-white transition-all text-sm font-medium text-gray-600">6. 企業卡</a>
+            <a href="#s6_summary" class="px-4 py-2 rounded-lg bg-gray-50 hover:bg-corporate-accent hover:text-white transition-all text-sm font-medium text-gray-600">7. 總結建議</a>
+        </div>
+    </section>
+
+    <!-- 1. 客戶使用價值與同級比較 (Hero Section) -->
+    <section id="s1_overview" class="scroll-mt-24">
+        
+        
+        
+          
+            
+              
+            
+          
+            
+              
+            
+          
+            
+              
+            
+          
+        
+        <div class="flex items-center mb-6">
+            <div class="w-1.5 h-8 bg-corporate-accent rounded-full mr-3"></div>
+            <h2 class="text-2xl font-bold text-corporate-main">1. 客戶使用價值與同級比較</h2>
+        </div>
+        <p class="text-sm text-gray-500 mb-6">
+            本段統整節省人力、風險控管與企業卡使用的整體成效，並提供與同級客戶的比例型指標對照，協助快速理解費用治理成熟度。
+        </p>
+
+        <!-- 價值卡片組 (Scorecards) -->
+        
+
+        <!-- 橫向對比表格 (分組 + 語意強化) -->
+        
+        
+        
+        
+          
+            
+          
+        
+          
+            
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+        
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+          
+          
+            
+          
+        
+        
+        
+        
+          
+            
+          
+        
+          
+            
+          
+        
+          
+            
+          
+        
+        <div class="bg-white rounded-2xl shadow-soft overflow-hidden">
+            <div class="p-6 border-b border-gray-100 bg-gray-50/50">
+                <div class="flex flex-wrap justify-between items-start gap-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-corporate-main flex items-center gap-2">
+                            <svg class="w-5 h-5 text-corporate-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                            同級橫向對比
+                        </h3>
+                        <p class="text-sm text-gray-500 mt-1">每組先顯示 1 個代表指標，完整明細可下拉檢視</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-50 text-green-700"><span class="w-2 h-2 rounded-full bg-green-500"></span>優於同級</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-50 text-red-700"><span class="w-2 h-2 rounded-full bg-red-400"></span>低於同級</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 text-gray-600"><span class="w-2 h-2 rounded-full bg-gray-400"></span>持平/資料不足</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-100">
+                        <tr>
+                            <th class="px-6 py-4 font-semibold tracking-wider">類別</th>
+                            <th class="px-6 py-4 font-semibold tracking-wider">關鍵指標</th>
+                            <th class="px-6 py-4 font-semibold tracking-wider text-corporate-accent">本公司</th>
+                            <th class="px-6 py-4 font-semibold tracking-wider">同級平均</th>
+                            <th class="px-6 py-4 font-semibold tracking-wider w-2/5">差異解讀（pp）</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                          
+                          
+                        
+                        
+                        
+                        
+                        
+                          
+                          
+                          
+                        
+                        
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4">
+                                <div class="font-semibold text-gray-700">合規品質</div>
+                                <div class="text-xs text-gray-400">憑證完整性與重複風險</div>
+                            </td>
+                            <td class="px-6 py-4 font-medium text-gray-700">
+                                單據完備率
+                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700">
+                                  高越好
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-lg font-bold text-corporate-main">68.0%</td>
+                            <td class="px-6 py-4 text-gray-500">89.1%</td>
+                            <td class="px-6 py-4">
+                                <div class="space-y-1.5">
+                                    <p class="text-xs font-semibold text-red-600">低於同級 28.5 個百分點</p>
+                                    <div class="relative h-2.5 bg-gray-100 rounded-full overflow-hidden" title="中心線代表同級平均">
+                                        <div class="absolute left-1/2 inset-y-0 w-px bg-gray-300"></div>
+                                        
+                                          <div class="absolute right-1/2 top-0 bottom-0 bg-red-400" style="width: 42.2%;"></div>
+                                        
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                          
+                          
+                        
+                        
+                        
+                        
+                        
+                          
+                          
+                          
+                        
+                        
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4">
+                                <div class="font-semibold text-gray-700">流程效率</div>
+                                <div class="text-xs text-gray-400">簽核與卡關效率</div>
+                            </td>
+                            <td class="px-6 py-4 font-medium text-gray-700">
+                                駁回率
+                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700">
+                                  低越好
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-lg font-bold text-corporate-main">0.3%</td>
+                            <td class="px-6 py-4 text-gray-500">0.6%</td>
+                            <td class="px-6 py-4">
+                                <div class="space-y-1.5">
+                                    <p class="text-xs font-semibold text-green-700">優於同級 0.4 個百分點</p>
+                                    <div class="relative h-2.5 bg-gray-100 rounded-full overflow-hidden" title="中心線代表同級平均">
+                                        <div class="absolute left-1/2 inset-y-0 w-px bg-gray-300"></div>
+                                        
+                                          <div class="absolute right-1/2 top-0 bottom-0 bg-green-500" style="width: 0.6%;"></div>
+                                        
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                          
+                          
+                        
+                        
+                        
+                        
+                        
+                          
+                          
+                          
+                        
+                        
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4">
+                                <div class="font-semibold text-gray-700">費用治理</div>
+                                <div class="text-xs text-gray-400">報銷與交易管理</div>
+                            </td>
+                            <td class="px-6 py-4 font-medium text-gray-700">
+                                交易成功率
+                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700">
+                                  高越好
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-lg font-bold text-corporate-main">76.9%</td>
+                            <td class="px-6 py-4 text-gray-500">91.1%</td>
+                            <td class="px-6 py-4">
+                                <div class="space-y-1.5">
+                                    <p class="text-xs font-semibold text-red-600">低於同級 19.2 個百分點</p>
+                                    <div class="relative h-2.5 bg-gray-100 rounded-full overflow-hidden" title="中心線代表同級平均">
+                                        <div class="absolute left-1/2 inset-y-0 w-px bg-gray-300"></div>
+                                        
+                                          <div class="absolute right-1/2 top-0 bottom-0 bg-red-400" style="width: 28.4%;"></div>
+                                        
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+            </div>
+            <div class="border-t border-gray-100" style="background-color: #f7f8fa;">
+                <details class="group max-w-6xl mx-auto">
+                    <summary class="list-none w-full text-center py-4 text-sm text-corporate-main font-bold hover:bg-gray-100 hover:text-corporate-accent transition-all cursor-pointer flex items-center justify-center gap-2">
+                        <span class="w-6 h-6 rounded-full bg-corporate-main text-white flex items-center justify-center text-xs group-hover:bg-corporate-accent transition-colors">14</span>
+                         查看完整指標細節數據（含分組）
+                         <svg class="w-4 h-4 transition-transform duration-300 group-open:-rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </summary>
+
+                    <div class="px-6 pb-8 animate-fade-in-down">
+                        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm text-left">
+                                    <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                                        <tr>
+                                            <th class="px-6 py-4 font-semibold">類別</th>
+                                            <th class="px-6 py-4 font-semibold">指標項目</th>
+                                            <th class="px-6 py-4 font-semibold text-center bg-blue-50/50 border-x border-blue-100 text-corporate-main">本公司表現</th>
+                                            <th class="px-6 py-4 font-semibold text-center">同級平均</th>
+                                            <th class="px-6 py-4 font-semibold text-center">評估</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100">
+                                        
+                                          
+                                          <tr class="bg-gray-50/70">
+                                              <td colspan="5" class="px-6 py-2">
+                                                  <div class="flex items-center gap-2">
+                                                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-gray-200 text-gray-700">合規品質</span>
+                                                      <span class="text-xs text-gray-500">憑證完整性與重複風險</span>
+                                                  </div>
+                                              </td>
+                                          </tr>
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          <tr class="hover:bg-blue-50/10 transition-colors group/row">
+                                              <td class="px-6 py-3 text-gray-500">合規品質</td>
+                                              <td class="px-6 py-3 font-medium text-gray-700">單據完備率</td>
+                                              <td class="px-6 py-3 text-center font-bold text-corporate-main bg-blue-50/20 border-x border-blue-50 group-hover/row:bg-blue-50/50">68.0%</td>
+                                              <td class="px-6 py-3 text-center text-gray-500">89.1%</td>
+                                              <td class="px-6 py-3 text-center">
+                                                  <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700">
+                                                      高越好
+                                                  </span>
+                                                  <p class="mt-1 text-xs font-semibold text-red-700">低於同級 28.5 個百分點</p>
+                                              </td>
+                                          </tr>
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          <tr class="hover:bg-blue-50/10 transition-colors group/row">
+                                              <td class="px-6 py-3 text-gray-500">合規品質</td>
+                                              <td class="px-6 py-3 font-medium text-gray-700">有效憑證比例</td>
+                                              <td class="px-6 py-3 text-center font-bold text-corporate-main bg-blue-50/20 border-x border-blue-50 group-hover/row:bg-blue-50/50">24.2%</td>
+                                              <td class="px-6 py-3 text-center text-gray-500">69.2%</td>
+                                              <td class="px-6 py-3 text-center">
+                                                  <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700">
+                                                      高越好
+                                                  </span>
+                                                  <p class="mt-1 text-xs font-semibold text-red-700">低於同級 60.8 個百分點</p>
+                                              </td>
+                                          </tr>
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          <tr class="hover:bg-blue-50/10 transition-colors group/row">
+                                              <td class="px-6 py-3 text-gray-500">合規品質</td>
+                                              <td class="px-6 py-3 font-medium text-gray-700">統編一致率</td>
+                                              <td class="px-6 py-3 text-center font-bold text-corporate-main bg-blue-50/20 border-x border-blue-50 group-hover/row:bg-blue-50/50">97.1%</td>
+                                              <td class="px-6 py-3 text-center text-gray-500">90.9%</td>
+                                              <td class="px-6 py-3 text-center">
+                                                  <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700">
+                                                      高越好
+                                                  </span>
+                                                  <p class="mt-1 text-xs font-semibold text-green-700">優於同級 8.4 個百分點</p>
+                                              </td>
+                                          </tr>
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          <tr class="hover:bg-blue-50/10 transition-colors group/row">
+                                              <td class="px-6 py-3 text-gray-500">合規品質</td>
+                                              <td class="px-6 py-3 font-medium text-gray-700">未填統編比例</td>
+                                              <td class="px-6 py-3 text-center font-bold text-corporate-main bg-blue-50/20 border-x border-blue-50 group-hover/row:bg-blue-50/50">1.4%</td>
+                                              <td class="px-6 py-3 text-center text-gray-500">0.8%</td>
+                                              <td class="px-6 py-3 text-center">
+                                                  <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-700">
+                                                      低越好
+                                                  </span>
+                                                  <p class="mt-1 text-xs font-semibold text-red-700">低於同級 0.8 個百分點</p>
+                                              </td>
+                                          </tr>
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          <tr class="hover:bg-blue-50/10 transition-colors group/row">
+                                              <td class="px-6 py-3 text-gray-500">合規品質</td>
+                                              <td class="px-6 py-3 font-medium text-gray-700">重複憑證率</td>
+                                              <td class="px-6 py-3 text-center font-bold text-corporate-main bg-blue-50/20 border-x border-blue-50 group-hover/row:bg-blue-50/50">0.1%</td>
+                                              <td class="px-6 py-3 text-center text-gray-500">1.6%</td>
+                                              <td class="px-6 py-3 text-center">
+                                                  <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-700">
+                                                      低越好
+                                                  </span>
+                                                  <p class="mt-1 text-xs font-semibold text-green-700">優於同級 2.0 個百分點</p>
+                                              </td>
+                                          </tr>
+                                          
+                                          
+                                        
+                                          
+                                          <tr class="bg-gray-50/70">
+                                              <td colspan="5" class="px-6 py-2">
+                                                  <div class="flex items-center gap-2">
+                                                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-gray-200 text-gray-700">流程效率</span>
+                                                      <span class="text-xs text-gray-500">簽核與卡關效率</span>
+                                                  </div>
+                                              </td>
+                                          </tr>
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          <tr class="hover:bg-blue-50/10 transition-colors group/row">
+                                              <td class="px-6 py-3 text-gray-500">流程效率</td>
+                                              <td class="px-6 py-3 font-medium text-gray-700">駁回率</td>
+                                              <td class="px-6 py-3 text-center font-bold text-corporate-main bg-blue-50/20 border-x border-blue-50 group-hover/row:bg-blue-50/50">0.3%</td>
+                                              <td class="px-6 py-3 text-center text-gray-500">0.6%</td>
+                                              <td class="px-6 py-3 text-center">
+                                                  <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-700">
+                                                      低越好
+                                                  </span>
+                                                  <p class="mt-1 text-xs font-semibold text-green-700">優於同級 0.4 個百分點</p>
+                                              </td>
+                                          </tr>
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          <tr class="hover:bg-blue-50/10 transition-colors group/row">
+                                              <td class="px-6 py-3 text-gray-500">流程效率</td>
+                                              <td class="px-6 py-3 font-medium text-gray-700">抽單率</td>
+                                              <td class="px-6 py-3 text-center font-bold text-corporate-main bg-blue-50/20 border-x border-blue-50 group-hover/row:bg-blue-50/50">0.3%</td>
+                                              <td class="px-6 py-3 text-center text-gray-500">0.2%</td>
+                                              <td class="px-6 py-3 text-center">
+                                                  <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-700">
+                                                      低越好
+                                                  </span>
+                                                  <p class="mt-1 text-xs font-semibold text-red-700">低於同級 0.1 個百分點</p>
+                                              </td>
+                                          </tr>
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          <tr class="hover:bg-blue-50/10 transition-colors group/row">
+                                              <td class="px-6 py-3 text-gray-500">流程效率</td>
+                                              <td class="px-6 py-3 font-medium text-gray-700">超時卡關率</td>
+                                              <td class="px-6 py-3 text-center font-bold text-corporate-main bg-blue-50/20 border-x border-blue-50 group-hover/row:bg-blue-50/50">0.0%</td>
+                                              <td class="px-6 py-3 text-center text-gray-500">1.2%</td>
+                                              <td class="px-6 py-3 text-center">
+                                                  <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-700">
+                                                      低越好
+                                                  </span>
+                                                  <p class="mt-1 text-xs font-semibold text-green-700">優於同級 1.6 個百分點</p>
+                                              </td>
+                                          </tr>
+                                          
+                                          
+                                        
+                                          
+                                          <tr class="bg-gray-50/70">
+                                              <td colspan="5" class="px-6 py-2">
+                                                  <div class="flex items-center gap-2">
+                                                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-gray-200 text-gray-700">費用治理</span>
+                                                      <span class="text-xs text-gray-500">報銷與交易管理</span>
+                                                  </div>
+                                              </td>
+                                          </tr>
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          <tr class="hover:bg-blue-50/10 transition-colors group/row">
+                                              <td class="px-6 py-3 text-gray-500">費用治理</td>
+                                              <td class="px-6 py-3 font-medium text-gray-700">交易成功率</td>
+                                              <td class="px-6 py-3 text-center font-bold text-corporate-main bg-blue-50/20 border-x border-blue-50 group-hover/row:bg-blue-50/50">76.9%</td>
+                                              <td class="px-6 py-3 text-center text-gray-500">91.1%</td>
+                                              <td class="px-6 py-3 text-center">
+                                                  <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700">
+                                                      高越好
+                                                  </span>
+                                                  <p class="mt-1 text-xs font-semibold text-red-700">低於同級 19.2 個百分點</p>
+                                              </td>
+                                          </tr>
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          
+                                          
+                                          
+                                          
+                                            
+                                            
+                                          
+                                          <tr class="hover:bg-blue-50/10 transition-colors group/row">
+                                              <td class="px-6 py-3 text-gray-500">費用治理</td>
+                                              <td class="px-6 py-3 font-medium text-gray-700">交易未報銷率</td>
+                                              <td class="px-6 py-3 text-center font-bold text-corporate-main bg-blue-50/20 border-x border-blue-50 group-hover/row:bg-blue-50/50">49.1%</td>
+                                              <td class="px-6 py-3 text-center text-gray-500">23.6%</td>
+                                              <td class="px-6 py-3 text-center">
+                                                  <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-700">
+                                                      低越好
+                                                  </span>
+                                                  <p class="mt-1 text-xs font-semibold text-red-700">低於同級 34.4 個百分點</p>
+                                              </td>
+                                          </tr>
+                                          
+                                          
+                                        
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="px-6 py-3 text-xs text-gray-400 border-t border-gray-100 text-center" style="background-color: #f7f8fa;">
+                                
+                                  同級分群依客戶分級模組計算，僅提供比例型指標橫向參考。
+                                
+                            </div>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </div>
+        
+        
+        
+        
+        
+          
+          
+          
+            
+          
+        
+          
+          
+          
+            
+          
+        
+          
+          
+          
+            
+          
+        
+          
+          
+          
+        
+        
+        
+        
+        
+        
+          
+            
+            
+            
+              
+            
+          
+            
+            
+            
+              
+            
+          
+            
+            
+            
+              
+            
+          
+            
+            
+            
+              
+            
+          
+            
+            
+            
+              
+            
+          
+            
+            
+            
+              
+            
+          
+        
+        
+        
+        
+          
+            
+              
+                
+                
+                  
+                  
+                
+              
+                
+                
+              
+                
+                
+              
+                
+                
+              
+            
+          
+            
+          
+        
+        
+        
+          
+            
+          
+            
+              
+                
+                  
+                  
+                  
+                    
+                  
+                
+              
+                
+              
+            
+          
+            
+          
+        
+        
+        
+          
+            
+              
+                
+                
+              
+                
+                
+              
+                
+                
+                  
+                
+              
+            
+          
+            
+          
+            
+              
+                
+                
+              
+                
+                
+              
+            
+          
+            
+          
+            
+          
+            
+          
+            
+          
+        
+        
+          
+        
+        <div class="bg-white rounded-2xl shadow-soft p-8 mt-8 border-t-4 border-corporate-accent relative overflow-hidden">
+            <div class="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-orange-50 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+
+            <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-2 mb-8 relative z-10">
+                <div>
+                    <h3 class="text-2xl font-bold text-corporate-main">系統轉型效益評估</h3>
+                    
+                    <p class="text-sm text-gray-500 mt-1">依營運效率、風險合規與財務收益三大支柱保守估算</p>
+                    
+                </div>
+                <div class="hidden md:block">
+                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                        估算節省效益
+                     </span>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10">
+                <div class="bg-gradient-to-br from-emerald-50 to-white p-6 rounded-2xl border border-emerald-100 shadow-sm relative">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500 font-medium">節省的錢</div>
+                    <div class="text-2xl font-bold text-corporate-main mt-1">TWD 100,147</div>
+                    
+                    <div class="mt-2 text-xs text-emerald-700 bg-emerald-100/50 inline-block px-2 py-1 rounded-md">財務與避險總效益</div>
+                    
+                    
+                    
+                    <details class="mt-4 group">
+                        <summary class="text-xs text-emerald-700 font-semibold cursor-pointer flex items-center gap-1">
+                            展開金額項目細看
+                            <svg class="w-3 h-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </summary>
+                        <div class="mt-3 space-y-2">
+                            
+                            <div class="flex items-start justify-between gap-3 text-xs">
+                                <div class="text-gray-500">稅務合規防護</div>
+                                <div class="font-semibold text-corporate-main shrink-0">TWD 15,717</div>
+                            </div>
+                            
+                            <div class="text-[11px] text-gray-400">合格憑證金額 TWD 31,434,665，按 5% 稅率與 1% 疏失率估算。</div>
+                            
+                            
+                            <div class="flex items-start justify-between gap-3 text-xs">
+                                <div class="text-gray-500">重複付款攔截</div>
+                                <div class="font-semibold text-corporate-main shrink-0">TWD 77,555</div>
+                            </div>
+                            
+                            <div class="text-[11px] text-gray-400">重複憑證 3 筆，以平均單筆費用估算。</div>
+                            
+                            
+                            <div class="flex items-start justify-between gap-3 text-xs">
+                                <div class="text-gray-500">企業卡現金回饋</div>
+                                <div class="font-semibold text-corporate-main shrink-0">TWD 3,953</div>
+                            </div>
+                            
+                            <div class="text-[11px] text-gray-400">成功交易金額 TWD 1,976,153 x 0.2%。</div>
+                            
+                            
+                            <div class="flex items-start justify-between gap-3 text-xs">
+                                <div class="text-gray-500">資金滯留利息</div>
+                                <div class="font-semibold text-corporate-main shrink-0">TWD 2,924</div>
+                            </div>
+                            
+                            <div class="text-[11px] text-gray-400">帳期 61 天，年利率 1.2%。</div>
+                            
+                            
+                        </div>
+                    </details>
+                    
+                </div>
+                
+                <div class="bg-gradient-to-br from-blue-50 to-white p-6 rounded-2xl border border-blue-100 shadow-sm relative">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500 font-medium">節省的時間</div>
+                    <div class="text-2xl font-bold text-corporate-main mt-1">6,012.1 小時</div>
+                    
+                    <div class="mt-2 text-xs text-blue-700 bg-blue-100/50 inline-block px-2 py-1 rounded-md">釋放組織產能</div>
+                    
+                    
+                    
+                    <div class="mt-4 space-y-2 text-xs text-gray-600">
+                        
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="text-gray-500">簽核動能趨勢紅利</div>
+                            <div class="font-semibold text-corporate-main shrink-0">5,940.3 小時</div>
+                        </div>
+                        
+                        <div class="text-[11px] text-gray-400">前兩月平均 118.7 小時，後兩月 75.9 小時，後兩月 188 張表單。</div>
+                        
+                        
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="text-gray-500">AI-OCR 輸入節省</div>
+                            <div class="font-semibold text-corporate-main shrink-0">71.8 小時</div>
+                        </div>
+                        
+                        <div class="text-[11px] text-gray-400">以 3 分鐘/筆估算，總 2,155 筆費用項目。</div>
+                        
+                        
+                    </div>
+                    
+                </div>
+                
+                <div class="bg-gradient-to-br from-orange-50 to-white p-6 rounded-2xl border border-orange-100 shadow-sm relative">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-orange-100 text-corporate-accent flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500 font-medium">管控效益</div>
+                    <div class="text-2xl font-bold text-corporate-main mt-1">TWD 61,749,695</div>
+                    
+                    <div class="mt-2 text-xs text-orange-700 bg-orange-100/50 inline-block px-2 py-1 rounded-md">控管平均佔比 12.1%</div>
+                    
+                    
+                    
+                    <div class="mt-4 space-y-2 text-xs text-gray-600">
+                        
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="text-gray-500">政策覆蓋率</div>
+                            <div class="font-semibold text-corporate-main shrink-0">0.0%</div>
+                        </div>
+                        
+                        
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="text-gray-500">有效憑證比例</div>
+                            <div class="font-semibold text-corporate-main shrink-0">24.2%</div>
+                        </div>
+                        
+                    </div>
+                    
+
+                    
+                </div>
+            </div>
+            
+            
+            <div class="mt-6 flex gap-2 text-xs text-gray-400 items-center justify-end">
+                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                 估算參數：業界常態退件率 10%，主管審核溝通成本 20 分鐘/件。OCR 3 分鐘/筆、政策稽核 4 分鐘/筆；僅計入已設定政策的費用項目。營業稅率 5%、人為疏失率 1%；企業卡回饋 0.2%、資金滯留 61 天 (年利率 1.2%)。合格憑證以電子發票與三聯式發票為主要抵扣標的
+            </div>
+            
+        </div>
+        
+    </section>
+
+    <!-- 2. 費用報銷趨勢分析 -->
+    <section id="s2_submission" class="scroll-mt-24">
+        
+        
+        
+          
+            
+              
+            
+          
+            
+              
+            
+          
+        
+        <div class="flex items-center mb-6">
+            <div class="w-1.5 h-8 bg-corporate-accent rounded-full mr-3"></div>
+            <h2 class="text-2xl font-bold text-corporate-main">2. 費用報銷趨勢分析</h2>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Chart Card 1 -->
+            <div class="bg-white p-6 rounded-2xl shadow-soft flex flex-col">
+                <h3 class="text-lg font-bold text-corporate-main mb-2">每月費用狀態趨勢</h3>
+                <p class="text-sm text-gray-500 mb-6">此圖表顯示每月提交報銷類與預付類表單的數量與人數，並以顏色區分最終「已核准」與「其他狀態」（如待簽核、駁回）的佔比。</p>
+                
+                <div class="chart-container flex-grow">
+                    <canvas id="submitStatsChart"></canvas>
+                </div>
+
+                
+                <div class="mt-6 space-y-4">
+                    
+                    <div class="p-4 rounded-xl border-l-4 flex gap-4 items-start bg-emerald-50 border-emerald-500">
+                        <div class="bg-white p-2 rounded-lg shadow-sm shrink-0 text-emerald-600">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-bold mb-1 text-emerald-800">
+                                成長趨勢
+                            </h4>
+                            <p class="text-sm leading-relaxed text-emerald-700">近三個月的總提交表單數平均為 100.3 張，過去 2025-02 至 2025-10 的平均為 74.0 張，與過去平均顯著增長了 35.7%。</p>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 rounded-xl border-l-4 flex gap-4 items-start bg-blue-50 border-blue-400">
+                        <div class="bg-white p-2 rounded-lg shadow-sm shrink-0 text-blue-500">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-bold mb-1 text-blue-800">
+                                趨勢穩定
+                            </h4>
+                            <p class="text-sm leading-relaxed text-blue-700">近三個月的總申請金額平均為 5,003,219.7 元，過去 2025-02 至 2025-10 的平均為 5,193,337.4 元，與過去平均相比保持穩定。</p>
+                        </div>
+                    </div>
+                    
+                </div>
+                
+            </div>
+
+            <!-- Chart Card 2 -->
+            <div class="bg-white p-6 rounded-2xl shadow-soft flex flex-col">
+                <h3 class="text-lg font-bold text-corporate-main mb-2">每月各類表單提交數量</h3>
+                <p class="text-sm text-gray-500 mb-6">此圖表呈現了報告期間內，每月各類表單的提交數量，可用於觀察主要表單的使用趨勢與分佈變化。</p>
+                <div class="chart-container flex-grow">
+                    <canvas id="formTypeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. 內控健康度 -->
+    <section id="s3_controls" class="scroll-mt-24">
+        
+        
+        
+          
+            
+              
+            
+          
+            
+              
+                
+                  
+                
+              
+                
+                  
+                
+              
+            
+          
+            
+              
+            
+          
+        
+        <div class="flex items-center mb-6">
+            <div class="w-1.5 h-8 bg-corporate-accent rounded-full mr-3"></div>
+            <h2 class="text-2xl font-bold text-corporate-main">3. 內部控制健康度儀表板</h2>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <!-- Pie Chart Cards -->
+            <div class="bg-white p-6 rounded-2xl shadow-soft md:col-span-1">
+                <h3 class="text-base font-bold text-corporate-main text-center mb-4">費用政策覆蓋率</h3>
+                <div class="chart-container" style="height: 200px;">
+                    <canvas id="policyCoverageChart"></canvas>
+                </div>
+                <p class="text-center text-xs text-gray-500 mt-2">先列出本期真的用到的費用種類，再和「費用政策設定」裡列出的種類比對，顯示其政策實際執行狀況。</p>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-soft md:col-span-1">
+                <h3 class="text-base font-bold text-corporate-main text-center mb-4">自訂欄位覆蓋率</h3>
+                <div class="chart-container" style="height: 200px;">
+                    <canvas id="customFieldCoverageChart"></canvas>
+                </div>
+                <p class="text-center text-xs text-gray-500 mt-2">同樣抓本期用到的費用種類，對照自訂欄位（位置=費用項目）有設定的種類；有欄位=已設定，沒有=未設定，顯示設定率。</p>
+            </div>
+            
+            <!-- Stats Block -->
+            <div class="bg-gradient-to-br from-corporate-accent to-violet-500 p-6 rounded-2xl shadow-soft md:col-span-1 text-white flex flex-col justify-between">
+                <div>
+                    <h3 class="text-lg font-bold mb-1">財務註記覆蓋率 (付款/入帳/傳票)</h3>
+                    <p class="text-slate-300 text-xs mb-6">付款 / 入帳 / 傳票勾稽狀況</p>
+                </div>
+                
+                
+                <div class="space-y-4">
+                    
+                    
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span>已付款標記</span>
+                            <span class="font-bold">86.2%</span>
+                        </div>
+                        <div class="w-full bg-slate-600 rounded-full h-1.5">
+                            <div class="bg-corporate-accent h-1.5 rounded-full" style="width: 86.2%"></div>
+                        </div>
+                        <p class="text-xs text-slate-300 mt-1">833/967 張表單有完成付款</p>
+                    </div>
+                    
+                    
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span>已入帳註記</span>
+                            <span class="font-bold">85.2%</span>
+                        </div>
+                        <div class="w-full bg-slate-600 rounded-full h-1.5">
+                            <div class="bg-blue-400 h-1.5 rounded-full" style="width: 85.2%"></div>
+                        </div>
+                        <p class="text-xs text-slate-300 mt-1">824/967 張表單標記已入帳</p>
+                    </div>
+                    
+                    
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span>傳票編號</span>
+                            <span class="font-bold">85.2%</span>
+                        </div>
+                        <div class="w-full bg-slate-600 rounded-full h-1.5">
+                            <div class="bg-emerald-400 h-1.5 rounded-full" style="width: 85.2%"></div>
+                        </div>
+                        <p class="text-xs text-slate-300 mt-1">824/967 張表單有傳票編號</p>
+                    </div>
+                    
+                </div>
+                
+                <div class="mt-4 pt-4 border-t border-slate-600/50">
+                    <p class="text-xs text-slate-400">註：上述為占總表單量之比例</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Approval Health Bar -->
+        <div class="bg-white p-6 rounded-2xl shadow-soft">
+            <h3 class="text-lg font-bold text-corporate-main mb-2">簽核流程健康度 (依實際表單分析)</h3>
+            <p class="text-sm text-gray-500 mb-4">看每張表單實際有幾個簽核關卡：1–3 關算精簡、4–5 關算標準、7 關以上算複雜，分三桶把表單數量加總，讓大家一眼判斷流程是否太多或太少。</p>
+            <div class="chart-container" style="height: 300px;">
+                <canvas id="approvalHealthChart"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. 簽核效率 -->
+    <section id="s3_efficiency" class="scroll-mt-24">
+         
+         
+         
+           
+             
+               
+             
+           
+             
+               
+             
+           
+             
+               
+             
+           
+         
+         <div class="flex items-center mb-6">
+            <div class="w-1.5 h-8 bg-corporate-accent rounded-full mr-3"></div>
+            <h2 class="text-2xl font-bold text-corporate-main">4. 簽核流程效率分析</h2>
+        </div>
+
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-soft mb-6">
+             <div class="flex flex-col md:flex-row justify-between items-end mb-6">
+                <div>
+                    <h3 class="text-lg font-bold text-corporate-main">平均簽核時長趨勢 (工作小時)</h3>
+                    <p class="text-sm text-gray-500">單位：工作小時 (排除假日)</p>
+                    <p class="text-xs text-gray-400 mt-1">簽核時長是衡量內部流程效率的關鍵指標。本圖表追蹤每月從表單送出到最終核准的平均歷時。</p>
+                </div>
+                
+                
+                  
+                    
+                      
+                    
+                  
+                    
+                      
+                    
+                  
+                    
+                      
+                    
+                  
+                
+                <div class="flex gap-4 mt-4 md:mt-0">
+                    <div class="text-right">
+                        <div class="text-xs text-gray-400">平均簽核關卡數</div>
+                        <div class="font-bold text-xl text-corporate-main">4.12 關</div>
+                    </div>
+	                     <div class="text-right border-l pl-4 border-gray-200">
+	                        <div class="text-xs text-gray-400">平均每項每關歷時(小時)</div>
+	                        <div class="font-bold text-xl text-corporate-main">14.05</div>
+                            
+                            <div class="text-xs text-corporate-accent mt-1 font-semibold">勝過同級客戶百分比 76%</div>
+                            
+	                    </div>
+	                </div>
+	            </div>
+            
+            <div class="chart-container" style="height: 350px;">
+                <canvas id="processingTimeChart"></canvas>
+            </div>
+
+            
+            <p class="text-xs text-gray-500 mt-3">每張表單平均費用項目數：3.09 項</p>
+            
+
+            
+            <div class="mt-6 space-y-4">
+              
+              <div class="p-4 rounded-xl border-l-4 flex gap-4 items-center bg-emerald-50 border-emerald-500">
+                <div class="bg-white p-2 rounded-lg shadow-sm shrink-0 text-emerald-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <div>
+                    <p class="text-sm leading-relaxed text-emerald-800">近三個月的平均簽核時長平均為 70.7 小時，過去 2025-02 至 2025-10 的平均為 111.8 小時，與過去平均顯著下降了 36.7%。</p>
+                </div>
+              </div>
+              
+            </div>
+            
+        </div>
+
+        <!-- 部門效率表格 -->
+	        <div class="bg-white rounded-2xl shadow-soft overflow-hidden">
+	            <div class="p-6 border-b border-gray-100">
+	                <h3 class="text-lg font-bold text-corporate-main">主要部門簽核效率觀察</h3>
+	                <p class="text-sm text-gray-500">此表格列出送單量最高的五個部門及其平均簽核時長，有助於識別特定部門的流程瓶頸。</p>
+                    
+                    
+                    
+                      
+                      
+                      
+                        
+                        
+                      
+                    
+                      
+                      
+                      
+                        
+                        
+                      
+                    
+                      
+                      
+                      
+                        
+                        
+                      
+                    
+                      
+                      
+                      
+                        
+                        
+                      
+                    
+                      
+                      
+                      
+                        
+                        
+                      
+                    
+                    
+                      
+                    
+                    
+                    <p class="text-xs text-gray-400 mt-1">效率燈號基準：主要部門加權平均簽核時長 70.9 小時</p>
+                    
+                    
+	            </div>
+	            <div class="overflow-x-auto">
+	                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
+                        <tr>
+                            
+                              
+                              <th class="px-6 py-4">費用歸屬部門</th>
+                              
+                              <th class="px-6 py-4">表單數</th>
+                              
+                              <th class="px-6 py-4">送單佔比</th>
+                              
+                              <th class="px-6 py-4">平均簽核時間(小時)</th>
+                              
+                              <th class="px-6 py-4">效率燈號</th>
+                            
+                        </tr>
+                    </thead>
+	                    <tbody class="divide-y divide-gray-50 text-gray-700">
+	                        
+	                          
+	                          
+                              
+                                
+                              
+	                          
+	                            
+	                            
+	                            
+	                          
+	                          <tr>
+	                              <td class="px-6 py-4 font-medium">部門 A</td>
+	                              <td class="px-6 py-4">173</td>
+	                              <td class="px-6 py-4">18.9%</td>
+	                              <td class="px-6 py-4 text-green-600 font-bold">59.51</td>
+	                              <td class="px-6 py-4">
+	                                <span class="inline-block w-3 h-3 rounded-full bg-green-500"></span>
+	                                <span class="text-xs text-green-500 ml-1">快於平均</span>
+	                              </td>
+	                          </tr>
+                          
+	                          
+                              
+                                
+                              
+	                          
+	                            
+	                            
+	                            
+	                          
+	                          <tr>
+	                              <td class="px-6 py-4 font-medium">部門 B</td>
+	                              <td class="px-6 py-4">99</td>
+	                              <td class="px-6 py-4">10.8%</td>
+	                              <td class="px-6 py-4 text-orange-600 font-bold">70.46</td>
+	                              <td class="px-6 py-4">
+	                                <span class="inline-block w-3 h-3 rounded-full bg-orange-500"></span>
+	                                <span class="text-xs text-orange-500 ml-1">接近平均</span>
+	                              </td>
+	                          </tr>
+                          
+	                          
+                              
+                                
+                              
+	                          
+	                            
+	                            
+	                            
+	                          
+	                          <tr>
+	                              <td class="px-6 py-4 font-medium">部門 C</td>
+	                              <td class="px-6 py-4">78</td>
+	                              <td class="px-6 py-4">8.6%</td>
+	                              <td class="px-6 py-4 text-green-600 font-bold">53.10</td>
+	                              <td class="px-6 py-4">
+	                                <span class="inline-block w-3 h-3 rounded-full bg-green-500"></span>
+	                                <span class="text-xs text-green-500 ml-1">快於平均</span>
+	                              </td>
+	                          </tr>
+                          
+	                          
+                              
+                                
+                              
+	                          
+	                            
+	                            
+	                            
+	                          
+	                          <tr>
+	                              <td class="px-6 py-4 font-medium">部門 D</td>
+	                              <td class="px-6 py-4">76</td>
+	                              <td class="px-6 py-4">8.3%</td>
+	                              <td class="px-6 py-4 text-red-600 font-bold">121.66</td>
+	                              <td class="px-6 py-4">
+	                                <span class="inline-block w-3 h-3 rounded-full bg-red-500 animate-pulse"></span>
+	                                <span class="text-xs text-red-500 ml-1">慢於平均</span>
+	                              </td>
+	                          </tr>
+                          
+	                          
+                              
+                                
+                              
+	                          
+	                            
+	                            
+	                            
+	                          
+	                          <tr>
+	                              <td class="px-6 py-4 font-medium">部門 E</td>
+	                              <td class="px-6 py-4">59</td>
+	                              <td class="px-6 py-4">6.5%</td>
+	                              <td class="px-6 py-4 text-green-600 font-bold">63.3</td>
+	                              <td class="px-6 py-4">
+	                                <span class="inline-block w-3 h-3 rounded-full bg-green-500"></span>
+	                                <span class="text-xs text-green-500 ml-1">快於平均</span>
+	                              </td>
+	                          </tr>
+                          
+                        
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- 5. 憑證合規 (Dual Column) -->
+    <section id="s4_compliance" class="scroll-mt-24">
+        
+        
+        
+          
+            
+              
+            
+          
+            
+              
+            
+          
+            
+              
+            
+          
+            
+              
+            
+          
+            
+              
+            
+          
+            
+              
+            
+          
+            
+              
+            
+          
+        
+        <div class="flex items-center mb-6">
+            <div class="w-1.5 h-8 bg-corporate-accent rounded-full mr-3"></div>
+            <h2 class="text-2xl font-bold text-corporate-main">5. 憑證品質與合規性分析</h2>
+        </div>
+        <p class="text-sm text-gray-500 mb-6">整合憑證有效性、統編一致性與異常狀態，協助辨識憑證品質與流程合規風險。</p>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+             <div class="bg-white p-6 rounded-2xl shadow-soft">
+                <h3 class="text-lg font-bold text-corporate-main mb-4">憑證與合規指標月度趨勢</h3>
+                <p class="text-sm text-gray-500 mb-4">追蹤單據完備率、憑證有效率、統編一致率與重複憑證比例的月度變化，快速辨識品質波動。</p>
+                <div class="chart-container">
+                    <canvas id="voucherTrendChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="space-y-6">
+                <!-- Stats Grid -->
+                
+                
+                
+                
+                
+                  
+                    
+                      
+                    
+                  
+                    
+                      
+                    
+                  
+                    
+                      
+                    
+                  
+                
+                
+                  
+                    
+                      
+                    
+                  
+                    
+                      
+                    
+                  
+                
+                
+                  
+                    
+                      
+                    
+                  
+                
+                
+                  
+                    
+                      
+                    
+                  
+                
+
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    
+                    <div class="bg-white p-5 rounded-2xl shadow-soft text-center border-b-4 border-corporate-accent relative">
+                        <div class="absolute -top-2 right-3 bg-corporate-accent text-white text-[10px] px-2 py-0.5 rounded-full font-bold">關鍵指標</div>
+                        <div class="text-3xl font-bold text-corporate-main">68.0%</div>
+                        <div class="text-sm text-gray-500 mt-1">單據完備率</div>
+                        <div class="text-xs text-corporate-accent font-medium mt-2 bg-orange-50 inline-block px-2 py-1 rounded">同級 89.1%</div>
+                    </div>
+                    
+                    
+                    <div class="bg-white p-5 rounded-2xl shadow-soft text-center border-b-4 border-green-400">
+                        <div class="text-3xl font-bold text-corporate-main">24.2%</div>
+                        <div class="text-sm text-gray-500 mt-1">有效憑證比例</div>
+                        <div class="text-xs text-green-600 font-medium mt-2 bg-green-50 inline-block px-2 py-1 rounded">同級 69.2%</div>
+                    </div>
+                    
+                    
+                    <div class="bg-white p-5 rounded-2xl shadow-soft text-center border-b-4 border-red-400">
+                        <div class="text-3xl font-bold text-corporate-main">97.1%</div>
+                        <div class="text-sm text-gray-500 mt-1">公司統編填寫比例</div>
+                        <div class="text-xs text-red-500 font-medium mt-2 bg-red-50 inline-block px-2 py-1 rounded">同級 90.9%</div>
+                    </div>
+                    
+                    
+                    <div class="bg-white p-5 rounded-2xl shadow-soft text-center border-b-4 border-orange-400">
+                        <div class="text-3xl font-bold text-corporate-main">0.1%</div>
+                        <div class="text-sm text-gray-500 mt-1">重複憑證提報比例</div>
+                        <div class="text-xs text-orange-600 font-medium mt-2 bg-orange-50 inline-block px-2 py-1 rounded">同級 1.6%</div>
+                    </div>
+                    
+                    
+                    <div class="bg-white p-5 rounded-2xl shadow-soft text-center border-b-4 border-green-400">
+                        <div class="text-3xl font-bold text-corporate-main">0.0%</div>
+                        <div class="text-sm text-gray-500 mt-1">超時卡關率</div>
+                        <div class="text-xs text-green-600 font-medium mt-2 bg-green-50 inline-block px-2 py-1 rounded">同級 1.2%</div>
+                    </div>
+                    
+                    
+                    <div class="bg-white p-5 rounded-2xl shadow-soft text-center border-b-4 border-slate-300">
+                        <div class="text-3xl font-bold text-corporate-main">32.0%</div>
+                        <div class="text-sm text-gray-500 mt-1">未提供憑證比例</div>
+                        <div class="text-xs text-slate-500 font-medium mt-2 bg-slate-50 inline-block px-2 py-1 rounded">同級 10.9%</div>
+                    </div>
+                    
+                </div>
+
+                <div class="bg-gray-50/70 border border-gray-100 rounded-xl p-4 text-xs text-gray-500">
+                    單據完備率（關鍵指標）將可佐證的附件納入計算，可更完整反映單據完備程度；有效憑證比例則以稅法定義、系統可辨識之憑證為準。
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-soft">
+                     <h3 class="text-lg font-bold text-corporate-main mb-4">憑證種類分佈</h3>
+                    <p class="text-sm text-gray-500 mb-4">此圖表展示了最常見的憑證類型，幫助您了解主要的費用發生場景，共上傳2,203筆憑證資料。</p>
+                    <div class="chart-container" style="height: 200px;">
+                        <canvas id="receiptPieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-2xl shadow-soft">
+                <h3 class="text-lg font-bold text-corporate-main mb-4">表單異常狀態分析（超時卡關率趨勢）</h3>
+                <p class="text-sm text-gray-500 mb-4">以當月送單作為分母，駁回率/抽單率採截至當月底曾發生該狀態之表單占比；超時卡關率以月底最新狀態計算（平均門檻為27.4天，取自該公司平均簽核時長）。</p>
+                 <div class="chart-container">
+                    <canvas id="issueRateChart"></canvas>
+                </div>
+                
+                 <div class="mt-6 flex flex-col md:flex-row gap-4">
+                     
+                     <div class="flex-1 p-4 rounded-xl border-l-4 bg-green-50 border-green-500">
+                        <h4 class="font-bold text-sm mb-1 text-green-800">
+                          改善趨勢
+                        </h4>
+                        <p class="text-xs text-green-700">近三個月的超時卡關率平均為 0.6 %，過去 2025-02 至 2025-10 的平均為 1.6 %，與過去平均顯著下降了 65.3%。</p>
+                     </div>
+                     
+                 </div>
+                 
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-soft">
+                <h3 class="text-lg font-bold text-corporate-main mb-4">上月待簽核分布</h3>
+                <p class="text-sm text-gray-500 mb-4">2026-01 月底仍待簽核的件數分佈（0-7 / 8-14 / 15-30 / &gt;41 天）。</p>
+                <div class="chart-container" style="height: 320px;">
+                    <canvas id="pendingAgeSnapshotChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <div class="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <div class="text-xs text-gray-400">年度報銷憑證數量</div>
+                <div class="text-lg font-bold text-corporate-main mt-1">1,318</div>
+                <p class="text-xs text-gray-500 mt-1">報告期間內有上傳憑證的費用項目總數。</p>
+            </div>
+            
+            <div class="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <div class="text-xs text-gray-400">沒統編的實際張數</div>
+                <div class="text-lg font-bold text-corporate-main mt-1">5</div>
+                <p class="text-xs text-gray-500 mt-1">必填統編的憑證中未填買方統編的筆數。</p>
+            </div>
+            
+        </div>
+        
+    </section>
+
+    <!-- 6. 企業卡 -->
+    <section id="s5_card_usage" class="scroll-mt-24">
+        
+        
+        
+          
+            
+              
+            
+          
+            
+              
+            
+          
+            
+              
+            
+          
+            
+              
+            
+          
+        
+        <div class="flex items-center mb-6">
+            <div class="w-1.5 h-8 bg-corporate-accent rounded-full mr-3"></div>
+            <h2 class="text-2xl font-bold text-corporate-main">6. 數位企業卡交易分析</h2>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Stats -->
+            <div class="md:col-span-1 space-y-4">
+                <div class="bg-gradient-to-br from-corporate-accent to-violet-500 text-white p-6 rounded-2xl shadow-soft relative overflow-hidden">
+                    <div class="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full"></div>
+                    <div class="relative z-10">
+                        
+                        
+                          
+                            
+                              
+                            
+                          
+                            
+                              
+                            
+                          
+                            
+                              
+                            
+                          
+                        
+                        <p class="text-gray-300 text-sm mb-1">總交易金額</p>
+                        <h3 class="text-3xl font-bold">TWD 2,004,225</h3>
+                        <p class="text-xs text-gray-400 mt-4">總交易筆數: 570</p>
+                        <p class="text-xs text-gray-400">總持卡人數: 38</p>
+                    </div>
+                </div>
+                 <div class="bg-white p-6 rounded-2xl shadow-soft">
+                    <h3 class="text-base font-bold text-corporate-main mb-4">交易報銷狀態分佈</h3>
+                    <p class="text-xs text-gray-500 mb-4">此圖表分析所有企業卡交易的後續報銷狀態，高『已核准』比例代表費用能快速合規地完成報銷流程；『未申請』則可能包含個人消費或延遲報銷的項目。</p>
+                    <div class="chart-container" style="height: 200px">
+                         <canvas id="txnStatusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trend Chart -->
+            <div class="md:col-span-2 bg-white p-6 rounded-2xl shadow-soft flex flex-col">
+                 <h3 class="text-lg font-bold text-corporate-main mb-2">每月企業卡交易趨勢</h3>
+                 <p class="text-sm text-gray-500 mb-4">透過交易量與金額的月度趨勢，評估企業卡的使用活躍度與主要消費週期。</p>
+                 <div class="chart-container flex-grow">
+                    <canvas id="txnMonthlyChart"></canvas>
+                 </div>
+                 
+                 <div class="mt-4 p-3 bg-gray-50 rounded-lg text-sm text-gray-600 border border-gray-100">
+                    提示：近三個月的企業卡月交易金額平均為 244,801.0 元，過去 2025-04 至 2025-10 的平均為 178,094.2 元，與過去平均顯著增長了 37.5%。
+                 </div>
+                 
+            </div>
+        </div>
+    </section>
+
+    <!-- 7. 總結 -->
+    <section id="s6_summary" class="scroll-mt-24">
+        
+        
+        
+          
+            
+              
+            
+          
+        
+        
+        
+        
+        
+          
+            
+              
+                
+              
+                
+                  
+                
+              
+                
+              
+            
+          
+            
+              
+              
+              
+              
+                
+                
+                
+                  
+                
+              
+                
+                
+                
+              
+                
+                
+                
+              
+                
+                
+                
+              
+              
+                
+              
+            
+          
+            
+          
+            
+              
+                
+              
+            
+          
+        
+        <div class="bg-white rounded-3xl shadow-soft p-8 border border-gray-100">
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-bold text-corporate-main mb-3" style="color: #425563;">總結與行動建議</h2>
+                <div class="w-20 h-1.5 bg-corporate-accent mx-auto rounded-full" style="background-color: #6B5CA0;"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                
+                
+                  
+                  
+                  
+                  <div class="bg-gray-50 rounded-2xl p-6 relative group hover:bg-white hover:shadow-lg transition-all border border-transparent hover:border-gray-100">
+                      <div class="absolute -top-4 left-6 text-white px-3 py-1 rounded text-xs font-bold shadow-md" style="background-color: #425563;">整體支出概況</div>
+                      <div class="mt-4">
+                          <div class="text-2xl font-bold text-corporate-main mb-2" style="color: #425563;">TWD 62,422,974</div>
+                          <p class="text-sm font-bold mb-2" style="color: #6E818C;">觀察：<span class="font-normal text-gray-600">本期共處理 914 張表單。</span></p>
+                          <hr class="border-gray-200 my-3">
+                          <p class="text-sm font-bold summary-suggestion" style="color: #6B5CA0;">建議：<span class="font-normal text-gray-600">建議持續透過 <a href="https://example.com/docs/budget" target="_blank" class="underline hover:text-orange-600">部門預算功能</a> 監控支出，確保費用與營運目標一致。</span></p>
+                      </div>
+                  </div>
+                  
+                  
+                  
+                  <div class="bg-gray-50 rounded-2xl p-6 relative group hover:bg-white hover:shadow-lg transition-all border border-transparent hover:border-gray-100">
+                      <div class="absolute -top-4 left-6 text-white px-3 py-1 rounded text-xs font-bold shadow-md" style="background-color: #425563;">簽核流程效率</div>
+                      <div class="mt-4">
+                          <div class="text-2xl font-bold text-corporate-main mb-2" style="color: #425563;">98.1 小時</div>
+                          <p class="text-sm font-bold mb-2" style="color: #6E818C;">觀察：<span class="font-normal text-gray-600">從送出申請到最終核准的平均歷時。</span></p>
+                          <hr class="border-gray-200 my-3">
+                          <p class="text-sm font-bold summary-suggestion" style="color: #6B5CA0;">建議：<span class="font-normal text-gray-600">可搭配 <a href="https://example.com/docs/custom-fields" target="_blank" class="underline hover:text-orange-600">自訂欄位</a> 與 <a href="https://example.com/docs/policy" target="_blank" class="underline hover:text-orange-600">費用政策</a> 優化判斷流程。</span></p>
+                      </div>
+                  </div>
+                  
+                  
+                  
+                  <div class="bg-gray-50 rounded-2xl p-6 relative group hover:bg-white hover:shadow-lg transition-all border border-transparent hover:border-gray-100">
+                      <div class="absolute -top-4 left-6 text-white px-3 py-1 rounded text-xs font-bold shadow-md" style="background-color: #425563;">憑證合規比例</div>
+                      <div class="mt-4">
+                          <div class="text-2xl font-bold text-corporate-main mb-2" style="color: #425563;">24.2%</div>
+                          <p class="text-sm font-bold mb-2" style="color: #6E818C;">觀察：<span class="font-normal text-gray-600">符合稅法定義之有效憑證（不含其他附件）比例。</span></p>
+                          <hr class="border-gray-200 my-3">
+                          <p class="text-sm font-bold summary-suggestion" style="color: #6B5CA0;">建議：<span class="font-normal text-gray-600">建議開啟 <a href="https://example.com/docs/duplicate-check" target="_blank" class="underline hover:text-orange-600">憑證重複檢查</a> 機制，降低稽核風險。</span></p>
+                      </div>
+                  </div>
+                  
+                
+                
+                <div class="bg-gray-50 rounded-2xl p-6 relative group hover:bg-white hover:shadow-lg transition-all border border-transparent hover:border-gray-100">
+                    <div class="absolute -top-4 left-6 text-white px-3 py-1 rounded text-xs font-bold shadow-md" style="background-color: #425563;">數位企業卡支出</div>
+                    <div class="mt-4">
+                        <div class="text-2xl font-bold text-corporate-main mb-2" style="color: #425563;">TWD 2,004,225</div>
+                        <p class="text-sm font-bold mb-2" style="color: #6E818C;">觀察：<span class="font-normal text-gray-600">
+                          
+                            目前卡片交易已報銷比例達 48%。
+                          
+                        </span></p>
+                        <hr class="border-gray-200 my-3">
+                        <p class="text-sm font-bold summary-suggestion" style="color: #6B5CA0;">建議：<span class="font-normal text-gray-600">使用率佳，可參考更多 <a href="https://example.com/docs/card-usage" target="_blank" class="underline hover:text-orange-600">支付場景</a> 擴大回饋效益。</span></p>
+                    </div>
+                </div>
+                
+            </div>
+            
+            <div class="mt-10 p-4 rounded-xl text-center text-sm text-gray-500" style="background-color: #EEECE6;">
+                本報告由系統自動生成，建議結合貴公司實際營運政策進行綜合評估。
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer / Survey -->
+    <footer class="text-center py-10 bg-white rounded-t-3xl shadow-inner mt-12 no-print">
+        <h2 class="text-xl font-bold text-corporate-main mb-2">您的回饋是我們進步的動力</h2>
+        <p class="text-gray-500 mb-6 text-sm">季度訪談滿意度調查</p>
+        <div class="inline-block p-4 bg-white rounded-xl shadow-card border border-gray-100 mb-4">
+             <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&amp;data=https%3A%2F%2Fexample.com%2Ffeedback" alt="回饋連結 QR Code" class="opacity-90 hover:opacity-100 transition-opacity">
+        </div>
+        <div>
+             <a href="https://example.com/feedback" target="_blank" class="text-corporate-info hover:text-corporate-accent font-medium text-sm transition-colors flex items-center justify-center gap-1">
+                點擊填寫問卷
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+            </a>
+        </div>
+    </footer>
+
+  </main>
+
+<!-- Chart Logic (不變動數據，僅微調樣式) -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    Chart.register(ChartDataLabels);
+
+    // 為每張圖表注入暖白底色，避免透明 canvas 產生黑底
+    const chartBgPlugin = {
+      id: 'chartBg',
+      beforeDraw(chart) {
+        const ctx = chart.canvas.getContext('2d');
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, chart.width, chart.height);
+        ctx.restore();
+      }
+    };
+    Chart.register(chartBgPlugin);
+
+    // 原始數據
+    const reportData = {"s1_overview":{"components":[{"note":"估算基於台灣市場平均薪資與節省工時假設。","section_id":"s1_overview","stats":[{"label":"年度人力節省(估)","value":"TWD 215,673"},{"label":"重複憑證攔截(估)","value":"TWD 5,400"},{"label":"企業卡交易金額","value":"TWD 2,004,225"}],"title":"客戶使用價值 (極簡)","type":"value_summary"},{"assumptions":["業界常態退件率 10%，主管審核溝通成本 20 分鐘/件","OCR 3 分鐘/筆、政策稽核 4 分鐘/筆；僅計入已設定政策的費用項目","營業稅率 5%、人為疏失率 1%；企業卡回饋 0.2%、資金滯留 61 天 (年利率 1.2%)","合格憑證以電子發票與三聯式發票為主要抵扣標的"],"detail_rows":[{"description":"前兩月平均 118.7 小時，後兩月 75.9 小時，後兩月 188 張表單。","label":"簽核動能趨勢紅利","value":"5,940.3 小時"},{"description":"以 3 分鐘/筆估算，總 2,155 筆費用項目。","label":"AI-OCR 輸入節省","value":"71.8 小時"},{"description":"合格憑證金額 TWD 31,434,665，按 5% 稅率與 1% 疏失率估算。","label":"稅務合規防護","value":"TWD 15,717"},{"description":"重複憑證 3 筆，以平均單筆費用估算。","label":"重複付款攔截","value":"TWD 77,555"},{"description":"成功交易金額 TWD 1,976,153 x 0.2%。","label":"企業卡現金回饋","value":"TWD 3,953"},{"description":"帳期 61 天，年利率 1.2%。","label":"資金滯留利息","value":"TWD 2,924"}],"section_id":"s1_overview","subtitle":"依營運效率、風險合規與財務收益三大支柱保守估算","summary_cards":[{"description":"含企業卡回饋 TWD 3,953、資金滯留 TWD 2,924、稅務防護 TWD 15,717、重複攔截 TWD 77,555","label":"財務與避險總效益","value":"TWD 100,147"},{"description":"含錯誤率優化 0.0h、簽核加速 5,940.2h、OCR 輸入 72.2h","label":"釋放組織產能","value":"6,012.1 小時"},{"description":"針對 0 筆費用執行自動稽核，約節省 0.0 小時","label":"精準政策稽核","value":"0.0%"},{"description":"近期平均每單縮短 42.8 小時","label":"簽核動能趨勢","value":"效率優化中"}],"title":"系統轉型效益評估","type":"benefit_block"},{"note":"同級分群依客戶分級模組計算，僅提供比例型指標橫向參考。","section_id":"s1_overview","table_data":{"headers":["指標","本公司","同級平均(S)"],"rows":[["單據完備率","68.0%","89.1%"],["有效憑證比例","24.2%","69.2%"],["未提供憑證比例","32.0%","10.9%"],["統編一致率","97.1%","90.9%"],["未填統編比例","1.4%","0.8%"],["重複憑證率","0.1%","1.6%"],["駁回率","0.3%","0.6%"],["抽單率","0.3%","0.2%"],["超時卡關率","0.0%","1.2%"],["交易成功率","76.9%","91.1%"],["交易未報銷率","49.1%","23.6%"]]},"tags":"核心客戶,高滲透率","tier":"S","title":"同級橫向對比 (比例指標)","type":"peer_compare"}],"title":"1. 客戶使用價值與同級比較"},"s2_submission":{"components":[{"chart_config":{"data":{"datasets":[{"backgroundColor":"rgba(144, 124, 216, 0.12)","borderColor":"#6B5CA0","data":[728511,6668700,6701898,10868985,9555925,7500971,5705253,7990742,7378063,6094933,6751632,7416476],"fill":true,"label":"申請金額 (TWD)","order":0,"type":"line","yAxisID":"y1"},{"backgroundColor":"rgba(250, 197, 84, 0.14)","borderColor":"#D9B45A","data":[15,24,32,24,32,36,35,31,27,35,42,38],"fill":false,"label":"提單人數","order":1,"type":"line","yAxisID":"y"},{"backgroundColor":"#DAD3FA","data":[32,88,103,99,99,135,88,126,93,134,140,120],"label":"已核准","order":2,"stack":"Stack 0","yAxisID":"y"},{"backgroundColor":"#C8C1D8","data":[0,5,12,1,0,0,7,7,4,0,0,12],"label":"其他狀態","order":2,"stack":"Stack 0","yAxisID":"y"}],"labels":["2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01"]},"options":{"scales":{"x":{"stacked":true},"y":{"beginAtZero":true,"stacked":true,"title":{"display":true,"text":"人數 / 表單數"}},"y1":{"beginAtZero":true,"grid":{"drawOnChartArea":false},"position":"right","title":{"display":true,"text":"金額 (TWD)"},"type":"linear"}}},"type":"bar"},"chart_id":"submitStatsChart","description":"此圖表顯示每月提交報銷類與預付類表單的數量與人數，並以顏色區分最終「已核准」與「其他狀態」（如待簽核、駁回）的佔比。","insight_block":[{"change_type":"positive","text":"近三個月的總提交表單數平均為 100.3 張，過去 2025-02 至 2025-10 的平均為 74.0 張，與過去平均顯著增長了 35.7%。"},{"change_type":"neutral","text":"近三個月的總申請金額平均為 5,003,219.7 元，過去 2025-02 至 2025-10 的平均為 5,193,337.4 元，與過去平均相比保持穩定。"}],"section_id":"s2_submission","title":"每月費用狀態趨勢","type":"chart"},{"chart_config":{"data":{"datasets":[{"backgroundColor":"#6B5CA0","data":[32,89,99,100,97,134,95,134,95,131,140,131],"label":"費用報銷單"},{"backgroundColor":"#1976d2","data":[55,109,84,93,84,84,68,51,63,74,109,80],"label":"費用申請單"},{"backgroundColor":"#43a047","data":[0,4,16,0,1,1,0,0,1,1,0,1],"label":"預先付款單"},{"backgroundColor":"#f44336","data":[0,0,5,0,0,1,0,0,0,0,4,1],"label":"預先付款報銷單"},{"backgroundColor":"#7e57c2","data":[0,0,5,0,1,4,1,1,0,4,0,0],"label":"卡片申請單"}],"labels":["2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01"]},"options":{"scales":{"x":{"stacked":true},"y":{"stacked":true}}},"type":"bar"},"chart_id":"formTypeChart","description":"此圖表呈現了報告期間內，每月各類表單的提交數量，可用於觀察主要表單的使用趨勢與分佈變化。","section_id":"s2_submission","title":"每月各類表單提交數量","type":"chart"}],"title":"2. 費用報銷趨勢分析"},"s3_controls":{"components":[{"chart_config":{"data":{"datasets":[{"data":[323,857,55],"label":"表單數量"}],"labels":["精簡 (1-2 關)","標準 (3-4 關)","複雜 (7+ 關)"]},"options":{"plugins":{"legend":{"display":false}},"scales":{"x":{"grid":{"display":false}}}},"type":"bar"},"chart_id":"approvalHealthChart","description":"看每張表單實際有幾個簽核關卡：1–3 關算精簡、4–5 關算標準、7 關以上算複雜，分三桶把表單數量加總，讓大家一眼判斷流程是否太多或太少。","section_id":"s3_controls","title":"簽核流程健康度 (依實際表單分析)","type":"chart"},{"charts":[{"chart_config":{"data":{"datasets":[{"backgroundColor":["#6B5CA0","#425563"],"data":[0,47]}],"labels":["已覆蓋","未覆蓋"]},"options":{"plugins":{"title":{"display":true,"font":{"size":24},"text":"0%"}}},"type":"doughnut"},"chart_id":"policyCoverageChart","description":"先列出本期真的用到的費用種類，再和「費用政策設定」裡列出的種類比對，顯示其政策實際執行狀況。","title":"費用政策覆蓋率"},{"chart_config":{"data":{"datasets":[{"backgroundColor":["#D9B45A","#425563"],"data":[47,0]}],"labels":["已設定","未設定"]},"options":{"plugins":{"title":{"display":true,"font":{"size":24},"text":"100%"}}},"type":"doughnut"},"chart_id":"customFieldCoverageChart","description":"同樣抓本期用到的費用種類，對照自訂欄位（位置=費用項目）有設定的種類；有欄位=已設定，沒有=未設定，顯示設定率。","title":"自訂欄位覆蓋率"}],"section_id":"s3_controls","type":"dual_chart_block"},{"section_id":"s3_controls","stats":[{"description":"833/967 張表單有完成付款","label":"已付款標記","value":"86.2%"},{"description":"824/967 張表單標記已入帳","label":"已入帳註記","value":"85.2%"},{"description":"824/967 張表單有傳票編號","label":"傳票編號","value":"85.2%"}],"title":"財務註記覆蓋率 (付款/入帳/傳票)","type":"stat_block"}],"title":"3. 內部控制健康度儀表板"},"s3_efficiency":{"components":[{"chart_config":{"data":{"datasets":[{"backgroundColor":"rgba(144, 124, 216, 0.12)","borderColor":"#6B5CA0","data":[148.15,165,226.46,150,84.62,108.74,154.4,137.15,183.55,83.74,110.77,92.11],"fill":true,"label":"平均處理時間 (工作小時)","tension":0.3}],"labels":["2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01"]},"options":{"plugins":{"legend":{"display":false}}},"type":"line"},"chart_id":"processingTimeChart","description":"簽核時長是衡量內部流程效率的關鍵指標。本圖表追蹤每月從表單送出到最終核准的平均歷時。","insight_block":[{"change_type":"positive","text":"近三個月的平均簽核時長平均為 70.7 小時，過去 2025-02 至 2025-10 的平均為 111.8 小時，與過去平均顯著下降了 36.7%。"}],"section_id":"s3_efficiency","title":"平均簽核時長趨勢 (工作小時)","type":"chart"},{"section_id":"s3_efficiency","stats":[{"label":"每張表單平均費用項目數","value":"3.09 項"},{"label":"平均簽核關卡數","value":"4.12 關"},{"description":"反映排除數量與複雜度後，單一簽核動作的基礎效率","label":"平均每項每關歷時(小時)","percentile":76.47058823529412,"percentile_label":"勝過同級客戶百分比","value":"14.05"}],"type":"stat_block"},{"description":"此表格列出送單量最高的五個部門及其平均簽核時長，有助於識別特定部門的流程瓶頸。","section_id":"s3_efficiency","table_data":{"headers":["費用歸屬部門","表單數","送單佔比","平均簽核時間(小時)"],"rows":[["部門 A",128,"18.9%",44.08],["部門 B",73,"10.8%",52.19],["部門 C",58,"8.6%",39.33],["部門 D",56,"8.3%",90.12],["部門 E",44,"6.5%",46.9]]},"table_id":"departmentEfficiencyTable","title":"主要部門簽核效率觀察","type":"table"}],"title":"4. 簽核流程效率分析"},"s4_compliance":{"components":[{"section_id":"s4_compliance","stats":[{"label":"總費用項目數","value":"1,937"},{"description":"將其他附件視為有效（關鍵指標）","label":"單據完備率","peer_value":"89.1%","value":"68.0%"},{"description":"不含其他附件","label":"有效憑證比例","peer_value":"69.2%","value":"24.2%"}],"title":"憑證覆蓋率","type":"stat_block"},{"section_id":"s4_compliance","stats":[{"description":"報告期間內有上傳憑證的費用項目總數。","label":"年度報銷憑證數量","value":"1,318"},{"description":"必填統編的憑證中未填買方統編的筆數。","label":"沒統編的實際張數","value":"5"}],"title":"憑證補充指標","type":"extra_stats"},{"section_id":"s4_compliance","stats":[{"description":"需填統編的憑證中，買方統編與公司統編 94,016,661 一致比例。","label":"公司統編填寫比例","peer_value":"90.9%","value":"97.1%"},{"description":"偵測到 3 筆重複憑證","label":"重複憑證提報比例","peer_value":"1.6%","value":"0.1%"}],"title":"合規提醒","type":"stat_block"},{"chart_config":{"data":{"datasets":[{"backgroundColor":"#6B5CA0","borderColor":"#6B5CA0","data":[34.6,34.8,28,17.5,28.6,28.2,27.4,16.9,31.8,22.1,20.3,23.6],"fill":false,"label":"有效憑證比例"},{"backgroundColor":"#425563","borderColor":"#425563","data":[76.9,92.4,58.5,66.7,71.4,73.4,83.3,65.4,80.7,72.4,53.8,68],"fill":false,"label":"單據完備率"},{"backgroundColor":"#DAD3FA","borderColor":"#DAD3FA","data":[100,94.7,91.3,100,100,96.8,100,100,96.2,88.2,100,96.9],"fill":false,"label":"統編一致率"},{"backgroundColor":"#f06c3a","borderColor":"#f06c3a","data":[0,0,1.7,0,0,0,0,0,0,0,0,0],"fill":false,"label":"重複憑證率"}],"labels":["2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01"]},"options":{"plugins":{"legend":{"position":"bottom"}},"scales":{"y":{"beginAtZero":true,"max":100}}},"type":"line"},"chart_id":"voucherTrendChart","description":"追蹤單據完備率、憑證有效率、統編一致率與重複憑證比例的月度變化，快速辨識品質波動。","section_id":"s4_compliance","title":"憑證與合規指標月度趨勢","type":"chart"},{"chart_config":{"data":{"datasets":[{"backgroundColor":"#425563","data":[1478,837,441,108,35,31,19,27],"label":"憑證筆數"}],"labels":["其他附件","未提供","電子發票","計程車票證","三聯式統一發票","三聯式收銀機統一發票","免用統一發票收據","其他"]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}}},"type":"bar"},"chart_id":"receiptPieChart","description":"此圖表展示了最常見的憑證類型，幫助您了解主要的費用發生場景，共上傳2,203筆憑證資料。","peer_compare":[{"company":"32.0%","label":"未提供憑證比例","peer":"10.9%"}],"section_id":"s4_compliance","title":"憑證種類分佈","type":"chart"},{"chart_config":{"data":{"datasets":[{"backgroundColor":"#f06c3a","data":[8.3,3.6,6.1,4.7,4,2.4,4.4,5.9,5.7,0.9,5,0.8],"label":"駁回率"},{"backgroundColor":"#E8C872","data":[0,15.3,20,9.4,8.9,9.8,10,10.8,9.1,6.9,7.9,5.9],"label":"抽單率"},{"backgroundColor":"#425563","data":[0,0,4.3,0,5.9,0,0,0,4.5,0.9,0,0.8],"label":"超時卡關率"}],"labels":["2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01"]},"options":{"scales":{"y":{"ticks":{"format":"percentage"}}}},"type":"bar"},"chart_id":"issueRateChart","description":"以當月送單作為分母，駁回率/抽單率採截至當月底曾發生該狀態之表單占比；超時卡關率以月底最新狀態計算（平均門檻為27.4天，取自該公司平均簽核時長）。","insight_block":[{"change_type":"positive","text":"近三個月的超時卡關率平均為 0.6 %，過去 2025-02 至 2025-10 的平均為 1.6 %，與過去平均顯著下降了 65.3%。"}],"peer_compare":[{"company":"0.0%","label":"超時卡關率","peer":"1.2%"}],"section_id":"s4_compliance","title":"表單異常狀態分析（超時卡關率趨勢）","type":"chart"},{"chart_config":{"data":{"datasets":[{"backgroundColor":["#EDE8FE","#BFB4EE","#7A6AAE","#4C3D81"],"data":[4,0,0,0],"label":"待簽核件數"}],"labels":["0-7天","8-14天","15-30天",">41天"]},"options":{"indexAxis":"y","plugins":{"legend":{"display":false}},"scales":{"x":{"beginAtZero":true,"ticks":{"precision":0}}}},"type":"bar"},"chart_id":"pendingAgeSnapshotChart","description":"2026-01 月底仍待簽核的件數分佈（0-7 / 8-14 / 15-30 / >41 天）。","section_id":"s4_compliance","title":"上月待簽核分布","type":"chart"}],"title":"5. 憑證品質與合規性分析"},"s5_card_usage":{"components":[{"section_id":"s5_card_usage","stats":[{"label":"總交易筆數","value":"570"},{"label":"總交易金額","value":"TWD 2,004,225"},{"label":"總持卡人數","value":"38"}],"type":"stat_block"},{"chart_config":{"data":{"datasets":[{"backgroundColor":["#DAD3FA","#E8C872","#E8C872","#C8C1D8"],"data":[370,11,11,377]}],"labels":["已核准","未送出","待簽核","未申請"]},"type":"doughnut"},"chart_id":"txnStatusChart","description":"此圖表分析所有企業卡交易的後續報銷狀態，高『已核准』比例代表費用能快速合規地完成報銷流程；『未申請』則可能包含個人消費或延遲報銷的項目。","peer_compare":[{"company":"76.9%","label":"交易成功率","peer":"91.1%"},{"company":"49.1%","label":"交易未報銷率率","peer":"23.6%"}],"section_id":"s5_card_usage","title":"交易報銷狀態分佈","type":"chart"},{"chart_config":{"data":{"datasets":[{"borderColor":"#6B5CA0","data":[0,0,33457,112442,262957,257812,331846,309868,374606,371597,364022,255826],"label":"交易金額 (TWD)","type":"line","yAxisID":"y1"},{"backgroundColor":"#425563","data":[0,0,9,12,36,74,84,74,89,100,144,128],"label":"交易筆數","yAxisID":"y"}],"labels":["2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01"]},"options":{"scales":{"y":{"beginAtZero":true,"title":{"display":true,"text":"筆數"}},"y1":{"beginAtZero":true,"grid":{"drawOnChartArea":false},"position":"right","title":{"display":true,"text":"金額 (TWD)"},"type":"linear"}}},"type":"bar"},"chart_id":"txnMonthlyChart","description":"透過交易量與金額的月度趨勢，評估企業卡的使用活躍度與主要消費週期。","insight_block":[{"change_type":"positive","text":"近三個月的企業卡月交易金額平均為 244,801.0 元，過去 2025-04 至 2025-10 的平均為 178,094.2 元，與過去平均顯著增長了 37.5%。"}],"section_id":"s5_card_usage","title":"每月企業卡交易趨勢","type":"chart"},{"section_id":"s5_card_usage","stats":[{"description":"共處理 741 筆交易，未成功/被拒 23.1%","label":"阻擋非合規交易","value":"171 筆"}],"title":"合規性提醒","type":"stat_block"}],"title":"6. 數位企業卡交易分析"},"s6_summary":{"components":[{"section_id":"s6_summary","summary_data":[{"observation":"本期共處理 914 張表單。","suggestion":"建議持續透過部門預算功能監控支出，確保費用與營運目標一致。","title":"整體支出概況","value":"TWD 62,422,974"},{"observation":"從送出申請到最終核准的平均歷時。","suggestion":"流程效率良好，請保持。","title":"簽核流程效率","value":"98.1 小時"},{"observation":"符合稅法定義之有效憑證（不含其他附件）比例。","suggestion":"有效憑證比例有提升空間，建議加強員工宣導使用手機 App 拍照上傳。","title":"憑證合規比例","value":"24.2%"}],"type":"summary_list"}],"title":"7. 總結與行動建議"}};
+
+    function renderSingleChart(chartComponent) {
+        if (!chartComponent || !chartComponent.chart_id) return;
+        const canvas = document.getElementById(chartComponent.chart_id);
+        if (!canvas) return;
+
+        const chartConfig = chartComponent.chart_config;
+        const chartOptions = chartConfig.options || {};
+        
+        if (chartOptions.scales && chartOptions.scales.y && chartOptions.scales.y.ticks && chartOptions.scales.y.ticks.format === 'percentage') {
+            chartOptions.scales.y.ticks.callback = function(value) { return value + '%'; };
+        }
+
+        const isStacked = (chartOptions.scales?.x?.stacked || chartOptions.scales?.y?.stacked);
+        const isPie = (chartConfig.type === 'doughnut' || chartConfig.type === 'pie');
+        const isHorizontal = (chartConfig.type === 'bar' && chartOptions.indexAxis === 'y');
+        const hideDataLabels = (chartConfig.type === 'bar' || isPie);
+
+        const smartDataLabels = {
+            display: function(context) {
+                const value = context.dataset.data[context.dataIndex];
+                if (value <= 0 || value === null || value === undefined) return false;
+                if (chartConfig.type === 'bar') {
+                    const meta = context.chart.getDatasetMeta(context.datasetIndex);
+                    const element = meta.data[context.dataIndex];
+                    let size = isHorizontal ? element.width : element.height;
+                    if (Math.abs(size) < 16) return false;
+                }
+                return true; 
+            },
+            backgroundColor: isStacked ? 'rgba(255, 255, 255, 0.85)' : 'transparent',
+            borderRadius: 3,
+            color: '#425563',
+            font: { weight: 'bold', size: 10 },
+            anchor: isStacked ? 'center' : (isPie ? 'center' : 'end'), 
+            align: isStacked ? 'center' : (isPie ? 'center' : 'top'),
+            offset: isStacked ? 0 : 2,                 
+            textStrokeColor: '#ffffff',
+            textStrokeWidth: isStacked ? 0 : 3,
+            formatter: function(value, context) {
+                return Math.round(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            },
+            clip: false,
+            clamp: true
+        };
+
+        if (isPie) {
+             smartDataLabels.backgroundColor = 'rgba(255, 255, 255, 0.92)';
+             smartDataLabels.borderRadius = 6;
+             smartDataLabels.color = '#425563';
+             smartDataLabels.font = { weight: 'bold', size: 11, family: "'Noto Sans TC', sans-serif" };
+        }
+
+        // 修改：使用 Chart.js 原生圓角設定與去除雜訊
+        // 專案配色色票（暖紫 + 金黃 + 岩灰 + 淡紫）
+        const paletteFill = ['#6B5CA0', '#D9B45A', '#425563', '#BFB4EE', '#E8C872', '#7A6AAE', '#DAD3FA', '#EDE8FE'];
+        if (chartConfig.type === 'bar') {
+             chartConfig.data.datasets.forEach((ds, i) => {
+                 ds.borderRadius = 4; // 圓角 Bar
+                 ds.borderSkipped = false;
+                 // 若 dataset 無顏色，自動補充專案色票
+                 if (!ds.backgroundColor) {
+                     ds.backgroundColor = paletteFill[i % paletteFill.length];
+                 }
+             });
+        }
+        
+        // 修改：簡化 Grid Lines
+        if (chartOptions.scales) {
+             if (chartOptions.scales.x) {
+                 chartOptions.scales.x.grid = { display: false, drawBorder: false };
+             }
+             if (chartOptions.scales.y) {
+                 chartOptions.scales.y.grid = { borderDash: [4, 4], color: 'rgba(238, 236, 230, 0.9)', drawBorder: false };
+                 chartOptions.scales.y.ticks = { ...chartOptions.scales.y.ticks, color: '#6E818C', font: { family: "'Noto Sans TC', sans-serif", size: 11 } };
+             }
+             if (chartOptions.scales.x) {
+                 chartOptions.scales.x.ticks = { ...chartOptions.scales.x?.ticks, color: '#6E818C', font: { family: "'Noto Sans TC', sans-serif", size: 11 } };
+             }
+             if (chartOptions.scales.y1) {
+                 chartOptions.scales.y1.grid = { display: false, drawBorder: false };
+             }
+        }
+
+        const finalPlugins = {
+            legend: { 
+                position: 'bottom',
+                labels: { usePointStyle: true, padding: 20, font: { family: "'Noto Sans TC', sans-serif" } }
+            },
+            autocolors: false,
+            datalabels: hideDataLabels ? { display: false } : smartDataLabels,
+            tooltip: {
+                backgroundColor: 'rgba(66, 85, 99, 0.92)',
+                titleColor: '#FFFFFF',
+                bodyColor: '#EDE8FE',
+                borderColor: 'rgba(107, 92, 160, 0.4)',
+                borderWidth: 1,
+                padding: 12,
+                cornerRadius: 10,
+                titleFont: { size: 13, weight: 'bold', family: "'Noto Sans TC', sans-serif" },
+                bodyFont: { size: 12, family: "'Noto Sans TC', sans-serif" },
+                displayColors: true,
+                boxPadding: 4
+            }
+        };
+
+        if (chartConfig.type === 'doughnut' && chartOptions.plugins && chartOptions.plugins.title) {
+            finalPlugins.title = chartOptions.plugins.title;
+        }
+
+        new Chart(canvas, {
+            type: chartConfig.type,
+            data: chartConfig.data,
+            options: {
+                ...chartOptions,
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: { 
+                        top: isStacked ? 10 : 25,
+                        right: isHorizontal ? 35 : 0 
+                    } 
+                },
+                plugins: finalPlugins
+            }
+        });
+    }
+
+    for (const sectionId in reportData) {
+      const section = reportData[sectionId];
+      if (section.components) {
+        section.components.forEach(component => {
+          if (component.type === 'chart') {
+            renderSingleChart(component);
+          }
+          if (component.type === 'dual_chart_block') {
+            component.charts.forEach(chart => {
+              renderSingleChart(chart);
+            });
+          }
+        });
+      }
+    }
+  });
+</script>
+
+
+</body></html>

@@ -55,6 +55,224 @@ html, body {
 }
 html { scroll-behavior: smooth; }
 
+/* Resume-only shell */
+.resume-shell {
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+  background:
+    radial-gradient(1200px 420px at 5% -5%, rgba(12, 88, 180, 0.1), transparent 65%),
+    radial-gradient(1000px 340px at 90% 0%, rgba(217, 180, 90, 0.14), transparent 70%),
+    linear-gradient(180deg, #f7f9fc 0%, #f3f6fa 100%);
+}
+
+.resume-noise {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(rgba(67, 86, 119, 0.14) 0.7px, transparent 0.7px),
+    radial-gradient(rgba(67, 86, 119, 0.08) 0.7px, transparent 0.7px);
+  background-position: 0 0, 14px 14px;
+  background-size: 28px 28px;
+  opacity: 0.22;
+}
+
+.resume-aurora {
+  position: fixed;
+  inset: -15% -5% auto;
+  height: 420px;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 12% 38%, rgba(63, 123, 210, 0.24), transparent 35%),
+    radial-gradient(circle at 82% 22%, rgba(242, 197, 88, 0.26), transparent 40%),
+    radial-gradient(circle at 56% 56%, rgba(107, 92, 160, 0.18), transparent 42%);
+  filter: blur(34px);
+  animation: resumeAuroraShift 14s ease-in-out infinite alternate;
+}
+
+.resume-masthead {
+  position: relative;
+  z-index: 30;
+  overflow: hidden;
+  border-radius: 1.4rem;
+  border: 1px solid rgba(79, 101, 138, 0.2);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(244, 248, 255, 0.84)),
+    linear-gradient(90deg, rgba(63, 123, 210, 0.08), rgba(242, 197, 88, 0.06));
+  box-shadow: 0 24px 56px rgba(26, 44, 74, 0.14);
+  backdrop-filter: blur(6px);
+}
+
+.resume-masthead-fixed {
+  position: fixed;
+  top: 0.65rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1100px, calc(100vw - 1rem));
+}
+
+.resume-content {
+  padding-top: 8.75rem;
+}
+
+.resume-masthead::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.45) 35%, transparent 70%);
+  transform: translateX(-65%);
+  animation: resumeSweep 6.4s ease-in-out infinite;
+}
+
+.resume-masthead-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 1.25rem;
+  padding: 1.5rem;
+}
+
+.resume-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #395282;
+}
+
+.resume-title {
+  font-size: clamp(1.4rem, 3vw, 2.25rem);
+  line-height: 1.15;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #1c2d4f;
+}
+
+.resume-purpose {
+  max-width: 68ch;
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: #3f4e6d;
+}
+
+.resume-contact-wrap {
+  border: 1px solid rgba(74, 96, 130, 0.16);
+  border-radius: 1rem;
+  padding: 0.95rem;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 14px 32px rgba(19, 33, 58, 0.11);
+  align-self: start;
+}
+
+.resume-contact-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #415279;
+}
+
+.resume-contact-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(74, 96, 130, 0.2);
+  background: rgba(248, 251, 255, 0.9);
+  color: #2b426f;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.resume-contact-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(63, 123, 210, 0.45);
+  box-shadow: 0 8px 18px rgba(29, 71, 136, 0.18);
+}
+
+.resume-home-link {
+  margin-top: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.46rem 0.78rem;
+  border-radius: 0.66rem;
+  border: 1px solid rgba(37, 62, 105, 0.18);
+  color: #1f3d73;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 242, 255, 0.86));
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.resume-home-link:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(220, 235, 255, 0.9));
+}
+
+@keyframes resumeAuroraShift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(0, 18px, 0) scale(1.04);
+  }
+}
+
+@keyframes resumeSweep {
+  0% {
+    transform: translateX(-68%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.5;
+  }
+  45% {
+    transform: translateX(40%);
+    opacity: 0.6;
+  }
+  60% {
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(95%);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 880px) {
+  .resume-masthead-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .resume-content {
+    padding-top: 14rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resume-aurora,
+  .resume-masthead::before {
+    animation: none;
+  }
+}
+
 /* 區塊統一間距與標題 */
 .section { @apply py-14 md:py-20; }
 .section-title {

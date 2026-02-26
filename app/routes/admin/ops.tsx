@@ -1,13 +1,16 @@
 import { Form, useActionData, useLoaderData, useNavigation } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { useEffect, useState } from "react";
 
 import { AdminNav } from "../../components/AdminNav";
 import { requireAdmin } from "../../features/admin/admin-auth.server";
+import { isLocalHost } from "../../features/admin/local-host";
 
 const TOOLBELT_BASE_URL = "http://127.0.0.1:43210";
 
 type LoaderData = {
   isLocal: boolean;
+  detectedHostname: string;
 };
 
 type GitCommitPushResult = {
@@ -27,28 +30,44 @@ type ActionData = {
   result?: GitCommitPushResult;
 };
 
+function getRequestHostname(request: Request): string {
+  // 優先用 Host header（在 wrangler dev / proxy 環境比 request.url 更可靠）
+  const hostHeader = request.headers.get("host") ?? "";
+  if (hostHeader) return hostHeader.split(":")[0].trim();
+  try {
+    return new URL(request.url).hostname;
+  } catch {
+    return "";
+  }
+}
+
 function isLocalRequest(request: Request) {
-  const hostname = new URL(request.url).hostname;
-  return (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "::1" ||
-    hostname.startsWith("192.168.") ||
-    hostname.startsWith("10.")
-  );
+  // 同時檢查 Host header 和 request.url
+  const fromHost = getRequestHostname(request);
+  if (isLocalHost(fromHost)) return true;
+  try {
+    return isLocalHost(new URL(request.url).hostname);
+  } catch {
+    return false;
+  }
 }
 
 export async function loader({ request, context }: LoaderFunctionArgs) {
   requireAdmin(request, context);
-  return { isLocal: isLocalRequest(request) } satisfies LoaderData;
+  const detectedHostname = getRequestHostname(request);
+  return {
+    isLocal: isLocalHost(detectedHostname),
+    detectedHostname,
+  } satisfies LoaderData;
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
   requireAdmin(request, context);
   if (!isLocalRequest(request)) {
+    const hostname = getRequestHostname(request);
     return {
       ok: false,
-      error: "Git Ops 僅限本機 localhost/127.0.0.1 使用。",
+      error: `Git Ops 僅限本機環境（localhost 或私有網段 IP）使用。（偵測到：${hostname}）`,
     } satisfies ActionData;
   }
 
@@ -108,10 +127,17 @@ export async function action({ request, context }: ActionFunctionArgs) {
 }
 
 export default function AdminOpsPage() {
-  const { isLocal } = useLoaderData<LoaderData>();
+  const { isLocal: serverIsLocal, detectedHostname } = useLoaderData<LoaderData>();
   const actionData = useActionData<ActionData>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
+
+  // 與 AdminNav 相同：用 client-side window.location.hostname 判斷
+  // 避免 wrangler dev 環境下 server-side request.url 偵測不準的問題
+  const [isLocal, setIsLocal] = useState(serverIsLocal);
+  useEffect(() => {
+    setIsLocal(isLocalHost(window.location.hostname));
+  }, []);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 space-y-8">
@@ -126,7 +152,8 @@ export default function AdminOpsPage() {
 
       {!isLocal && (
         <section className="card bg-amber-50 border border-amber-200 text-amber-800">
-          此頁僅限本機 localhost/127.0.0.1 可執行。
+          此頁僅限本機環境（localhost 或私有網段 IP）可執行。
+          <span className="ml-2 text-xs opacity-70">（server 偵測：{detectedHostname}）</span>
         </section>
       )}
 

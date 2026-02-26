@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { isLocalHost } from "../features/admin/local-host";
 
 /**
  * 隱藏的管理入口：
@@ -34,15 +35,11 @@ export default function DevMenu() {
   useEffect(() => {
     const stored = localStorage.getItem("showAdminMenu") === "1";
     const host = window.location.hostname;
-    const isLocalHost =
-      host === "localhost" ||
-      host === "127.0.0.1" ||
-      host.startsWith("192.168.") ||
-      host.startsWith("10.");
+    const isLocal = isLocalHost(host);
 
-    setIsLocal(import.meta.env.DEV || isLocalHost);
+    setIsLocal(import.meta.env.DEV || isLocal);
 
-    if (import.meta.env.DEV || isLocalHost || stored) {
+    if (import.meta.env.DEV || isLocal || stored) {
       setShow(true);
     }
     return () => {
