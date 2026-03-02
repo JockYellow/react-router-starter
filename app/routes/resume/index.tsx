@@ -17,6 +17,11 @@ import {
   ChevronUp,
   Users,
   AlertCircle,
+  Timer,
+  Wrench,
+  Flag,
+  Music,
+  Film,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -47,6 +52,7 @@ type WorkExp = {
   };
   tags: string[];
   blogSlug: string;
+  links?: { label: string; url: string; external?: boolean }[];
 };
 
 // ---------------------------------------------------------------------------
@@ -74,7 +80,7 @@ const WORK_EXPERIENCE: WorkExp[] = [
     role: "客戶成功 / 客戶成功營運",
     company: "COMMEET（SaaS 費用管理平台）",
     location: "台北, 台灣",
-    period: "2024/07 – 2026/01",
+    period: "2024/07 – 2026/03",
     displayYear: "2024",
     distance: "754 萬導入 / 坡度 12%",
     vibe: "一段陡坡長征——從產品理解、客戶導入、流程建置到數據分析，全程獨力完成。",
@@ -92,7 +98,7 @@ const WORK_EXPERIENCE: WorkExp[] = [
     ],
     stories: {
       rhythm:
-        "日常以 Zendesk 工單處理與客戶進度追蹤為主，每週固定 2~3 場客戶會議（導入對焦或成效追蹤），每月產出客製化成效報告並執行一場客戶成功講座。跨部門協作主要對象為 PM 和工程團隊，透過 TASK 提報機制推動產品改善。",
+        "日常以客戶導入與客戶進度追蹤為主，每週固定 2~3 場客戶會議（導入對焦或成效追蹤），每月產出季度客製化成效報告，執行一場客戶成功講座。跨部門協作主要對象為 PM 和工程團隊，透過 TASK 提報機制推動產品改善。",
       cases: [
         {
           situation: "【待補充】某客戶導入初期的抵觸情況或特殊挑戰",
@@ -113,6 +119,10 @@ const WORK_EXPERIENCE: WorkExp[] = [
     },
     tags: ["Customer Success", "SQL", "Python", "Zendesk", "Chart.js", "Onboarding", "Data Analysis"],
     blogSlug: "",
+    links: [
+      { label: "客製化成效報告", url: "/resume/custom-impact-report" },
+      { label: "CS 工作定位流程圖", url: "/resume/cs-flow" },
+    ],
   },
   {
     id: "exp-2",
@@ -230,14 +240,20 @@ const NAV_NODES = (() => {
 const SKILL_GROUPS = [
   {
     label: "數據 & 分析",
+    metaphor: "碼表與功率輸出",
+    icon: Timer,
     skills: ["SQL（查詢 / 資料檢核）", "Python（資料處理 / Jinja2 模板）", "Tableau", "Power BI", "Excel 進階"],
   },
   {
     label: "客戶成功 & 營運",
+    metaphor: "傳動與變速系統",
+    icon: Settings,
     skills: ["Zendesk（工單 / 幫助中心）", "Onboarding 流程設計", "客戶健康度指標", "Mailjet（郵件行銷）", "活動通"],
   },
   {
     label: "前端 & 報表呈現",
+    metaphor: "車架與幾何",
+    icon: Wrench,
     skills: ["HTML / CSS", "Chart.js", "Tailwind CSS", "Git / GitHub", "AI-Assisted Development"],
   },
 ];
@@ -269,6 +285,30 @@ const PROJECTS = [
     tags: ["React 19", "TypeScript", "Tailwind CSS", "Cloudflare Workers", "D1"],
     externalUrl: PERSONAL.github,
     blogSlug: "",
+  },
+];
+
+const INTERESTS: { id: string; title: string; subtitle?: string; description: string }[] = [
+  {
+    id: "bike",
+    title: "真實的單車生活",
+    description: "最愛的路線是陽明山風櫃嘴，每次爬坡都是和自己的對話。坡度雖陡，但抵達時的視野讓一切值得。",
+  },
+  {
+    id: "music",
+    title: "現場音樂演出",
+    subtitle: "樂團、爵士",
+    description: "喜歡在現場感受音樂的即興與共鳴，每場演出都是獨一無二的當下。",
+  },
+  {
+    id: "anime",
+    title: "日本動畫及電影",
+    description: "從宮崎駿到新海誠，動畫是世界觀的另一扇窗。",
+  },
+  {
+    id: "motto",
+    title: "座右銘",
+    description: "找到節奏，持續踩踏，終會抵達。",
   },
 ];
 
@@ -539,6 +579,33 @@ export default function ResumePage() {
                           </ul>
                         )}
 
+                        {/* 作品連結 */}
+                        {exp.links && exp.links.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-4 pt-3 border-t border-neutral-100">
+                            {exp.links.map((lk) => {
+                              const cls =
+                                "inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-brand-200 bg-brand-50 text-brand-600 hover:bg-brand-100 hover:border-brand-400 transition-all";
+                              return lk.external ? (
+                                <a
+                                  key={lk.url}
+                                  href={lk.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className={cls}
+                                >
+                                  <ExternalLink size={11} className="shrink-0 opacity-70" />
+                                  {lk.label}
+                                </a>
+                              ) : (
+                                <Link key={lk.url} to={lk.url} className={cls}>
+                                  <ExternalLink size={11} className="shrink-0 opacity-70" />
+                                  {lk.label}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+
                         {/* 標籤列 + 展開按鈕 */}
                         <div className="flex flex-wrap items-center gap-2">
                           {exp.tags.map((tag) => (
@@ -587,37 +654,55 @@ export default function ResumePage() {
 
           {/* ── 技術能力 ── */}
           <section>
-            <h2 className="section-title mb-8">技術能力</h2>
+            <h2 className="section-title mb-8">
+              裝備與功率輸出{" "}
+              <span className="text-sm font-normal text-neutral-400 ml-2">GEAR & WATTS</span>
+            </h2>
             <div className="module-panel module-skills">
               <div className="grid md:grid-cols-3 gap-6">
-                {SKILL_GROUPS.map((group) => (
-                  <div key={group.label} className="skill-card">
-                    <p className="eyebrow mb-3">{group.label}</p>
-                    <ul className="space-y-1.5">
-                      {group.skills.map((skill) => (
-                        <li
-                          key={skill}
-                          className="text-sm text-neutral-700 flex items-center gap-2"
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" />
-                          {skill}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+                {SKILL_GROUPS.map((group) => {
+                  const GroupIcon = group.icon;
+                  return (
+                    <div key={group.label} className="skill-card">
+                      <div className="flex items-center gap-2.5 mb-1">
+                        <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center shrink-0">
+                          <GroupIcon size={16} className="text-brand-500" />
+                        </div>
+                        <p className="eyebrow leading-none">{group.label}</p>
+                      </div>
+                      <p className="text-[11px] text-neutral-400 mb-4 pl-10">{group.metaphor}</p>
+                      <ul className="space-y-1.5">
+                        {group.skills.map((skill) => (
+                          <li
+                            key={skill}
+                            className="text-sm text-neutral-700 flex items-center gap-2"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" />
+                            {skill}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </section>
 
           {/* ── 作品集 ── */}
           <section>
-            <h2 className="section-title mb-8">作品集</h2>
+            <h2 className="section-title mb-8">
+              攻克路線{" "}
+              <span className="text-sm font-normal text-neutral-400 ml-2">ACHIEVED ROUTES</span>
+            </h2>
             <div className="module-panel module-projects">
               <div className="grid md:grid-cols-3 gap-5">
                 {PROJECTS.map((proj) => (
-                  <div key={proj.id} className="card hover-raise flex flex-col">
-                    <h3 className="font-bold text-base mb-2">{proj.name}</h3>
+                  <div key={proj.id} className="card hover-raise flex flex-col relative">
+                    <div className="absolute top-4 right-4 text-neutral-200">
+                      <Flag size={16} />
+                    </div>
+                    <h3 className="font-bold text-base mb-2 pr-6">{proj.name}</h3>
                     <p className="text-sm text-neutral-500 leading-relaxed mb-4 flex-1">
                       {proj.description}
                     </p>
@@ -637,7 +722,7 @@ export default function ResumePage() {
                           className="btn-ghost text-xs flex items-center gap-1"
                         >
                           <ExternalLink size={12} />
-                          查看
+                          查看路線細節
                         </a>
                       )}
                       {proj.blogSlug && (
@@ -662,6 +747,89 @@ export default function ResumePage() {
               </div>
             </div>
           </section>
+          {/* ── 補給站 ── */}
+          <section>
+            <h2 className="section-title mb-8">
+              補給站{" "}
+              <span className="text-sm font-normal text-neutral-400 ml-2">REST STOP</span>
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-4">
+
+              {/* Block A: 單車生活 (2×2) */}
+              <div className="md:col-span-2 md:row-span-2 relative rounded-2xl overflow-hidden min-h-72 bg-gradient-to-br from-neutral-800 to-neutral-900 group">
+                {/* 海拔剪影 SVG */}
+                <svg
+                  viewBox="0 0 400 200"
+                  preserveAspectRatio="none"
+                  className="absolute inset-0 w-full h-full opacity-10"
+                  aria-hidden
+                >
+                  <path
+                    d="M0 180 L60 180 L100 130 L140 70 L180 90 L220 110 L270 40 L320 100 L360 120 L400 80 L400 200 L0 200 Z"
+                    fill="white"
+                  />
+                </svg>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                <div className="absolute bottom-0 left-0 p-6 text-white">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Bike size={15} className="text-brand-300" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-brand-300">
+                      真實的單車生活
+                    </span>
+                  </div>
+                  <p className="text-2xl font-black leading-tight mb-2">陽明山風櫃嘴</p>
+                  <p className="text-sm text-white/70 leading-relaxed">
+                    {INTERESTS[0].description}
+                  </p>
+                </div>
+              </div>
+
+              {/* Block B: 現場音樂 (2×1) */}
+              <div className="md:col-span-2 md:row-span-1 card p-6 flex items-center gap-5">
+                <div className="w-12 h-12 rounded-xl bg-neutral-100 flex items-center justify-center shrink-0">
+                  <Music size={22} className="text-accent-500" />
+                </div>
+                <div>
+                  <p className="eyebrow mb-0.5">{INTERESTS[1].title}</p>
+                  {INTERESTS[1].subtitle && (
+                    <h3 className="font-bold text-base">{INTERESTS[1].subtitle}</h3>
+                  )}
+                  <p className="text-sm text-neutral-500 mt-1 leading-relaxed">
+                    {INTERESTS[1].description}
+                  </p>
+                </div>
+              </div>
+
+              {/* Block C: 日本動畫及電影 (1×1) */}
+              <div className="md:col-span-1 md:row-span-1 card p-5 flex flex-col justify-between">
+                <div className="w-10 h-10 rounded-xl bg-neutral-100 flex items-center justify-center mb-3">
+                  <Film size={18} className="text-brand-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">
+                    動畫 & 電影
+                  </p>
+                  <h3 className="font-bold text-sm">{INTERESTS[2].title}</h3>
+                  <p className="text-xs text-neutral-400 mt-1.5 leading-relaxed">
+                    {INTERESTS[2].description}
+                  </p>
+                </div>
+              </div>
+
+              {/* Block D: 座右銘 (1×1) */}
+              <div className="md:col-span-1 md:row-span-1 card p-5 flex flex-col justify-center bg-neutral-900 text-white rounded-2xl border-0">
+                <p className="text-3xl font-black leading-none mb-3 text-brand-300">"</p>
+                <p className="text-sm font-medium leading-relaxed">
+                  {INTERESTS[3].description}
+                </p>
+                <p className="text-[10px] text-neutral-500 mt-3 uppercase tracking-widest font-bold">
+                  {INTERESTS[3].title}
+                </p>
+              </div>
+
+            </div>
+          </section>
+
         </div>
       </main>
 

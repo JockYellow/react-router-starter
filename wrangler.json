@@ -17,7 +17,9 @@
     "SPOTIFY_CLIENT_ID": "faa338557e2643799b05abc270cdf875",
     "SPOTIFY_CLIENT_SECRET": "e55bdbfd5c77496aad01981ac259ef65",
     "SPOTIFY_REDIRECT_URI": "https://react-router-starter.jockhuang77.workers.dev/call_spotify",
-    "SPOTIFY_ALLOWED_ORIGINS": "https://react-router-starter.jockhuang77.workers.dev"
+    "SPOTIFY_ALLOWED_ORIGINS": "https://react-router-starter.jockhuang77.workers.dev",
+    "TELEGRAM_BOT_TOKEN": "8116504818:AAEbEY4QGMQAdYpEEjLS9_7kRRasqoHHm4U",
+    "TELEGRAM_CHAT_ID": "1125254161"
   },
   "d1_databases": [
     {

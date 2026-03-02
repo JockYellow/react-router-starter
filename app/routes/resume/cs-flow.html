@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CS 工作定位與價值｜關係流程圖 (含續約最終產出)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      /* 淡黃紫為主調 */
+      --bg-page: #fffdf7;
+      --bg-board: #ffffff;
+      --text-main: #2d2039;
+      --text-muted: #6b5a7a;
+
+      /* 紫色系 (CS - 核心) */
+      --purple-primary: #9333ea;
+      --purple-light: #f3e8ff;
+      --purple-border: #d8b4fe;
+      --pink-accent: #d946ef; /* 用於最終產出的強調色 */
+
+      /* 黃色系 (公司端) */
+      --yellow-primary: #d97706;
+      --yellow-light: #fffbeb;
+      --yellow-border: #fcd34d;
+
+      /* 青綠色系 (客戶端) */
+      --teal-primary: #0d9488;
+      --teal-light: #e0f2f1;
+      --teal-border: #99f6e4;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: 'Noto Sans TC', ui-sans-serif, system-ui, -apple-system, sans-serif;
+      background: var(--bg-page);
+      background-image: radial-gradient(circle at 10% 20%, rgba(147, 51, 234, 0.03) 0%, rgba(217, 119, 6, 0.03) 90%);
+      color:var(--text-main);
+      padding: 20px;
+    }
+    header{max-width:1200px;margin:0 auto 30px; text-align: center;}
+    h1{margin:0;font-size:24px;letter-spacing:.5px; color: var(--purple-primary); font-weight: 700;}
+    header p{margin:12px auto 0;color:var(--text-muted);font-size:14px;line-height:1.6;max-width:700px;}
+
+    .wrap{max-width:1200px;margin:0 auto;}
+
+    .board{
+      position:relative;
+      border-radius:24px;
+      background: var(--bg-board);
+      box-shadow: 0 10px 40px rgba(147, 51, 234, 0.08);
+      padding:30px;
+      overflow: hidden;
+    }
+
+    .lanes{
+      display:grid;
+      grid-template-columns: 1fr 1.15fr 1fr;
+      gap:24px;
+      position:relative;
+      z-index:2;
+    }
+
+    .lane{
+      border-radius:20px;
+      padding: 20px 16px;
+      min-height:750px;
+      display: flex;
+      flex-direction: column;
+    }
+    .lane[aria-label="公司端"] { background: linear-gradient(to bottom, var(--yellow-light), transparent); border: 1px solid rgba(251, 191, 36, 0.2); }
+    .lane[aria-label="你（CS）"] { background: linear-gradient(to bottom, var(--purple-light), transparent); border: 1px solid rgba(168, 85, 247, 0.2); }
+    .lane[aria-label="客戶端"] { background: linear-gradient(to bottom, var(--teal-light), transparent); border: 1px solid rgba(45, 212, 191, 0.2); }
+
+
+    .laneTitle{
+      text-align: center;
+      margin-bottom:24px;
+    }
+    .laneTitle h2{margin:0 0 8px;font-size:18px; color: var(--text-main); font-weight: 700;}
+    .badge{
+      font-size:12px; font-weight: 500;
+      padding:4px 12px; border-radius:999px;
+      display: inline-block;
+    }
+    .lane[aria-label="公司端"] .badge { color: var(--yellow-primary); background: #fff7ed; border: 1px solid var(--yellow-border); }
+    .lane[aria-label="你（CS）"] .badge { color: var(--purple-primary); background: #faf5ff; border: 1px solid var(--purple-border); }
+    .lane[aria-label="客戶端"] .badge { color: var(--teal-primary); background: #f0fdfa; border: 1px solid var(--teal-border); }
+
+    .node{
+      border-radius:16px;
+      background: #ffffff;
+      padding:16px;
+      margin: 18px 0;
+      position: relative;
+      border: 2px solid transparent;
+      box-shadow: 3px 3px 0px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .node:hover { transform: translateY(-2px); box-shadow: 4px 4px 0px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.08); }
+
+    .node.co{ border-color: var(--yellow-border); }
+    .node.co .kicker { color: var(--yellow-primary); }
+    .node.co .title { color: var(--yellow-primary); }
+
+    .node.cs{
+      border-color: var(--purple-primary);
+      box-shadow: 4px 4px 0px rgba(147, 51, 234, 0.15), 0 8px 20px rgba(147, 51, 234, 0.1);
+    }
+    .node.cs .kicker { color: var(--purple-primary); }
+    .node.cs .title { color: var(--purple-primary); }
+
+    .node.cu{ border-color: var(--teal-border); }
+    .node.cu .kicker { color: var(--teal-primary); }
+    .node.cu .title { color: var(--teal-primary); }
+
+    /* 新增：最終產出 Milestone 樣式 */
+    .node.milestone {
+      border: 2px solid var(--pink-accent);
+      background: linear-gradient(145deg, #ffffff, #fdf4ff);
+      box-shadow: 0 8px 24px rgba(217, 70, 239, 0.18);
+    }
+    .node.milestone .kicker { color: var(--pink-accent); font-weight: 700; }
+    .node.milestone .title { color: var(--text-main); font-size: 16px; }
+    .node.milestone .kv { background: #ffffff; border-color: rgba(217, 70, 239, 0.2); }
+    .node.milestone .kv b { color: var(--pink-accent); background: #fdf4ff; }
+
+
+    .kicker{
+      font-size:11px; font-weight: 600; text-transform: uppercase; letter-spacing:.5px;
+      margin-bottom:6px; display: block;
+    }
+    .title{
+      font-size:15px; font-weight:700; line-height:1.4; margin:0 0 12px;
+      color: var(--text-main);
+    }
+
+    .row{
+      display:flex;
+      flex-direction: column;
+      gap:8px;
+      font-size:12px;
+      line-height:1.5;
+      color: var(--text-muted);
+    }
+
+    .kv{
+      border-radius: 8px;
+      background: #fcfcfc;
+      border: 1px solid rgba(0,0,0,0.08);
+      padding: 8px 10px;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .kv b{
+      font-weight:600; color: var(--text-main);
+      flex-shrink: 0;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(0,0,0,0.05);
+    }
+    .co .kv b { color: var(--yellow-primary); background: #fff7ed; }
+    .cs .kv b { color: var(--purple-primary); background: #faf5ff; }
+    .cu .kv b { color: var(--teal-primary); background: #f0fdfa; }
+
+    .impact{
+      border-radius:12px;
+      border:1px solid var(--purple-border);
+      background: #faf5ff;
+      padding:10px 12px;
+      margin-top:12px;
+      color: var(--purple-primary);
+      font-size:12px; font-weight: 500; line-height:1.5;
+      text-align: center;
+    }
+    .impact b { display: block; margin-bottom: 4px; font-weight: 700;}
+
+    svg.arrows{
+      position:absolute; inset:0; width:100%; height:100%; z-index:1; pointer-events:none;
+      opacity: 0.85;
+    }
+
+    .footer{
+      margin-top:30px;
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:20px;
+    }
+    .panel{
+      border: 2px solid #eee;
+      background: #fff;
+      border-radius:16px;
+      padding:20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+    .panel h3{margin:0 0 10px;font-size:14px; color: var(--text-main); font-weight: 700;}
+    .panel p{margin:0;color:var(--text-muted);font-size:13px;line-height:1.7;}
+
+    @media (max-width: 980px){
+      .lanes{grid-template-columns:1fr; gap: 10px;}
+      .lane{min-height:auto; padding: 16px 12px;}
+      svg.arrows{display:none} 
+      .footer{grid-template-columns:1fr}
+      .board { padding: 16px; }
+      .node { margin: 12px 0; }
+      .node::after {
+        content: '↓';
+        display: block; text-align: center; color: #ddd; font-weight: bold; margin-top: 10px;
+      }
+      .lane section:last-child .node::after { display: none; }
+      #cs_renew::after { display: none; } /* 最後一個節點不顯示箭頭 */
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>我的 CS 工作流</h1>
+  </header>
+
+  <div class="wrap">
+    <div class="board" id="board">
+      <svg class="arrows" id="arrows" aria-hidden="true">
+        <defs>
+          <marker id="arrowCo" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,1 L13,7 L0,13 L3.5,7 z" fill="var(--yellow-primary)"></path>
+          </marker>
+          <marker id="arrowCs" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,1 L13,7 L0,13 L3.5,7 z" fill="var(--purple-primary)"></path>
+          </marker>
+          <marker id="arrowCu" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,1 L13,7 L0,13 L3.5,7 z" fill="var(--teal-primary)"></path>
+          </marker>
+          <marker id="arrowMilestone" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,1 L13,7 L0,13 L3.5,7 z" fill="var(--pink-accent)"></path>
+          </marker>
+        </defs>
+      </svg>
+
+      <div class="lanes">
+        <section class="lane" aria-label="公司端">
+          <div class="laneTitle">
+            <h2>公司端</h2>
+            <span class="badge">產品 / 研發 / 銷售</span>
+          </div>
+
+          <div class="node co" id="co_in">
+            <span class="kicker">訊號輸入</span>
+            <h3 class="title">產品更新、規格變動、銷售承諾</h3>
+            <div class="row">
+              <div class="kv"><b>Input</b>更新內容、限制、風險、時程、需求條件</div>
+              <div class="kv"><b>Need</b>將「產品發展與服務標的」轉化為導入框架</div>
+            </div>
+          </div>
+
+          <div class="node co" id="co_align">
+            <span class="kicker">協作回路</span>
+            <h3 class="title">與 PM/RD 對齊邏輯邊界</h3>
+            <div class="row">
+              <div class="kv"><b>Output</b>再現步驟、影響範圍、需求輪廓</div>
+              <div class="kv"><b>Value</b>確保迭代被正確理解，避免錯誤承諾</div>
+            </div>
+          </div>
+
+          <div class="node co" id="co_assets">
+            <span class="kicker">可複用交付物</span>
+            <h3 class="title">知識庫 / 訓練素材 /客戶案例/標準回覆</h3>
+            <div class="row">
+              <div class="kv"><b>Output</b>幫助中心、FAQ、客戶案例</div>
+              <div class="kv"><b>Value</b>將個案經驗轉化為共同支援能力</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lane" aria-label="你（CS）">
+          <div class="laneTitle">
+            <h2 style="color: var(--purple-primary); font-size: 20px;">你 (CS)</h2>
+            <span class="badge">核心角色：產品實踐者</span>
+          </div>
+
+          <div class="node cs" id="cs_role">
+            <span class="kicker">核心定位</span>
+            <h3 class="title" style="font-size: 17px;">公司與客戶間的「產品編譯器」</h3>
+            <div class="row">
+              <div class="kv"><b>Mission</b>把產品規則拼接成客戶的系統期待</div>
+              <div class="kv"><b>Focus</b>降低系統摩擦、提高流程可預測性</div>
+            </div>
+            <div class="impact">
+              <b>價值創造</b>
+              把「不斷變化的問題情境」架設「處理方案標準」。
+            </div>
+          </div>
+
+          <div class="node cs" id="cs_design">
+            <span class="kicker">方案設計</span>
+            <h3 class="title">落地藍圖 (權限 × 流程 × 資料流)</h3>
+            <div class="row">
+              <div class="kv"><b>Input</b>客戶組織、簽核制度、財務規範、痛點</div>
+              <div class="kv"><b>Output</b>導入藍圖、設定建議、例外處置方案</div>
+            </div>
+          </div>
+
+          <div class="node cs" id="cs_deliver">
+            <span class="kicker">交付與推進</span>
+            <h3 class="title">教育、對齊、排除 (會用/用對/用久)</h3>
+            <div class="row">
+              <div class="kv"><b>Output</b>客戶專屬說明、最佳實務、排除路徑</div>
+              <div class="kv"><b>Value</b>縮短從導入到穩定運作的距離</div>
+            </div>
+          </div>
+
+          <div class="node cs" id="cs_loop">
+            <span class="kicker">量測與回路</span>
+            <h3 class="title">流程數據化 (可量測/可優化)</h3>
+            <div class="row">
+              <div class="kv"><b>Observe</b>簽核時間、退件率、使用率、錯誤率</div>
+              <div class="kv"><b>Output</b>成效報告、健康度洞察、產品回饋</div>
+            </div>
+          </div>
+
+          <div class="node milestone" id="cs_renew" style="margin-top: 24px;">
+            <span class="kicker">最終商業產出</span>
+            <h3 class="title">客戶續約與擴增 (Renew & Expand)</h3>
+            <div class="row">
+              <div class="kv"><b>Base</b>依據「客戶成效」與「健康度」展開對話</div>
+              <div class="kv"><b>Result</b>確保經常性收入(ARR)、增購、成功案例</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lane" aria-label="客戶端">
+          <div class="laneTitle">
+            <h2>客戶端</h2>
+            <span class="badge">管理者 / 財務 / 員工</span>
+          </div>
+
+          <div class="node cu" id="cu_context">
+            <span class="kicker">情境與限制</span>
+            <h3 class="title">組織架構、權限分工、財務規範</h3>
+            <div class="row">
+              <div class="kv"><b>Input</b>部門/專案、預算歸屬、簽核制度</div>
+              <div class="kv"><b>Get</b>真實作業的「不可妥協點」與彈性</div>
+            </div>
+          </div>
+
+          <div class="node cu" id="cu_run">
+            <span class="kicker">日常運作</span>
+            <h3 class="title">填單、簽核、付款 (穩定運行)</h3>
+            <div class="row">
+              <div class="kv"><b>Output</b>可追溯資料、可控流程</div>
+              <div class="kv"><b>Result</b>少補件、少卡關、少反覆溝通</div>
+            </div>
+          </div>
+
+          <div class="node cu" id="cu_value">
+            <span class="kicker">成效獲取</span>
+            <h3 class="title">效率↑ 風險↓ 洞察↑</h3>
+            <div class="row">
+              <div class="kv" style="justify-content: space-between;"><span><b>效率</b>簽核快、退件少</span> </div>
+              <div class="kv" style="justify-content: space-between;"><span><b>風險</b>預算/憑證錯誤降</span> </div>
+              <div class="kv" style="justify-content: space-between;"><span><b>洞察</b>費用結構清晰</span> </div>
+            </div>
+          </div>
+
+          <div class="node cu" id="cu_feedback">
+            <span class="kicker">回饋回流</span>
+            <h3 class="title">例外情境、新需求、教育缺口</h3>
+            <div class="row">
+              <div class="kv"><b>Content</b>痛點、再現案例、新需求</div>
+              <div class="kv"><b>Value</b>形成下一輪優化的根源</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+    
+
+  <script>
+    const board = document.getElementById('board');
+    const svg = document.getElementById('arrows');
+
+    const links = [
+      { from: 'co_in', to: 'cs_role', type: 'co' },
+      { from: 'co_align', to: 'cs_role', type: 'co' },
+      { from: 'co_assets', to: 'cs_deliver', type: 'co' },
+
+      { from: 'cs_role', to: 'cs_design', type: 'csMain' },
+      { from: 'cs_design', to: 'cs_deliver', type: 'csMain' },
+      { from: 'cs_deliver', to: 'cs_loop', type: 'csMain' },
+
+      { from: 'cs_design', to: 'cu_context', type: 'cs' },
+      { from: 'cs_deliver', to: 'cu_run', type: 'cs' },
+      
+      { from: 'cu_run', to: 'cu_value', type: 'cu' },
+
+      { from: 'cu_feedback', to: 'cs_loop', type: 'cu' },
+      { from: 'cs_loop', to: 'co_align', type: 'cs' },
+      { from: 'cs_loop', to: 'co_assets', type: 'cs' },
+      
+      { from: 'cu_context', to: 'cu_run', type: 'cu' },
+      { from: 'cu_value', to: 'cu_feedback', type: 'cu' },
+
+      // 新增：指向「續約」的連線
+      { from: 'cs_loop', to: 'cs_renew', type: 'milestone' }, // 數據指標 導向 續約
+      { from: 'cu_value', to: 'cs_renew', type: 'milestone' } // 客戶成效 導向 續約
+    ];
+
+    function rect(el){
+      if(!el) return null;
+      const r = el.getBoundingClientRect();
+      const br = board.getBoundingClientRect();
+      return {
+        left: r.left - br.left, top: r.top - br.top,
+        right: r.right - br.left, bottom: r.bottom - br.top,
+        width: r.width, height: r.height,
+        cx: (r.left - br.left) + r.width/2, cy: (r.top - br.top) + r.height/2,
+      };
+    }
+
+    function pickPorts(a, b){
+      const dx = b.cx - a.cx;
+      const dy = b.cy - a.cy;
+      
+      // 垂直排列 (同一個泳道)
+      if (Math.abs(dx) < 80){
+         return {
+          start: { x: a.cx, y: dy > 0 ? a.bottom : a.top },
+          end:   { x: b.cx, y: dy > 0 ? b.top    : b.bottom },
+          orient: 'v'
+        };
+      }
+
+      // 水平跨區 (不同泳道)
+      return {
+        start: { x: dx > 0 ? a.right : a.left, y: a.cy },
+        end:   { x: dx > 0 ? b.left  : b.right, y: b.cy },
+        orient: 'h'
+      };
+    }
+
+    function manhattanPath(p1, p2, orient){
+      if (orient === 'v') {
+        const midY = (p1.y + p2.y) / 2;
+        return `M ${p1.x} ${p1.y} L ${p1.x} ${midY} L ${p2.x} ${midY} L ${p2.x} ${p2.y}`;
+      } else {
+        const midX = (p1.x + p2.x) / 2;
+        return `M ${p1.x} ${p1.y} L ${midX} ${p1.y} L ${midX} ${p2.y} L ${p2.x} ${p2.y}`;
+      }
+    }
+
+    function strokeStyle(type){
+      const rootStyle = getComputedStyle(document.documentElement);
+      const yellow = rootStyle.getPropertyValue('--yellow-primary').trim();
+      const purple = rootStyle.getPropertyValue('--purple-primary').trim();
+      const teal = rootStyle.getPropertyValue('--teal-primary').trim();
+      const pink = rootStyle.getPropertyValue('--pink-accent').trim();
+
+      switch(type){
+        case 'milestone': return { stroke: pink, width: 3, marker: 'url(#arrowMilestone)' }; // 指向最終產出的線稍微加粗並換色
+        case 'csMain': return { stroke: purple, width: 2.5, marker: 'url(#arrowCs)' };
+        case 'cs': return { stroke: purple, width: 2, marker: 'url(#arrowCs)' };
+        case 'cu': return { stroke: teal, width: 2, marker: 'url(#arrowCu)' };
+        default:   return { stroke: yellow, width: 2, marker: 'url(#arrowCo)' };
+      }
+    }
+
+    function draw(){
+      const defs = svg.querySelector('defs');
+      svg.innerHTML = '';
+      svg.appendChild(defs);
+      const br = board.getBoundingClientRect();
+      svg.setAttribute('viewBox', `0 0 ${br.width} ${br.height}`);
+
+      for (const l of links){
+        const fromEl = document.getElementById(l.from);
+        const toEl = document.getElementById(l.to);
+        const a = rect(fromEl);
+        const b = rect(toEl);
+        if (!a || !b) continue;
+
+        const ports = pickPorts(a, b);
+        const d = manhattanPath(ports.start, ports.end, ports.orient);
+        const style = strokeStyle(l.type);
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', d);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', style.stroke);
+        path.setAttribute('stroke-width', style.width);
+        path.setAttribute('stroke-linejoin', 'round');
+        path.setAttribute('marker-end', style.marker);
+        
+        svg.appendChild(path);
+      }
+    }
+
+    const ro = new ResizeObserver(draw);
+    ro.observe(board);
+    window.addEventListener('resize', draw);
+    window.addEventListener('load', () => { setTimeout(draw, 100); });
+    draw();
+  </script>
+</body>
+</html>
