@@ -69,15 +69,19 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const db = requireBlogDb(context);
   await insertMessage(db, { name, company, contact, message, wantContact, ip });
 
-  // Fire-and-forget — don't block redirect on notification failure
-  notifyGuestbook(context, {
-    name,
-    company,
-    contact,
-    message,
-    wantContact: wantContact === 1,
-    ip,
-  }).catch(() => {});
+  // await so Cloudflare Worker doesn't kill the fetch before it completes
+  try {
+    await notifyGuestbook(context, {
+      name,
+      company,
+      contact,
+      message,
+      wantContact: wantContact === 1,
+      ip,
+    });
+  } catch (_) {
+    // notification failure must not block the redirect
+  }
 
   return redirect("/resume/guestbook?ok=1");
 }
@@ -322,35 +326,35 @@ export default function GuestbookPage() {
         {/* Form */}
         <SubmitForm submitted={submitted} />
 
-        {/* Message list */}
-        <div>
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="section-title">
-              訪客留言{" "}
-              <span className="text-sm font-normal text-neutral-400 ml-1.5">
-                {messages.length} 則
-              </span>
-            </h2>
-            {admin && (
+        {/* Message list — admin only */}
+        {admin && (
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="section-title">
+                訪客留言{" "}
+                <span className="text-sm font-normal text-neutral-400 ml-1.5">
+                  {messages.length} 則
+                </span>
+              </h2>
               <span className="chip text-[10px] bg-accent-50 text-accent-500 border-accent-200">
                 管理員模式
               </span>
+            </div>
+
+            {messages.length === 0 ? (
+              <div className="card text-center py-12 text-neutral-400">
+                <MessageSquare size={28} className="mx-auto mb-3 opacity-30" />
+                <p className="text-sm">尚無留言</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {messages.map((msg) => (
+                  <MessageCard key={msg.id} msg={msg} admin={admin} />
+                ))}
+              </div>
             )}
           </div>
-
-          {messages.length === 0 ? (
-            <div className="card text-center py-12 text-neutral-400">
-              <MessageSquare size={28} className="mx-auto mb-3 opacity-30" />
-              <p className="text-sm">還沒有留言，成為第一個留言的人吧！</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {messages.map((msg) => (
-                <MessageCard key={msg.id} msg={msg} admin={admin} />
-              ))}
-            </div>
-          )}
-        </div>
+        )}
       </main>
     </div>
   );

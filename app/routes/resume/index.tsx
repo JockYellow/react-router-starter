@@ -13,8 +13,6 @@ import {
   Mail,
   Github,
   ArrowRight,
-  ChevronDown,
-  ChevronUp,
   Users,
   AlertCircle,
   Timer,
@@ -312,53 +310,6 @@ const INTERESTS: { id: string; title: string; subtitle?: string; description: st
   },
 ];
 
-// ---------------------------------------------------------------------------
-// 子元件：展開的故事層
-// ---------------------------------------------------------------------------
-
-function StoriesPanel({ stories }: { stories: WorkExp["stories"] }) {
-  return (
-    <div className="bg-neutral-50 rounded-xl p-5 mt-4 border border-neutral-100 space-y-5">
-      {/* 工作節奏 */}
-      <div>
-        <p className="text-xs font-bold uppercase tracking-wider text-brand-500 mb-2">
-          日常工作節奏
-        </p>
-        <p className="text-sm text-neutral-500 leading-relaxed">{stories.rhythm}</p>
-      </div>
-
-      {/* 關鍵行動故事 */}
-      {stories.cases.length > 0 && (
-        <div className="space-y-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-brand-500">
-            關鍵行動故事
-          </p>
-          {stories.cases.map((c, i) => (
-            <div key={i} className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-neutral-300 mb-1">
-                ── {i + 1 < 10 ? `0${i + 1}` : i + 1} ──
-              </p>
-              <div className="space-y-1.5 text-sm leading-relaxed">
-                <p>
-                  <span className="text-xs font-semibold text-neutral-400 mr-2">情境</span>
-                  <span className="text-neutral-600">{c.situation}</span>
-                </p>
-                <p>
-                  <span className="text-xs font-semibold text-accent-500 mr-2">行動</span>
-                  <span className="text-neutral-600">{c.action}</span>
-                </p>
-                <p>
-                  <span className="text-xs font-semibold text-emerald-600 mr-2">結果</span>
-                  <span className="text-neutral-600">{c.result}</span>
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // 主元件
@@ -367,7 +318,6 @@ function StoriesPanel({ stories }: { stories: WorkExp["stories"] }) {
 export default function ResumePage() {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [activeSection, setActiveSection] = useState(0);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -492,7 +442,6 @@ export default function ResumePage() {
             <h2 className="section-title mb-10">工作經歷</h2>
             <div className="space-y-16">
               {WORK_EXPERIENCE.map((exp, index) => {
-                const isExpanded = expandedId === exp.id;
                 return (
                   <section
                     key={exp.id}
@@ -622,27 +571,6 @@ export default function ResumePage() {
                               查看相關文章
                             </Link>
                           )}
-                          <button
-                            onClick={() =>
-                              setExpandedId(isExpanded ? null : exp.id)
-                            }
-                            className="ml-auto btn-ghost text-xs flex items-center gap-1 text-accent-500 border-accent-200"
-                          >
-                            {isExpanded ? (
-                              <>收起 <ChevronUp size={12} /></>
-                            ) : (
-                              <>了解我怎麼工作 <ChevronDown size={12} /></>
-                            )}
-                          </button>
-                        </div>
-
-                        {/* 第二層：Stories 展開 */}
-                        <div
-                          className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                            isExpanded ? "max-h-[1200px] opacity-100" : "max-h-0 opacity-0"
-                          }`}
-                        >
-                          <StoriesPanel stories={exp.stories} />
                         </div>
                       </div>
                     </div>
