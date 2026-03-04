@@ -289,26 +289,31 @@ const PROJECTS = [
 const INTERESTS: { id: string; title: string; subtitle?: string; description: string }[] = [
   {
     id: "bike",
-    title: "真實的單車生活",
-    description: "最愛的路線是陽明山風櫃嘴，每次爬坡都是和自己的對話。坡度雖陡，但抵達時的視野讓一切值得。",
+    title: "恬靜的單車生活",
+    description: "喜歡在杳無人煙的環境下暢行、享受寧靜。世界僅需定佇當下的風景與呼吸。",
   },
   {
     id: "music",
     title: "現場音樂演出",
-    subtitle: "樂團、爵士",
-    description: "喜歡在現場感受音樂的即興與共鳴，每場演出都是獨一無二的當下。",
+    subtitle: "音樂、演出",
+    description: "在現場感受音樂的衝擊與共鳴，為每個交織的樂器獻出搖擺的身體。",
   },
   {
     id: "anime",
     title: "日本動畫及電影",
-    description: "從宮崎駿到新海誠，動畫是世界觀的另一扇窗。",
+    description: "描刻的細膩情感與充滿想像力的畫面，讓我著迷於每一個故事的綻放。",
   },
   {
     id: "motto",
     title: "座右銘",
-    description: "找到節奏，持續踩踏，終會抵達。",
+    description: "我想要怎樣的生活、生活想要怎樣的我。",
   },
 ];
+
+const REST_STOP_PHOTOS = {
+  bike: "/images/resume/bike-life-yunlin.jpg",
+  music: "/images/resume/live-music-songyan.jpg",
+};
 
 
 // ---------------------------------------------------------------------------
@@ -685,11 +690,17 @@ export default function ResumePage() {
 
               {/* Block A: 單車生活 (2×2) */}
               <div className="md:col-span-2 md:row-span-2 relative rounded-2xl overflow-hidden min-h-72 bg-gradient-to-br from-neutral-800 to-neutral-900 group">
+                <img
+                  src={REST_STOP_PHOTOS.bike}
+                  alt="單車生活：雲林騎乘路線風景"
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  loading="lazy"
+                />
                 {/* 海拔剪影 SVG */}
                 <svg
                   viewBox="0 0 400 200"
                   preserveAspectRatio="none"
-                  className="absolute inset-0 w-full h-full opacity-10"
+                  className="absolute inset-0 w-full h-full opacity-[0.15]"
                   aria-hidden
                 >
                   <path
@@ -697,34 +708,50 @@ export default function ResumePage() {
                     fill="white"
                   />
                 </svg>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                <div className="absolute inset-0 bg-black/10" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/30 to-transparent" />
                 <div className="absolute bottom-0 left-0 p-6 text-white">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Bike size={15} className="text-brand-300" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-brand-300">
-                      真實的單車生活
-                    </span>
+                  <div className="max-w-[92%] rounded-xl bg-black/20 backdrop-blur-[1px] border border-white/25 px-4 py-3 shadow-[0_8px_20px_rgba(0,0,0,0.25)]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Bike size={15} className="text-brand-300" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-brand-200">
+                        真實的單車生活
+                      </span>
+                    </div>
+                    <p className="text-2xl font-black leading-tight mb-2 text-white [text-shadow:0_2px_10px_rgba(0,0,0,0.55)]">
+                      遍歷皆有趣 這裡是雲林
+                    </p>
+                    <p className="text-sm text-white/90 leading-relaxed [text-shadow:0_1px_8px_rgba(0,0,0,0.45)]">
+                      {INTERESTS[0].description}
+                    </p>
                   </div>
-                  <p className="text-2xl font-black leading-tight mb-2">陽明山風櫃嘴</p>
-                  <p className="text-sm text-white/70 leading-relaxed">
-                    {INTERESTS[0].description}
-                  </p>
                 </div>
               </div>
 
               {/* Block B: 現場音樂 (2×1) */}
-              <div className="md:col-span-2 md:row-span-1 card p-6 flex items-center gap-5">
-                <div className="w-12 h-12 rounded-xl bg-neutral-100 flex items-center justify-center shrink-0">
-                  <Music size={22} className="text-accent-500" />
-                </div>
-                <div>
-                  <p className="eyebrow mb-0.5">{INTERESTS[1].title}</p>
-                  {INTERESTS[1].subtitle && (
-                    <h3 className="font-bold text-base">{INTERESTS[1].subtitle}</h3>
-                  )}
-                  <p className="text-sm text-neutral-500 mt-1 leading-relaxed">
-                    {INTERESTS[1].description}
-                  </p>
+              <div className="md:col-span-2 md:row-span-1 relative rounded-2xl overflow-hidden min-h-48 group">
+                <img
+                  src={REST_STOP_PHOTOS.music}
+                  alt="現場音樂：松菸演出現場"
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-black/8" />
+                <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/30 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                <div className="absolute inset-0 p-6 flex items-end">
+                  <div className="rounded-xl bg-black/20 backdrop-blur-[1px] border border-white/25 px-4 py-3 shadow-[0_8px_20px_rgba(0,0,0,0.25)] max-w-xl">
+                    <div className="w-12 h-12 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0 mb-3 border border-white/25">
+                      <Music size={22} className="text-brand-300" />
+                    </div>
+                    <p className="eyebrow mb-0.5 text-white">{INTERESTS[1].title}</p>
+                    {INTERESTS[1].subtitle && (
+                      <h3 className="font-bold text-base text-white [text-shadow:0_2px_10px_rgba(0,0,0,0.55)]">{INTERESTS[1].subtitle}</h3>
+                    )}
+                    <p className="text-sm text-white/90 mt-1 leading-relaxed [text-shadow:0_1px_8px_rgba(0,0,0,0.45)]">
+                      {INTERESTS[1].description}
+                    </p>
+                  </div>
                 </div>
               </div>
 
