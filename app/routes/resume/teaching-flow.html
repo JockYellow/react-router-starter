@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>創思文教教學部｜工作階段流程</title>
+  <style>
+    :root {
+      --tf-bg: var(--color-warm-50, #f6f5f2);
+      --tf-bg-glow: var(--color-brand-50, #fff7e1);
+      --tf-text: #1f2d47;
+      --tf-muted: #54617d;
+
+      --tf-border: var(--color-accent-200, #dad3fa);
+      --tf-panel: var(--color-warm-25, #fdfcfb);
+      --tf-panel-head: var(--color-warm-50, #f6f5f2);
+
+      --tf-sales: var(--color-brand-100, #fbefc8);
+      --tf-teaching: var(--color-module-skills, #ddebff);
+      --tf-support: var(--color-module-about, #f6dfff);
+      --tf-logistics: var(--color-module-contact, #ffe0d9);
+
+      --tf-line-main: var(--color-accent-500, #6b5ca0);
+      --tf-line-info: #3f7bd2;
+      --tf-check: var(--color-brand-500, #b9923e);
+      --tf-title: #425b93;
+      --tf-shadow: 0 18px 38px rgba(36, 52, 85, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      color: var(--tf-text);
+      background:
+        radial-gradient(circle at 7% 8%, rgba(217, 180, 90, 0.2) 0%, transparent 28%),
+        radial-gradient(circle at 92% 20%, rgba(122, 106, 174, 0.16) 0%, transparent 24%),
+        radial-gradient(circle at 84% 88%, rgba(63, 123, 210, 0.12) 0%, transparent 20%),
+        linear-gradient(180deg, var(--tf-bg-glow) 0%, var(--tf-bg) 38%, var(--tf-bg) 100%);
+      padding: 20px;
+    }
+
+    header {
+      max-width: 1520px;
+      margin: 0 auto 18px;
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(38px, 5vw, 74px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: 2px;
+      color: var(--tf-title);
+    }
+
+    header p {
+      margin: 10px auto 0;
+      max-width: 900px;
+      font-size: 15px;
+      color: var(--tf-muted);
+      line-height: 1.65;
+    }
+
+    .chips {
+      margin-top: 12px;
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .chip {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      border: 1px solid #dad3fa;
+      background: linear-gradient(180deg, #f8f5ff, #ffffff);
+      color: #6b5ca0;
+    }
+
+    .shell {
+      max-width: 1520px;
+      margin: 0 auto;
+    }
+
+    .board-wrap {
+      border-radius: 20px;
+      border: 1px solid rgba(79, 101, 138, 0.22);
+      box-shadow: var(--tf-shadow);
+      background:
+        linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(244, 248, 255, 0.76)),
+        linear-gradient(90deg, rgba(63, 123, 210, 0.08), rgba(217, 180, 90, 0.08));
+      backdrop-filter: blur(6px);
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .board {
+      position: relative;
+      width: 1500px;
+      height: 860px;
+      margin: 0 auto;
+    }
+
+    .panel {
+      position: absolute;
+      top: 22px;
+      height: 790px;
+      border: 2px solid var(--tf-border);
+      border-radius: 16px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(252, 251, 247, 0.88)),
+        var(--tf-panel);
+      overflow: hidden;
+      z-index: 1;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    .panel.left {
+      left: 22px;
+      width: 700px;
+    }
+
+    .panel.mid {
+      left: 748px;
+      width: 540px;
+    }
+
+    .panel-head {
+      height: 100px;
+      border-bottom: 2px solid var(--tf-border);
+      background: linear-gradient(180deg, #ffffff, var(--tf-panel-head));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 50px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      color: #2f4473;
+    }
+
+    .exec-lane {
+      position: absolute;
+      top: 22px;
+      left: 1312px;
+      width: 166px;
+      height: 790px;
+      border: 2px dashed rgba(107, 92, 160, 0.45);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(237, 232, 254, 0.6), rgba(255, 247, 225, 0.45));
+      z-index: 1;
+    }
+
+    .exec-lane p {
+      margin: 16px 0 0;
+      text-align: center;
+      font-size: 15px;
+      font-weight: 700;
+      color: #5a4d89;
+      letter-spacing: 0.8px;
+    }
+
+    .lane-label {
+      position: absolute;
+      z-index: 5;
+      font-size: 38px;
+      font-weight: 800;
+      color: #314a7b;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.62);
+    }
+
+    .arrow-note {
+      position: absolute;
+      z-index: 5;
+      font-size: 24px;
+      font-weight: 700;
+      color: #32588e;
+      padding: 4px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(122, 106, 174, 0.22);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 245, 255, 0.82));
+      box-shadow: 0 6px 14px rgba(48, 63, 102, 0.08);
+    }
+
+    .node {
+      position: absolute;
+      z-index: 6;
+      width: 210px;
+      min-height: 112px;
+      padding: 14px 14px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(79, 101, 138, 0.26);
+      box-shadow:
+        0 6px 16px rgba(27, 41, 71, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 5px;
+      backdrop-filter: blur(3px);
+    }
+
+    .node.sm {
+      width: 190px;
+      min-height: 96px;
+    }
+
+    .node.lg {
+      width: 236px;
+      min-height: 138px;
+    }
+
+    .node.sales {
+      background: linear-gradient(160deg, #fff9df, var(--tf-sales));
+    }
+
+    .node.teaching {
+      background: linear-gradient(160deg, #f6f9ff, var(--tf-teaching));
+    }
+
+    .node.support {
+      background: linear-gradient(160deg, #faf8ff, var(--tf-support));
+    }
+
+    .node.logistics {
+      background: linear-gradient(160deg, #fff5ee, var(--tf-logistics));
+    }
+
+    .node.execution {
+      background: linear-gradient(160deg, #ffffff, #ebe6fa);
+      border-color: rgba(107, 92, 160, 0.35);
+    }
+
+    .title {
+      margin: 0;
+      font-size: 34px;
+      font-weight: 800;
+      line-height: 1.12;
+      color: #2d4270;
+      letter-spacing: 0.5px;
+    }
+
+    .sub {
+      margin: 0;
+      font-size: 19px;
+      line-height: 1.4;
+      color: #5b6886;
+      font-weight: 500;
+    }
+
+    .owner {
+      position: absolute;
+      top: -12px;
+      right: 10px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #fff8e7, #f8f5ff);
+      border: 1px solid rgba(185, 146, 62, 0.35);
+      color: #8b6c26;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .check {
+      position: absolute;
+      z-index: 7;
+      font-size: 54px;
+      font-weight: 800;
+      color: var(--tf-check);
+      transform: rotate(-8deg);
+      text-shadow: 0 4px 12px rgba(185, 146, 62, 0.24);
+      pointer-events: none;
+      line-height: 1;
+    }
+
+    svg.arrows {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 4;
+      opacity: 0.95;
+    }
+
+    .notes {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .note {
+      border-radius: 12px;
+      border: 1px solid rgba(79, 101, 138, 0.22);
+      background: linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(246, 245, 242, 0.78));
+      padding: 12px 14px;
+      box-shadow: 0 8px 20px rgba(30, 43, 72, 0.08);
+    }
+
+    .note h3 {
+      margin: 0 0 6px;
+      font-size: 14px;
+      color: #37558a;
+    }
+
+    .note p {
+      margin: 0;
+      font-size: 13px;
+      color: #596884;
+      line-height: 1.55;
+    }
+
+    .mobile-tip {
+      display: none;
+      margin: 8px 4px 0;
+      color: var(--tf-muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 980px) {
+      body {
+        padding: 12px;
+      }
+
+      .panel-head {
+        font-size: 36px;
+      }
+
+      .notes {
+        grid-template-columns: 1fr;
+      }
+
+      .mobile-tip {
+        display: block;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>工作階段流程</h1>
+    <p>
+      以教學部為核心，串接「宣傳期、準備期、課程執行」三段流程。
+      每個節點都標示輸入與目的，讓跨部門溝通、排程協作與現場交付更易追蹤。
+    </p>
+    <div class="chips" aria-hidden="true">
+      <span class="chip">教學部主責</span>
+      <span class="chip">業務協作</span>
+      <span class="chip">教師訓練</span>
+      <span class="chip">物流配套</span>
+    </div>
+  </header>
+
+  <div class="shell">
+    <div class="board-wrap">
+      <div class="board" id="board">
+        <svg class="arrows" id="arrows" aria-hidden="true">
+          <defs>
+            <marker id="arrowMain" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M0,1 L13,7 L0,13 L3.5,7 z" fill="var(--tf-line-main)"></path>
+            </marker>
+            <marker id="arrowInfo" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M0,1 L13,7 L0,13 L3.5,7 z" fill="var(--tf-line-info)"></path>
+            </marker>
+          </defs>
+        </svg>
+
+        <div class="panel left"><div class="panel-head">宣傳期</div></div>
+        <div class="panel mid"><div class="panel-head">準備期</div></div>
+        <div class="exec-lane"><p>課程執行</p></div>
+
+        <div class="lane-label" style="left: 344px; top: 140px;">業務</div>
+        <div class="lane-label" style="left: 80px; top: 378px;">教學部</div>
+        <div class="lane-label" style="left: 330px; top: 608px;">物流</div>
+
+        <div class="arrow-note" style="left: 842px; top: 288px;">時程需求</div>
+        <div class="arrow-note" style="left: 960px; top: 382px;">教育訓練</div>
+        <div class="arrow-note" style="left: 840px; top: 568px;">日程安排</div>
+
+        <div class="node sales" id="biz_dev" style="left: 310px; top: 196px;">
+          <p class="title">聯絡開發</p>
+          <p class="sub">建立合作窗口，確認開課意願</p>
+        </div>
+
+        <div class="node sales" id="biz_promote" style="left: 550px; top: 196px;">
+          <p class="title">宣傳招生</p>
+          <p class="sub">投放與招募，累積開班名單</p>
+        </div>
+
+        <div class="node support sm" id="promo_event" style="left: 530px; top: 336px;">
+          <p class="title">宣傳活動</p>
+          <p class="sub">曝光與說明會</p>
+        </div>
+
+        <div class="node teaching" id="teach_design" style="left: 50px; top: 438px;">
+          <span class="owner">主責</span>
+          <p class="title">課程設計</p>
+          <p class="sub">教案與學習目標定義</p>
+        </div>
+
+        <div class="node teaching" id="package_plan" style="left: 310px; top: 438px;">
+          <span class="owner">主責</span>
+          <p class="title">套裝規劃</p>
+          <p class="sub">組裝課程包與適用情境</p>
+        </div>
+
+        <div class="node teaching" id="content_review" style="left: 560px; top: 438px;">
+          <span class="owner">主責</span>
+          <p class="title">內容審定</p>
+          <p class="sub">品質檢核與版本定稿</p>
+        </div>
+
+        <div class="node sales" id="prep_confirm" style="left: 810px; top: 196px;">
+          <p class="title">開班確認</p>
+          <p class="sub">敲定班次與執行條件</p>
+        </div>
+
+        <div class="node teaching" id="prep_ready" style="left: 850px; top: 438px;">
+          <span class="owner">主責</span>
+          <p class="title">開班預備</p>
+          <p class="sub">課表、教具、講師整備</p>
+        </div>
+
+        <div class="node support lg" id="teacher" style="left: 1070px; top: 292px;">
+          <p class="title">教師</p>
+          <p class="sub">培訓、演練、交付標準</p>
+        </div>
+
+        <div class="node logistics" id="log_eval" style="left: 300px; top: 658px;">
+          <p class="title">建置評估</p>
+          <p class="sub">清點設備與場域條件</p>
+        </div>
+
+        <div class="node logistics" id="procure_make" style="left: 550px; top: 658px;">
+          <p class="title">採購製作</p>
+          <p class="sub">備料、組裝、品質確認</p>
+        </div>
+
+        <div class="node logistics" id="log_ship" style="left: 850px; top: 658px;">
+          <p class="title">物流運輸</p>
+          <p class="sub">配送排程與到貨追蹤</p>
+        </div>
+
+        <div class="node execution" id="class_exec" style="left: 1300px; top: 438px; width: 168px;">
+          <span class="owner">交付</span>
+          <p class="title">課程執行</p>
+          <p class="sub">現場授課與回收回饋</p>
+        </div>
+
+        <span class="check" style="left: 164px; top: 388px;">✓</span>
+        <span class="check" style="left: 430px; top: 390px;">✓</span>
+        <span class="check" style="left: 688px; top: 390px;">✓</span>
+        <span class="check" style="left: 954px; top: 610px;">✓</span>
+        <span class="check" style="left: 1090px; top: 346px;">✓</span>
+        <span class="check" style="left: 1392px; top: 390px;">✓</span>
+      </div>
+    </div>
+
+    <p class="mobile-tip">手機可左右滑動查看完整流程圖。</p>
+
+    <div class="notes">
+      <section class="note">
+        <h3>閱讀方式</h3>
+        <p>黑線代表主流程推進；藍線代表時程、訓練與日程等關鍵協調資訊。流程設計目標是降低交接落差與執行風險。</p>
+      </section>
+      <section class="note">
+        <h3>教學部價值</h3>
+        <p>教學部串連課程內容、師資準備與物流配套，讓招生成果可被穩定交付，最終落地為可複製的課程品質與班級運作品質。</p>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const board = document.getElementById("board");
+    const svg = document.getElementById("arrows");
+
+    const links = [
+      { from: "teach_design", to: "package_plan", tone: "main" },
+      { from: "package_plan", to: "content_review", tone: "main" },
+      { from: "content_review", to: "prep_ready", tone: "main" },
+      { from: "prep_ready", to: "class_exec", tone: "main" },
+
+      { from: "biz_dev", to: "biz_promote", tone: "main" },
+      { from: "biz_promote", to: "prep_confirm", tone: "main" },
+      { from: "biz_promote", to: "promo_event", tone: "main", axis: "v", bias: -10 },
+      { from: "promo_event", to: "package_plan", tone: "main", bias: -12 },
+      { from: "package_plan", to: "biz_dev", tone: "main", axis: "v", bias: -10 },
+
+      { from: "prep_ready", to: "teacher", tone: "main", bias: 20 },
+      { from: "teacher", to: "class_exec", tone: "main", bias: 12 },
+
+      { from: "log_eval", to: "procure_make", tone: "main" },
+      { from: "procure_make", to: "log_ship", tone: "main" },
+      { from: "log_ship", to: "class_exec", tone: "main", bias: 24 },
+
+      { from: "prep_confirm", to: "prep_ready", tone: "info", axis: "v" },
+      { from: "prep_ready", to: "log_ship", tone: "info", axis: "v" },
+      { from: "content_review", to: "log_eval", tone: "info", bias: -14 }
+    ];
+
+    function rect(el) {
+      const r = el.getBoundingClientRect();
+      const br = board.getBoundingClientRect();
+      return {
+        left: r.left - br.left,
+        top: r.top - br.top,
+        right: r.right - br.left,
+        bottom: r.bottom - br.top,
+        cx: r.left - br.left + r.width / 2,
+        cy: r.top - br.top + r.height / 2,
+      };
+    }
+
+    function pickPorts(a, b, axis) {
+      const dx = b.cx - a.cx;
+      const dy = b.cy - a.cy;
+      const vertical = axis ? axis === "v" : Math.abs(dx) < Math.abs(dy);
+
+      if (vertical) {
+        return {
+          start: { x: a.cx, y: dy > 0 ? a.bottom : a.top },
+          end: { x: b.cx, y: dy > 0 ? b.top : b.bottom },
+          axis: "v"
+        };
+      }
+
+      return {
+        start: { x: dx > 0 ? a.right : a.left, y: a.cy },
+        end: { x: dx > 0 ? b.left : b.right, y: b.cy },
+        axis: "h"
+      };
+    }
+
+    function manhattanPath(start, end, axis, bias = 0) {
+      if (axis === "v") {
+        const midY = (start.y + end.y) / 2 + bias;
+        return `M ${start.x} ${start.y} L ${start.x} ${midY} L ${end.x} ${midY} L ${end.x} ${end.y}`;
+      }
+
+      const midX = (start.x + end.x) / 2 + bias;
+      return `M ${start.x} ${start.y} L ${midX} ${start.y} L ${midX} ${end.y} L ${end.x} ${end.y}`;
+    }
+
+    function draw() {
+      const defs = svg.querySelector("defs");
+      svg.innerHTML = "";
+      svg.appendChild(defs);
+
+      const br = board.getBoundingClientRect();
+      svg.setAttribute("viewBox", `0 0 ${br.width} ${br.height}`);
+
+      links.forEach((link) => {
+        const from = document.getElementById(link.from);
+        const to = document.getElementById(link.to);
+        if (!from || !to) return;
+
+        const a = rect(from);
+        const b = rect(to);
+        const ports = pickPorts(a, b, link.axis);
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", manhattanPath(ports.start, ports.end, ports.axis, link.bias || 0));
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke-linejoin", "round");
+        path.setAttribute("stroke-linecap", "round");
+
+        if (link.tone === "info") {
+          path.setAttribute("stroke", "var(--tf-line-info)");
+          path.setAttribute("stroke-width", "3.4");
+          path.setAttribute("marker-end", "url(#arrowInfo)");
+        } else {
+          path.setAttribute("stroke", "var(--tf-line-main)");
+          path.setAttribute("stroke-width", "2.6");
+          path.setAttribute("marker-end", "url(#arrowMain)");
+        }
+
+        svg.appendChild(path);
+      });
+    }
+
+    const ro = new ResizeObserver(draw);
+    ro.observe(board);
+    window.addEventListener("resize", draw);
+    window.addEventListener("load", () => setTimeout(draw, 80));
+    draw();
+  </script>
+</body>
+</html>

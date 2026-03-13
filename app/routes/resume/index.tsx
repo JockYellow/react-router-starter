@@ -217,6 +217,9 @@ const WORK_EXPERIENCE: WorkExp[] = [
       ],
     },
     tags: ["教學設計", "ERP 管理", "流程標準化", "師資培訓", "課程企劃"],
+    links: [
+      { label: "教學部工作流程圖", url: "/resume/teaching-flow" },
+    ],
     blogSlug: "",
   },
 ];
