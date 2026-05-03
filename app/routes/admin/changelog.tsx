@@ -17,14 +17,14 @@ type LoaderData = { changelogs: Changelog[] };
 type ActionData = { error?: string } | null;
 
 export async function loader({ request, context }: LoaderFunctionArgs) {
-  requireAdmin(request, context);
+  await requireAdmin(request, context);
   const db = requireBlogDb(context);
   const changelogs = await getAllChangelogs(db);
   return { changelogs };
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
-  requireAdmin(request, context);
+  await requireAdmin(request, context);
   const db = requireBlogDb(context);
   const formData = await request.formData();
   const intent = (formData.get("intent") ?? "").toString();

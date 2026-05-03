@@ -29,7 +29,7 @@ import { notifyGuestbook } from "~/lib/notify.server";
 export async function loader({ request, context }: LoaderFunctionArgs) {
   const db = requireBlogDb(context);
   const messages = await getAllMessages(db);
-  const admin = isAdmin(request);
+  const admin = await isAdmin(request, context);
   const url = new URL(request.url);
   const submitted = url.searchParams.get("ok") === "1";
   return { messages, admin, submitted };
@@ -44,7 +44,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const intent = formData.get("intent") as string;
 
   if (intent === "delete") {
-    requireAdmin(request, context);
+    await requireAdmin(request, context);
     const id = Number(formData.get("id"));
     if (!Number.isFinite(id)) throw new Response("Bad id", { status: 400 });
     const db = requireBlogDb(context);

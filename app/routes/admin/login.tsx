@@ -2,13 +2,16 @@ import { Form, useActionData } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
 import {
+  assertLoginAllowed,
+  clearLoginFailures,
   createAdminSessionCookie,
   getAdminPassword,
   isAdmin,
+  recordLoginFailure,
 } from "../../features/admin/admin-auth.server";
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  if (isAdmin(request)) {
+export async function loader({ request, context }: LoaderFunctionArgs) {
+  if (await isAdmin(request, context)) {
     const url = new URL("/admin", request.url);
     return new Response(null, {
       status: 302,
@@ -19,24 +22,27 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
+  await assertLoginAllowed(request, context);
   const formData = await request.formData();
   const password = (formData.get("password") ?? "").toString();
   const expected = getAdminPassword(context);
 
   if (!expected) {
-    return { error: "未設定管理密碼 (ADMIN_PASS)" };
+    return { error: "未設定管理密碼 (BLOG_ADMIN_PASS 或 ADMIN_PASS)" };
   }
 
   if (password !== expected) {
+    await recordLoginFailure(request, context);
     return { error: "密碼錯誤" };
   }
+  await clearLoginFailures(request, context);
 
   const url = new URL("/admin", request.url);
   return new Response(null, {
     status: 302,
     headers: {
       Location: url.toString(),
-      "Set-Cookie": createAdminSessionCookie(),
+      "Set-Cookie": await createAdminSessionCookie(request, context),
     },
   });
 }

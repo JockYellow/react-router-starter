@@ -53,7 +53,7 @@ function isLocalRequest(request: Request) {
 }
 
 export async function loader({ request, context }: LoaderFunctionArgs) {
-  requireAdmin(request, context);
+  await requireAdmin(request, context);
   const detectedHostname = getRequestHostname(request);
   return {
     isLocal: isLocalHost(detectedHostname),
@@ -62,7 +62,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
-  requireAdmin(request, context);
+  await requireAdmin(request, context);
   if (!isLocalRequest(request)) {
     const hostname = getRequestHostname(request);
     return {

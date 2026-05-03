@@ -2,7 +2,8 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { writeFileSync } from "node:fs";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { BlogPost } from "../app/lib/blog.types";
+import type { BlogPost } from "../app/features/blog/blog.types";
+import { blocksFromPlainText } from "../app/features/blog/blog-content";
 
 // ===== 路徑設定 =====
 
@@ -63,6 +64,7 @@ function normalizePost(raw: Record<string, any>): BlogPost {
     title,
     summary,
     body,
+    content: Array.isArray(raw.content) ? raw.content : blocksFromPlainText(body),
     tags,
     categoryId: raw.categoryId ?? null,
     subcategoryId: raw.subcategoryId ?? null,
@@ -106,6 +108,7 @@ async function run() {
       toSql(post.title),
       toSql(post.summary ?? ""),
       toSql(post.body),
+      toSql(JSON.stringify(post.content ?? blocksFromPlainText(post.body))),
       toSql(JSON.stringify(post.tags ?? [])),
       toSql(post.categoryId ?? null),
       toSql(post.subcategoryId ?? null),
@@ -116,7 +119,7 @@ async function run() {
     ];
 
     return `INSERT OR IGNORE INTO blog_posts
-(slug, title, summary, body, tags, category_id, subcategory_id, published_at, created_at, updated_at, image_url)
+(slug, title, summary, body, content_json, tags, category_id, subcategory_id, published_at, created_at, updated_at, image_url)
 VALUES (${values.join(", ")});`;
   });
 

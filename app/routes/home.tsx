@@ -18,7 +18,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
   const [allPosts, allChangelogs, isAdminUser] = await Promise.all([
     getAllBlogPosts(db),
     getAllChangelogs(db).catch(() => [] as Changelog[]),
-    Promise.resolve(isAdmin(request)),
+    isAdmin(request, context),
   ]);
   return {
     posts: allPosts.slice(0, 5),

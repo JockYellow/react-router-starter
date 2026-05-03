@@ -7,6 +7,7 @@ import type { BlogPost, BlogCategory } from "../../features/blog/blog.types";
 import { requireBlogDb } from "../../lib/d1.server";
 import { getBlogPostBySlug } from "../../features/blog/blog.d1.server";
 import { deriveAccentColor } from "../../features/blog/blog-accent";
+import { BlogContentRenderer } from "../../features/blog/BlogContentRenderer";
 
 type LoaderData = {
   post: BlogPost;
@@ -24,13 +25,6 @@ function formatDate(date: string) {
   } catch {
     return date;
   }
-}
-
-function paragraphize(body: string) {
-  return body
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean);
 }
 
 function formatCategory(post: BlogPost, categories: BlogCategory[]) {
@@ -72,7 +66,6 @@ export default function BlogPostPage() {
   const { post, categories, accent } = useLoaderData() as LoaderData;
   const categoryLabel = formatCategory(post, categories);
   const accentStyle = useMemo(() => ({ "--post-accent": accent } as CSSProperties), [accent]);
-  const paragraphs = useMemo(() => paragraphize(post.body), [post.body]);
 
   return (
     <div className="min-h-screen pb-12" style={accentStyle}>
@@ -121,15 +114,9 @@ export default function BlogPostPage() {
           </span>
         </div>
 
-        <article className="rounded-2xl border border-[color:var(--post-accent)]/20 bg-white/95 p-6 shadow-sm">
+        <article className="rounded-2xl border border-[color:var(--post-accent)]/20 bg-white/95 p-6 shadow-sm md:p-8">
           <div className="mb-4 h-1 w-16 rounded-full bg-[color:var(--post-accent)]/70" />
-          <div className="space-y-6 text-neutral-800">
-            {paragraphs.map((paragraph, index) => (
-              <p key={index} className="leading-relaxed">
-                {paragraph}
-              </p>
-            ))}
-          </div>
+          <BlogContentRenderer blocks={post.content} />
         </article>
       </main>
     </div>

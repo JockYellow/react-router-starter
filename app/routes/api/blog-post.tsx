@@ -3,15 +3,23 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { requireBlogDb } from "../../lib/d1.server";
 import { getBlogPostBySlug } from "../../features/blog/blog.d1.server";
 import type { BlogPost } from "../../features/blog/blog.types";
-import { requireAdmin } from "../../features/admin/admin-auth.server";
+import { requireAdmin, requireCsrf } from "../../features/admin/admin-auth.server";
 import { processCoverImage } from "../../lib/image-processing.server";
 import { buildPublicImageUrl, requireBlogImagesBucket, requireBlogImagesPublicBase } from "../../lib/r2.server";
+import {
+  collectMediaIdsFromBlocks,
+  extractPlainTextFromBlocks,
+  firstImageFromBlocks,
+  normalizeBlogBlocks,
+} from "../../features/blog/blog-content";
+import { replacePostMediaReferences } from "../../features/blog/blog-media.server";
 
 type IncomingPostPayload = Partial<BlogPost> & {
   updatedAtBase?: string;
   categoryId?: string | null;
   subcategoryId?: string | null;
   imageFile?: File | null;
+  contentJson?: string;
 };
 
 function slugify(value: string) {
@@ -57,6 +65,16 @@ function parseTags(input: unknown) {
   return Array.from(tags);
 }
 
+function deriveSummary(body: string) {
+  const firstParagraph =
+    body
+      ?.split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean)[0] ?? "";
+  if (!firstParagraph) return "";
+  return firstParagraph.length > 200 ? `${firstParagraph.slice(0, 197)}…` : firstParagraph;
+}
+
 async function parsePayload(request: Request): Promise<IncomingPostPayload> {
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.startsWith("multipart/form-data")) {
@@ -81,6 +99,7 @@ async function parsePayload(request: Request): Promise<IncomingPostPayload> {
     const hasSummary = formData.has("summary");
     const hasTitle = formData.has("title");
     const hasPublishedAt = formData.has("publishedAt");
+    const hasContentJson = formData.has("contentJson");
 
     return {
       slug: normalizeString(formData.get("slug")),
@@ -93,6 +112,7 @@ async function parsePayload(request: Request): Promise<IncomingPostPayload> {
       updatedAtBase: formData.has("updatedAtBase") ? normalizeString(formData.get("updatedAtBase")) : undefined,
       tags: Array.from(tags),
       imageFile,
+      contentJson: hasContentJson ? (formData.get("contentJson") ?? "").toString() : undefined,
     };
   }
 
@@ -107,6 +127,7 @@ async function parsePayload(request: Request): Promise<IncomingPostPayload> {
     publishedAt: normalizeString(payload.publishedAt),
     updatedAtBase: normalizeString(payload.updatedAtBase),
     tags: parseTags(payload.tags),
+    contentJson: typeof payload.contentJson === "string" ? payload.contentJson : JSON.stringify(payload.content ?? []),
   };
 }
 
@@ -128,7 +149,7 @@ async function uploadCoverImage(context: ActionFunctionArgs["context"], file: Fi
 }
 
 export async function loader({ request, context }: LoaderFunctionArgs) {
-  requireAdmin(request, context);
+  await requireAdmin(request, context);
   const url = new URL(request.url);
   const slug = url.searchParams.get("slug");
   if (!slug) {
@@ -145,13 +166,21 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 async function handlePost(request: Request, context: ActionFunctionArgs["context"]) {
   const payload = await parsePayload(request);
   const title = normalizeString(payload.title);
-  const body = (payload.body ?? "").toString();
-  const summary = normalizeString(payload.summary);
+  const incomingBody = (payload.body ?? "").toString();
+  const parsedContent = (() => {
+    try {
+      return normalizeBlogBlocks(payload.contentJson ? JSON.parse(payload.contentJson) : [], incomingBody);
+    } catch {
+      return normalizeBlogBlocks([], incomingBody);
+    }
+  })();
+  const body = extractPlainTextFromBlocks(parsedContent) || incomingBody;
+  const summary = normalizeString(payload.summary) || deriveSummary(body);
   const categoryId = normalizeCategory(payload.categoryId);
   const subcategoryId = normalizeCategory(payload.subcategoryId);
 
-  if (!title || !body) {
-    throw Response.json({ error: "title and body are required" }, { status: 400 });
+  if (!title || !parsedContent.length) {
+    throw Response.json({ error: "title and content are required" }, { status: 400 });
   }
   const slugInput = payload.slug || title;
   const slug = slugify(slugInput) || slugify(`${title}-${Date.now()}`);
@@ -170,16 +199,32 @@ async function handlePost(request: Request, context: ActionFunctionArgs["context
   let imageUrl: string | null = null;
   if (payload.imageFile) {
     imageUrl = await uploadCoverImage(context, payload.imageFile, slug);
+  } else {
+    imageUrl = firstImageFromBlocks(parsedContent);
   }
 
   await db
     .prepare(
       `INSERT INTO blog_posts
-        (slug, title, summary, body, image_url, tags, category_id, subcategory_id, published_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (slug, title, summary, body, content_json, image_url, tags, category_id, subcategory_id, published_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(slug, title, summary, body, imageUrl, tags, categoryId, subcategoryId, publishedAt, createdAt, updatedAt)
+    .bind(
+      slug,
+      title,
+      summary,
+      body,
+      JSON.stringify(parsedContent),
+      imageUrl,
+      tags,
+      categoryId,
+      subcategoryId,
+      publishedAt,
+      createdAt,
+      updatedAt,
+    )
     .run();
+  await replacePostMediaReferences(db, slug, collectMediaIdsFromBlocks(parsedContent));
 
   return Response.json({ ok: true, slug, imageUrl });
 }
@@ -205,9 +250,18 @@ async function handlePut(request: Request, context: ActionFunctionArgs["context"
     throw Response.json({ error: "Post was updated elsewhere" }, { status: 409 });
   }
 
+  const nextContent = (() => {
+    if (payload.contentJson === undefined) return existing.content;
+    try {
+      return normalizeBlogBlocks(JSON.parse(payload.contentJson), existing.body);
+    } catch {
+      return existing.content;
+    }
+  })();
+  const nextBody = payload.body !== undefined ? (payload.body ?? "").toString() : extractPlainTextFromBlocks(nextContent);
+  const body = nextBody || existing.body;
   const title = normalizeString(payload.title) || existing.title;
-  const summary = normalizeString(payload.summary) || existing.summary;
-  const body = (payload.body ?? existing.body).toString();
+  const summary = normalizeString(payload.summary) || deriveSummary(body) || existing.summary;
   const tags = JSON.stringify(parseTags(payload.tags ?? existing.tags));
   const categoryId = normalizeCategory(payload.categoryId ?? existing.categoryId);
   const subcategoryId = normalizeCategory(payload.subcategoryId ?? existing.subcategoryId);
@@ -217,23 +271,38 @@ async function handlePut(request: Request, context: ActionFunctionArgs["context"
   let imageUrl = existing.imageUrl ?? null;
   if (payload.imageFile) {
     imageUrl = await uploadCoverImage(context, payload.imageFile, slug);
+  } else {
+    imageUrl = imageUrl || firstImageFromBlocks(nextContent);
   }
 
   await db
     .prepare(
       `UPDATE blog_posts
-       SET title = ?, summary = ?, body = ?, image_url = ?, tags = ?, category_id = ?, subcategory_id = ?, published_at = ?, updated_at = ?
+       SET title = ?, summary = ?, body = ?, content_json = ?, image_url = ?, tags = ?, category_id = ?, subcategory_id = ?, published_at = ?, updated_at = ?
        WHERE slug = ?`,
     )
-    .bind(title, summary, body, imageUrl, tags, categoryId, subcategoryId, publishedAt, updatedAt, slug)
+    .bind(
+      title,
+      summary,
+      body,
+      JSON.stringify(nextContent),
+      imageUrl,
+      tags,
+      categoryId,
+      subcategoryId,
+      publishedAt,
+      updatedAt,
+      slug,
+    )
     .run();
+  await replacePostMediaReferences(db, slug, collectMediaIdsFromBlocks(nextContent));
 
   const refreshed = await getBlogPostBySlug(db, slug);
   return Response.json({ ok: true, post: refreshed });
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
-  requireAdmin(request, context);
+  await requireCsrf(request, context);
   switch (request.method.toUpperCase()) {
     case "POST":
       return handlePost(request, context);

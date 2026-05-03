@@ -1,4 +1,5 @@
 import type { BlogCategory, BlogPost } from "./blog.types";
+import { firstImageFromBlocks, normalizeBlogBlocks } from "./blog-content";
 export type { BlogCategory, BlogSubcategory, BlogPost } from "./blog.types";
 
 const BLOG_POST_RE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9\-]+\.json$/i;
@@ -97,15 +98,18 @@ export async function loadBlogPosts() {
     const updatedAt = post.updatedAt ?? createdAt;
     const summary = post.summary ?? deriveSummary(body);
     const tags = Array.isArray(post.tags) ? post.tags.map((tag) => tag.toString()) : [];
-    const imageUrl = typeof (post as any).imageUrl === "string" ? (post as any).imageUrl : null;
+    const content = normalizeBlogBlocks((post as any).content, body);
+    const imageUrl = typeof (post as any).imageUrl === "string" ? (post as any).imageUrl : firstImageFromBlocks(content);
     return {
       ...post,
       body,
+      content,
       summary,
       tags,
       createdAt,
       updatedAt,
       imageUrl,
+      coverMediaId: (post as any).coverMediaId ?? null,
       slug: post.slug ?? (post as any).filename?.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/\.json$/, ""),
     };
   });

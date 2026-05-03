@@ -34,10 +34,9 @@ try {
 }
 
 const env = { ...process.env };
-delete env.CLOUDFLARE_API_TOKEN;
 
 const args = ["dev", "--remote", ...process.argv.slice(2)];
-const child = spawn("wrangler", args, {
+const child = spawn("npx", ["wrangler", ...args], {
   stdio: "inherit",
   env,
   shell: process.platform === "win32",
