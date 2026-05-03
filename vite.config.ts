@@ -17,7 +17,7 @@ export default defineConfig({
   ssr: {
     optimizeDeps: {
       noDiscovery: true,
-      include: [],
+      include: ["cheerio", "recharts", "three"],
     },
   },
 });

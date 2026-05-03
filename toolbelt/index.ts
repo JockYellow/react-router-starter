@@ -23,11 +23,13 @@ function runCmd(cmd: string, args: string[] = []) {
     cwd: REPO,
     shell: false,          // for git use
     encoding: "utf8",
+    timeout: 120_000,
   });
+  const errorMessage = result.error ? `${result.error.name}: ${result.error.message}` : "";
   return {
-    code: result.status,
-    stdout: result.stdout,
-    stderr: result.stderr,
+    code: result.status ?? 1,
+    stdout: result.stdout ?? "",
+    stderr: [result.stderr ?? "", errorMessage].filter(Boolean).join("\n"),
   };
 }
 

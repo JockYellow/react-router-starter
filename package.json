@@ -54,7 +54,7 @@
     "dev:remote:ui": "concurrently --kill-others-on-fail -n APP,TB \"npm run dev\" \"npm:toolbelt\"",
     "dev:ui": "concurrently --kill-others-on-fail -n APP,TB \"npm:dev\" \"npm:toolbelt\"",
     "dev": "react-router dev",
-    "build": "react-router build && rm -f build/server/.dev.vars",
+    "build": "react-router build && node -e \"require('node:fs').rmSync('build/server/.dev.vars',{force:true})\"",
     "preview": "npm run build && vite preview",
     "deploy": "wrangler deploy",
     "typegen": "wrangler types && react-router typegen",

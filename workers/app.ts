@@ -14,6 +14,16 @@ const requestHandler = createRequestHandler(
   import.meta.env.MODE,
 );
 
+function isLocalHostname(hostname: string) {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "0.0.0.0" ||
+    hostname === "::1" ||
+    hostname === "[::1]"
+  );
+}
+
 export default {
   async fetch(request, env, ctx) {
     const response = await requestHandler(request, {
@@ -22,6 +32,8 @@ export default {
     const headers = new Headers(response.headers);
     const mediaBase = env.BLOG_IMAGES_PUBLIC_BASE_URL ? new URL(env.BLOG_IMAGES_PUBLIC_BASE_URL).origin : "";
     const mediaSrc = mediaBase ? ` ${mediaBase}` : "";
+    const requestHostname = new URL(request.url).hostname;
+    const toolbeltSrc = isLocalHostname(requestHostname) ? " http://127.0.0.1:43210 http://localhost:43210" : "";
     headers.set(
       "Content-Security-Policy",
       [
@@ -31,7 +43,7 @@ export default {
         `img-src 'self' data:${mediaSrc}`,
         `media-src 'self' blob:${mediaSrc}`,
         "font-src 'self' data:",
-        "connect-src 'self'",
+        `connect-src 'self'${toolbeltSrc}`,
         "frame-src 'none'",
         "object-src 'none'",
         "base-uri 'self'",
