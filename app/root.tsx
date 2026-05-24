@@ -73,6 +73,8 @@ function App() {
     pathname.startsWith("/resume/") ||
     pathname === "/gift" ||
     pathname.startsWith("/gift/") ||
+    pathname === "/food-mind" ||
+    pathname.startsWith("/food-mind/") ||
     pathname === "/spotify" ||
     pathname.startsWith("/spotify/") ||
     pathname === "/call_spotify";
