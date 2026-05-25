@@ -77,7 +77,8 @@ function App() {
     pathname.startsWith("/food-mind/") ||
     pathname === "/spotify" ||
     pathname.startsWith("/spotify/") ||
-    pathname === "/call_spotify";
+    pathname === "/call_spotify" ||
+    pathname === "/chiayi_pikmin";
 
   if (isStandalone) {
     return <Outlet />;

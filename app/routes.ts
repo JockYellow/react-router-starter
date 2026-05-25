@@ -67,4 +67,5 @@ export default [
   route("vote", "routes/tools/gift-vote.tsx"),
   route("rng_prompt", "routes/tools/rng-prompt.tsx"),
   route("concert_events", "routes/tools/concert-events.tsx"),
+  route("chiayi_pikmin", "routes/tools/chiayi-pikmin.tsx"),
 ] satisfies RouteConfig;
