@@ -625,11 +625,6 @@ function buildSchedule(orderedStops: Stop[]) {
   return schedule;
 }
 
-function getCurrentTimeValue() {
-  const now = new Date();
-  return `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
-}
-
 function saveCompleted(next: Set<string>) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
 }
@@ -661,7 +656,6 @@ export default function ChiayiPikminPage() {
     document.title = "嘉義皮克敏踩點行程";
     setCompleted(getStoredCompleted());
     setOrder(getStoredOrder());
-    setCurrentTime(getCurrentTimeValue());
     setHasMounted(true);
   }, []);
 
@@ -799,10 +793,6 @@ export default function ChiayiPikminPage() {
     window.open(currentLocationRouteUrl(stop), "_blank", "noopener,noreferrer");
   };
 
-  const syncCurrentTime = () => {
-    setCurrentTime(getCurrentTimeValue());
-  };
-
   return (
     <div className="chiayi-pikmin-page">
       <style>{chiayiPikminCss}</style>
@@ -874,7 +864,6 @@ export default function ChiayiPikminPage() {
                 />
                 <span>分</span>
               </label>
-              <button type="button" onClick={syncCurrentTime}>用現在</button>
             </div>
 
             <div className="chiayi-pikmin-quick-read">
@@ -1595,7 +1584,7 @@ const chiayiPikminCss = `
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 88px 56px;
+  grid-template-columns: minmax(0, 1fr) 88px;
   gap: 5px;
   align-items: center;
   margin-top: 5px;
@@ -1629,17 +1618,6 @@ const chiayiPikminCss = `
 
 .chiayi-pikmin-time-tool input[type="number"] {
   text-align: right;
-}
-
-.chiayi-pikmin-time-tool button {
-  min-height: 30px;
-  border: 0;
-  border-radius: 12px;
-  background: #ffffff;
-  color: var(--cp-leaf-dark);
-  font-size: 12px;
-  font-weight: 900;
-  cursor: pointer;
 }
 
 .chiayi-pikmin-quick-read {
@@ -2188,7 +2166,6 @@ const chiayiPikminCss = `
 }
 
 .chiayi-pikmin-mini-btn,
-.chiayi-pikmin-time-tool button,
 .chiayi-pikmin-action.primary {
   background:
     linear-gradient(180deg, rgba(127, 208, 202, 0.22), transparent),
