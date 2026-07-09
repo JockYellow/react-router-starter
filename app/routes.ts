@@ -21,6 +21,7 @@ export default [
     route("custom-impact-report/raw", "routes/resume/custom-impact-report-raw.tsx"),
     route("cs-flow", "routes/resume/cs-flow.tsx"),
     route("teaching-flow", "routes/resume/teaching-flow.tsx"),
+    route("ai-health-dashboard", "routes/resume/ai-health-dashboard.tsx"),
     route("guestbook", "routes/resume/guestbook.tsx"),
     route(":companySlug", "routes/resume/$companySlug.tsx"),
   ]),

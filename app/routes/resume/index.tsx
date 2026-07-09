@@ -59,20 +59,62 @@ type WorkExp = {
 
 const PERSONAL = {
   name: "黃彥禎",
-  title: "Customer Success · Product Ops · Data-Informed Problem Solver",
+  title: "Customer Success · AI Product Ops · Data-Informed Problem Solver",
   location: "新北市, 台灣",
   email: "hyjock777@outlook.com",
   github: "https://github.com/JockYellow",
   intro:
-    "擅長從客戶使用數據中找到問題、設計流程、推動改善。\n從教育現場到 SaaS 客戶成功，每一段經歷都在做同一件事——把混亂變成可運作的系統。\n對我來說，解決問題就像騎車爬坡——找到節奏，持續踩踏，終會抵達。",
+    "擅長從客戶使用數據中找到問題、設計流程、推動改善。\n從教育現場、SaaS 客戶成功到 AI 客服與 RAG 知識庫導入，每一段經歷都在做同一件事——把混亂變成可運作的系統。\n對我來說，解決問題就像騎車爬坡——找到節奏，持續踩踏，終會抵達。",
   // 底部面板真實數據
   stats: {
-    clients: { value: 51, label: "Clients", unit: "accounts" },
-    issues: { value: 159, label: "Issues Filed", unit: "tickets" },
+    clients: { value: 81, label: "Accounts Tracked", unit: "accounts" },
+    issues: { value: 16, label: "KB Audits", unit: "bases" },
   },
 };
 
 const WORK_EXPERIENCE: WorkExp[] = [
+  {
+    id: "exp-0",
+    role: "客戶成功經理",
+    company: "愛吠的狗娛樂股份有限公司（數位內容產業）",
+    location: "新北市三重區",
+    period: "2026/04 – 2026/07",
+    displayYear: "2026",
+    distance: "16 座知識庫 / 5 份使用簡報",
+    vibe: "一段 AI 產品導入的短坡測試——在問答系統、電話客服與 RAG 知識庫之間，把客戶需求轉成可驗證的設定與文件。",
+    summary: "支援 AI 問答系統、AI 電話客服與 RAG 知識庫產品導入，負責設定、測試、文件整理與產品說明",
+    highlights: [
+      "協助檢測分析 16 間 AI 知識庫問題，涵蓋百貨公司、動物園、車站等不同使用場景",
+      "製作 5 份客戶使用簡報，整理用量、QA 類型與知識庫內容，提出初步使用觀察與優化建議",
+      "製作內部專案快速健康度檢測表，可快速檢視 30 間線上客戶使用量與 10 間客戶機台操作點擊",
+    ],
+    details: [
+      "參與公部門 AI 專案需求整理與變更溝通，協助團隊釐清客戶需求與產品限制",
+      "支援 AI 問答系統、AI 電話客服與 RAG 知識庫設定、測試與文件整理",
+      "支援 COMPUTEX 展會布展與現場產品展示，協助向潛在客戶說明 AI 客服與知識庫應用",
+    ],
+    stories: {
+      rhythm:
+        "工作節奏圍繞 AI 產品導入支援、知識庫檢測、客戶使用資料整理與產品說明。日常需要在客戶情境、知識庫內容、系統回覆品質與產品限制之間來回校準，將零散問題整理成團隊可討論的觀察與建議。",
+      cases: [
+        {
+          situation: "不同客戶的知識庫場景差異大，包含百貨公司、動物園、車站等公共服務情境，問題類型與內容缺口不容易用單一標準判斷",
+          action: "協助檢測 16 間 AI 知識庫，整理 QA 類型、用量狀況與內容問題，將觀察轉成客戶使用簡報與優化建議",
+          result: "產出 5 份客戶使用簡報，讓團隊能以用量與知識庫品質作為後續溝通基礎",
+        },
+        {
+          situation: "線上客戶與機台使用狀況分散，團隊需要快速掌握哪些專案需要優先追蹤",
+          action: "製作內部專案快速健康度檢測表，集中檢視線上客戶使用量與機台操作點擊",
+          result: "支援 30 間線上客戶使用量與 10 間客戶機台操作點擊的快速檢測，提升專案追蹤效率",
+        },
+      ],
+    },
+    tags: ["Customer Success", "AI 客服", "RAG", "知識管理", "用量分析", "提案簡報"],
+    blogSlug: "",
+    links: [
+      { label: "AI 健康度檢測 Dashboard", url: "/resume/ai-health-dashboard" },
+    ],
+  },
   {
     id: "exp-1",
     role: "客戶成功 / 客戶成功營運",
@@ -243,23 +285,32 @@ const SKILL_GROUPS = [
     label: "數據 & 分析",
     metaphor: "碼表與功率輸出",
     icon: Timer,
-    skills: ["SQL（查詢 / 資料檢核）", "Python（資料處理 / Jinja2 模板）", "Tableau", "Power BI", "Excel 進階"],
+    skills: ["SQL（查詢 / 資料檢核）", "Python（資料處理 / Jinja2 模板）", "用量與 QA 類型分析", "Tableau", "Power BI", "Excel 進階"],
   },
   {
     label: "客戶成功 & 營運",
     metaphor: "傳動與變速系統",
     icon: Settings,
-    skills: ["Zendesk（工單 / 幫助中心）", "Onboarding 流程設計", "客戶健康度指標", "Mailjet（郵件行銷）", "活動通"],
+    skills: ["AI 客服 / RAG 導入支援", "Zendesk（工單 / 幫助中心）", "Onboarding 流程設計", "客戶健康度指標", "提案與產品說明", "Mailjet（郵件行銷）"],
   },
   {
     label: "前端 & 報表呈現",
     metaphor: "車架與幾何",
     icon: Wrench,
-    skills: ["HTML / CSS", "Chart.js", "Tailwind CSS", "Git / GitHub", "AI-Assisted Development"],
+    skills: ["HTML / CSS", "Chart.js", "Tailwind CSS", "Git / GitHub", "AI-Assisted Development", "知識庫文件整理"],
   },
 ];
 
 const PROJECTS = [
+  {
+    id: "proj-0",
+    name: "AI 知識庫健康度檢測",
+    description:
+      "支援 AI 問答、AI 電話客服與 RAG 知識庫導入，協助檢測 16 間知識庫問題，並製作內部快速健康度檢測表，追蹤 30 間線上客戶使用量與 10 間客戶機台操作點擊。",
+    tags: ["AI 客服", "RAG", "知識管理", "用量分析", "Customer Success"],
+    externalUrl: "/resume/ai-health-dashboard",
+    blogSlug: "",
+  },
   {
     id: "proj-1",
     name: "客製化客戶成效報告系統",
