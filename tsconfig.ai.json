@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.cloudflare.json",
+  "include": [
+    "app/data/profile.ts",
+    "app/features/ai/**/*",
+    "app/routes/api/ai/**/*",
+    "app/routes/resume/company-fit.tsx",
+    "app/routes/resume/layout.tsx",
+    "app/routes/resume/index.tsx",
+    "tests/ai/**/*"
+  ],
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "types": ["@cloudflare/workers-types", "vite/client", "node"]
+  }
+}

@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation } from "react-router";
-import { Github, Mail, MessageSquare } from "lucide-react";
+import { Github, Mail, MessageSquare, Sparkles } from "lucide-react";
+import { PROFILE } from "~/data/profile";
+import { PortfolioChat } from "~/features/ai/components/PortfolioChat";
 
 function GlobalHeader() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -29,19 +31,28 @@ function GlobalHeader() {
             to="/resume"
             className="font-bold text-neutral-800 hover:text-brand-500 transition-colors text-sm"
           >
-            黃彥禎{" "}
-            <span className="text-neutral-400 font-normal">| Product Ops</span>
+            {PROFILE.personal.name}{" "}
+            <span className="hidden text-neutral-400 font-normal sm:inline">| Product Ops</span>
           </Link>
           {showBackToResume && (
             <Link
               to="/resume"
               className="text-xs text-neutral-400 hover:text-brand-500 transition-colors"
             >
-              ← 回到履歷
+              <span className="sm:hidden">← 履歷</span>
+              <span className="hidden sm:inline">← 回到履歷</span>
             </Link>
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            to="/resume/company-fit"
+            className="btn-ghost text-xs flex items-center gap-1.5"
+            title="AI 公司適配分析"
+          >
+            <Sparkles size={13} />
+            <span className="hidden lg:inline">公司適配</span>
+          </Link>
           <Link
             to="/resume/guestbook"
             className="btn-ghost text-xs flex items-center gap-1.5"
@@ -50,14 +61,14 @@ function GlobalHeader() {
             <span className="hidden sm:inline">留言版</span>
           </Link>
           <a
-            href="mailto:hyjock777@outlook.com"
+            href={`mailto:${PROFILE.personal.email}`}
             className="btn-ghost text-xs flex items-center gap-1.5"
           >
             <Mail size={13} />
             <span className="hidden sm:inline">Email</span>
           </a>
           <a
-            href="https://github.com/JockYellow"
+            href={PROFILE.personal.github}
             target="_blank"
             rel="noreferrer"
             className="btn-ghost text-xs flex items-center gap-1.5"
@@ -82,6 +93,8 @@ export default function ResumeLayout() {
       <div className="resume-content relative z-10 mx-auto w-full max-w-[1200px] px-2 md:px-4">
         <Outlet />
       </div>
+
+      <PortfolioChat />
     </div>
   );
 }
