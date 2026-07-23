@@ -15,7 +15,13 @@
     "BLOG_IMAGES_PUBLIC_BASE_URL": "https://pub-dced73b40e724469990adfef043fc5b2.r2.dev",
     "SPOTIFY_CLIENT_ID": "faa338557e2643799b05abc270cdf875",
     "SPOTIFY_REDIRECT_URI": "https://react-router-starter.jockhuang77.workers.dev/call_spotify",
-    "SPOTIFY_ALLOWED_ORIGINS": "https://react-router-starter.jockhuang77.workers.dev"
+    "SPOTIFY_ALLOWED_ORIGINS": "https://react-router-starter.jockhuang77.workers.dev",
+    "OPENAI_BASE_URL": "https://api.openai.com/v1",
+    "OPENAI_MODEL_ANALYSIS": "gpt-5.6-terra",
+    "OPENAI_MODEL_CHAT": "gpt-5.6-luna",
+    "PROMPT_CACHE_KEY": "huang-profile-v1",
+    "AI_DAILY_REQUEST_LIMIT": "100",
+    "AI_REQUEST_TIMEOUT_MS": "90000"
   },
   "d1_databases": [
     {

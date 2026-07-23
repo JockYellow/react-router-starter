@@ -208,4 +208,9 @@ blog-migrate.sql
 dumps/*.sql
 
 ### Local docs ###
-/docs/
+/docs/*
+!/docs/ai-setup.md
+
+### Playwright ###
+/test-results/
+/playwright-report/
