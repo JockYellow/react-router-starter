@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, RefreshCw, Volume2, Activity, Zap, Shield, Swords, Ghost, Database } from 'lucide-react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip } from 'recharts';
-import type { Route } from "./+types/creatures";
+import type { Route } from "./+types/pokeapi-creatures";
 
 // 設定 Meta 標籤
 export function meta({}: Route.MetaArgs) {
@@ -34,6 +34,26 @@ interface CreatureData {
   chartData: any[];
 }
 
+interface PokeApiResponse {
+  id: number;
+  name: string;
+  types: Array<{ type: { name: string } }>;
+  height: number;
+  weight: number;
+  stats: Array<{ base_stat: number }>;
+  sprites: {
+    front_default: string;
+    front_shiny: string;
+    other: {
+      "official-artwork": {
+        front_default: string;
+        front_shiny: string;
+      };
+    };
+  };
+  cries: { latest: string };
+}
+
 export default function CreatureDatabase() {
   const [searchTerm, setSearchTerm] = useState('lucario');
   const [creature, setCreature] = useState<CreatureData | null>(null);
@@ -53,7 +73,7 @@ export default function CreatureDatabase() {
       const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${query.toString().toLowerCase()}`);
       if (!response.ok) throw new Error('Target not found in database.');
       
-      const data = await response.json();
+      const data = (await response.json()) as PokeApiResponse;
       
       // 整理數據格式以符合我們的 UI 需求
       const stats = {
@@ -77,7 +97,7 @@ export default function CreatureDatabase() {
       setCreature({
         id: data.id,
         name: data.name,
-        types: data.types.map((t: any) => t.type.name),
+        types: data.types.map((t) => t.type.name),
         height: data.height / 10, // 轉為公尺
         weight: data.weight / 10, // 轉為公斤
         sprite: data.sprites.other['official-artwork'].front_default || data.sprites.front_default,

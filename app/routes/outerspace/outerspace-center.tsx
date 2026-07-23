@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { Activity, Zap, Wind, Navigation, AlertTriangle, Clock, ArrowLeft } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router';
-import type { Route } from "./+types/dashboard"; // 支援 React Router v7 的型別 (可選)
+import type { Route } from "./+types/outerspace-center"; // 支援 React Router v7 的型別 (可選)
 
 // --- META 設定 (設定網頁標題) ---
 export function meta({}: Route.MetaArgs) {

@@ -4,6 +4,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 export type Gift = {
   id: string;
   type: 'GOOD' | 'BAD';
+  provider_id: string;
   slogan: string;
   tags: string[]; // 我們會手動 parse
   image_key?: string | null;
@@ -11,6 +12,7 @@ export type Gift = {
   is_forced: boolean;
   vote_count: number;
   provider_name: string;
+  is_revealed: boolean;
   holder_id?: string | null;
   holder_name?: string;
 };
@@ -55,6 +57,7 @@ export async function getGifts(db: D1Database): Promise<Gift[]> {
     tags: parseTags(r.tags),
     is_locked: Boolean(r.is_locked),
     is_forced: Boolean(r.is_forced),
+    is_revealed: Boolean(r.is_revealed),
     // 確保 SQLite 的 integer 0/1 被轉為 boolean
   }));
 }

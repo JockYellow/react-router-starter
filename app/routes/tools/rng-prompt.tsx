@@ -83,6 +83,15 @@ type ToastState = {
   message: string;
 };
 
+type ImportResponse = {
+  created?: number;
+  updated?: number;
+  backupId?: number | string;
+  error?: string;
+  details?: string[];
+  expected?: string;
+};
+
 
 type TabMode = "all" | "general" | "group";
 
@@ -457,7 +466,7 @@ const AdminPanel = ({
         method: "POST",
         body: formData,
       });
-      const payload = await res.json().catch(() => null);
+      const payload = (await res.json().catch(() => null)) as ImportResponse | null;
       if (!res.ok) {
         setImportError(formatImportError(payload));
         return;

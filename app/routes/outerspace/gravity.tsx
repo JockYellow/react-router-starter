@@ -276,7 +276,7 @@ export default function GravityLab() {
       try {
         const response = await fetch('https://api.le-systeme-solaire.net/rest/bodies?data=id,englishName,gravity,meanRadius,avgTemp,density,moons');
         if (!response.ok) throw new Error(`API Error: ${response.status}`);
-        const data = await response.json();
+        const data = (await response.json()) as { bodies: PlanetBody[] };
         processData(data.bodies);
         setUseFallback(false);
       } catch (error) {

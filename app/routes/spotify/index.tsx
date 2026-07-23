@@ -711,7 +711,7 @@ export default function SpotifyRankingPage() {
                         </span>
                       ) : (
                         <span className="rounded-full bg-slate-100 px-3 py-1">
-                          目前組別 {royaleState?.currentIndex + 1}/{royaleState?.currentGroups.length}
+                          目前組別 {(royaleState?.currentIndex ?? 0) + 1}/{royaleState?.currentGroups.length ?? 0}
                         </span>
                       )}
                     </div>
