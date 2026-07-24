@@ -14,6 +14,7 @@ export default [
   route("admin", "routes/admin/index.tsx"),
   route("admin/changelog", "routes/admin/changelog.tsx"),
   route("admin/resume-company", "routes/admin/resume-company.tsx"),
+  route("admin/profile", "routes/admin/profile.tsx"),
   route("admin/ops", "routes/admin/ops.tsx"),
   route("resume", "routes/resume/layout.tsx", [
     index("routes/resume/index.tsx"),

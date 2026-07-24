@@ -5,7 +5,8 @@ import {
   AIClientError,
   consumeAIStream,
 } from "../../app/features/ai/client-sse";
-import { matchStaticFaq } from "../../app/features/ai/faq";
+import { DEFAULT_PROFILE } from "../../app/data/profile";
+import { buildStaticFaqs, matchStaticFaq } from "../../app/features/ai/faq";
 import {
   extractOpenAIUsage,
   extractSSEFrames,
@@ -42,6 +43,8 @@ function providerRequest(): AIRequest {
     model: "test-model",
     maxOutputTokens: 1_000,
     promptCacheKey: "huang-profile-v1",
+    profile: DEFAULT_PROFILE,
+    profileRevision: 1,
     abortSignal: new AbortController().signal,
     timeoutMs: 5_000,
     rateLimit: { remaining: 4, limits: {} },
@@ -165,7 +168,7 @@ test("provider maps malformed upstream deltas to a safe site error", async () =>
 });
 
 test("static FAQs answer without an AI provider", () => {
-  const faq = matchStaticFaq("有哪些作品或專案可以看？");
+  const faq = matchStaticFaq("有哪些作品或專案可以看？", buildStaticFaqs(DEFAULT_PROFILE));
   assert.ok(faq);
   assert.match(faq.answer, /AI 知識庫健康度檢測|客製化客戶成效報告/);
 });

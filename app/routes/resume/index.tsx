@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router";
-import { PROFILE } from "~/data/profile";
+import { Link, useOutletContext } from "react-router";
+import type { ResumeOutletContext } from "./layout";
 import {
   Bike,
   Settings,
@@ -28,35 +28,11 @@ import {
 // Canonical profile data and presentation-only mappings
 // ---------------------------------------------------------------------------
 
-const PERSONAL = PROFILE.personal;
-const WORK_EXPERIENCE = PROFILE.workExperience;
-
-// 右側導覽節點（合併同年份）
-const NAV_NODES = (() => {
-  const seen = new Map<string, { firstId: string; roles: string[]; period: string }>();
-  for (const exp of WORK_EXPERIENCE) {
-    const year = exp.displayYear;
-    if (!seen.has(year)) {
-      seen.set(year, { firstId: exp.id, roles: [exp.role], period: exp.period });
-    } else {
-      seen.get(year)!.roles.push(exp.role);
-    }
-  }
-  return Array.from(seen.entries()).map(([year, data]) => ({ year, ...data }));
-})();
-
 const SKILL_PRESENTATION = [
   { metaphor: "碼表與功率輸出", icon: Timer },
   { metaphor: "傳動與變速系統", icon: Settings },
   { metaphor: "車架與幾何", icon: Wrench },
 ];
-
-const SKILL_GROUPS = PROFILE.skillGroups.map((group, index) => ({
-  ...group,
-  ...SKILL_PRESENTATION[index],
-}));
-
-const PROJECTS = PROFILE.projects;
 
 const INTERESTS: { id: string; title: string; subtitle?: string; description: string }[] = [
   {
@@ -93,6 +69,23 @@ const REST_STOP_PHOTOS = {
 // ---------------------------------------------------------------------------
 
 export default function ResumePage() {
+  const { profile } = useOutletContext<ResumeOutletContext>();
+  const PERSONAL = profile.personal;
+  const WORK_EXPERIENCE = profile.workExperience;
+  const NAV_NODES = (() => {
+    const seen = new Map<string, { firstId: string; roles: string[]; period: string }>();
+    for (const exp of WORK_EXPERIENCE) {
+      const year = exp.displayYear;
+      if (!seen.has(year)) seen.set(year, { firstId: exp.id, roles: [exp.role], period: exp.period });
+      else seen.get(year)!.roles.push(exp.role);
+    }
+    return Array.from(seen.entries()).map(([year, data]) => ({ year, ...data }));
+  })();
+  const SKILL_GROUPS = profile.skillGroups.map((group, index) => ({
+    ...group,
+    ...(SKILL_PRESENTATION[index] ?? SKILL_PRESENTATION[SKILL_PRESENTATION.length - 1]),
+  }));
+  const PROJECTS = profile.projects;
   const [scrollProgress, setScrollProgress] = useState(0);
   const [activeSection, setActiveSection] = useState(0);
 

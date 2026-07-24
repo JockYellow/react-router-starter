@@ -1,4 +1,4 @@
-import { PROFILE } from "../../data/profile";
+import type { Profile } from "../../data/profile";
 
 export type StaticFaq = {
   id: string;
@@ -12,8 +12,8 @@ function compact(items: string[]): string {
   return items.filter(Boolean).join("；");
 }
 
-function findExperience(term: string): (typeof PROFILE.workExperience)[number] | null {
-  return PROFILE.workExperience.find((experience) =>
+function findExperience(profile: Profile, term: string): Profile["workExperience"][number] | null {
+  return profile.workExperience.find((experience) =>
     [
       experience.role,
       experience.company,
@@ -23,15 +23,15 @@ function findExperience(term: string): (typeof PROFILE.workExperience)[number] |
   ) ?? null;
 }
 
-const aiExperience = findExperience("RAG") ?? findExperience("AI 客服");
-const saasExperience = findExperience("SaaS") ?? findExperience("COMMEET");
-const teachingExperience = findExperience("講師") ?? findExperience("教學");
-
-export const STATIC_FAQS: StaticFaq[] = [
+export function buildStaticFaqs(profile: Profile): StaticFaq[] {
+  const aiExperience = findExperience(profile, "RAG") ?? findExperience(profile, "AI 客服");
+  const saasExperience = findExperience(profile, "SaaS") ?? findExperience(profile, "COMMEET");
+  const teachingExperience = findExperience(profile, "講師") ?? findExperience(profile, "教學");
+  return [
   {
     id: "work-overview",
     question: "可以快速介紹你的工作經歷嗎？",
-    answer: `履歷目前列出 ${PROFILE.workExperience.length} 段已確認經歷：${PROFILE.workExperience.map((experience) => `${experience.period} ${experience.company}｜${experience.role}`).join("；")}。共同主軸是把客戶需求、營運流程與資料整理成可執行的系統。`,
+    answer: `履歷目前列出 ${profile.workExperience.length} 段已確認經歷：${profile.workExperience.map((experience) => `${experience.period} ${experience.company}｜${experience.role}`).join("；")}。共同主軸是把客戶需求、營運流程與資料整理成可執行的系統。`,
     keywords: ["工作經歷", "經歷總覽", "自我介紹", "快速介紹", "做過什麼工作"],
   },
   {
@@ -53,7 +53,7 @@ export const STATIC_FAQS: StaticFaq[] = [
   {
     id: "projects",
     question: "有哪些作品或專案可以看？",
-    answer: `履歷列出的作品與專案包括：${PROFILE.projects.map((project) => `${project.name}（${project.description}）`).join("；")}。可從履歷首頁的作品區開啟有連結的項目。`,
+    answer: `履歷列出的作品與專案包括：${profile.projects.map((project) => `${project.name}（${project.description}）`).join("；")}。可從履歷首頁的作品區開啟有連結的項目。`,
     keywords: ["作品", "專案", "portfolio", "案例", "作品集"],
   },
   {
@@ -74,16 +74,17 @@ export const STATIC_FAQS: StaticFaq[] = [
   {
     id: "direction",
     question: "你目前想找什麼方向的工作？",
-    answer: `目前履歷列出的求職方向為：${PROFILE.jobDirections.join("、")}。更精確的職務範圍與合作方式，建議面談時再確認。`,
+    answer: `目前履歷列出的求職方向為：${profile.jobDirections.join("、")}。更精確的職務範圍與合作方式，建議面談時再確認。`,
     keywords: ["求職方向", "找什麼工作", "想找", "職涯方向", "職務方向"],
   },
   {
     id: "contact",
     question: "如何聯絡你？",
-    answer: `可以寄信到 ${PROFILE.personal.email}，或從 GitHub 查看作品：${PROFILE.personal.github}。`,
+    answer: `可以寄信到 ${profile.personal.email}，或從 GitHub 查看作品：${profile.personal.github}。`,
     keywords: ["如何聯絡", "聯絡方式", "email", "電子郵件", "github"],
   },
-];
+  ];
+}
 
 function normalizeQuestion(value: string): string {
   return value
@@ -92,11 +93,11 @@ function normalizeQuestion(value: string): string {
 }
 
 /** Returns a canonical-profile answer for common questions, without using AI quota. */
-export function matchStaticFaq(question: string): StaticFaq | null {
+export function matchStaticFaq(question: string, faqs: StaticFaq[]): StaticFaq | null {
   const normalized = normalizeQuestion(question);
   if (!normalized) return null;
 
-  return STATIC_FAQS.find((faq) => {
+  return faqs.find((faq) => {
     if (normalizeQuestion(faq.question) === normalized) return true;
     return faq.keywords.some((keyword) => normalized.includes(normalizeQuestion(keyword)));
   }) ?? null;

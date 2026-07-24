@@ -57,3 +57,9 @@ test("resume bot answers canonical FAQ locally and fits the viewport", async ({ 
   expect(box!.x + box!.width).toBeLessThanOrEqual(viewport!.width + 1);
   expect(box!.y + box!.height).toBeLessThanOrEqual(viewport!.height + 1);
 });
+
+test("profile knowledge editor redirects unauthenticated visitors", async ({ page }) => {
+  await page.goto("/admin/profile");
+  await expect(page).toHaveURL(/\/admin\/login/);
+  await expect(page.getByRole("heading", { name: "登入管理後台" })).toBeVisible();
+});

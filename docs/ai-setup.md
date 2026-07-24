@@ -12,10 +12,11 @@
    npx wrangler d1 migrations apply blog-db --local
    ```
 
-   若既有本機資料庫曾手動套用舊 migration，可能出現「欄位已存在」但 migration ledger 未記錄的情況。請勿修改或重跑既有 migration；先用 `npx wrangler d1 migrations list blog-db --local` 確認，再只對開發資料庫執行本次 AI migration：
+   若既有本機資料庫曾手動套用舊 migration，可能出現「欄位已存在」但 migration ledger 未記錄的情況。請勿修改或重跑既有 migration；先用 `npx wrangler d1 migrations list blog-db --local` 確認，再只對開發資料庫執行本次 migration：
 
    ```powershell
    npx wrangler d1 execute blog-db --local --file=migrations/2026-07-23-ai-usage-counters.sql
+   npx wrangler d1 execute blog-db --local --file=migrations/2026-07-24-profile-documents.sql
    ```
 
    正式環境仍應先檢查 remote migration ledger，再使用標準 `migrations apply --remote`。
@@ -46,7 +47,18 @@ npx wrangler secret put AI_RATE_LIMIT_SECRET
 - `AI_DAILY_REQUEST_LIMIT=100`
 - `AI_REQUEST_TIMEOUT_MS=90000`
 
-若更新 Profile 內容或固定 Prompt 結構，需同步更新程式內的 `PROFILE_VERSION` 與 `PROMPT_CACHE_KEY`，例如改成 `huang-profile-v2`。
+## 個人知識庫編輯與發布
+
+登入 `/admin/profile` 後可用引導式表單編輯完整 Profile：
+
+1. 「儲存草稿」只寫入草稿，不改變公開履歷、FAQ 或 AI。
+2. 「公開 Context」可在不呼叫 AI 的情況下確認實際送出的完整內容。
+3. 「完整 Context」只供已登入的管理員檢查，會包含私人面試筆記。
+4. 「發布到履歷與 Bot」才會更新公開版本並遞增 revision。
+
+公開 AI 的實際 cache key 會自動組成 `huang-profile-v1-r{revision}`。因此一般內容更新只需從後台發布，不需修改環境變數或重新部署；同一 revision 的固定前綴保持一致。只有 Profile schema 或固定 Prompt 規則有破壞性調整時，才同步更新程式內 `PROFILE_VERSION` 與 `PROMPT_CACHE_KEY`（例如 `huang-profile-v2`）。
+
+私人筆記與標記為 private 的 STAR 故事會在伺服器端建立公開 Profile 時移除，不會進入公開 loader、FAQ 或 OpenAI request。
 
 ## 正式部署
 

@@ -3,7 +3,7 @@ import { Link } from "react-router";
 
 import { isLocalHost } from "../features/admin/local-host";
 
-type AdminSection = "blog" | "changelog" | "resume" | "ops";
+type AdminSection = "blog" | "changelog" | "resume" | "profile" | "ops";
 
 interface AdminNavProps {
   active: AdminSection;
@@ -13,6 +13,7 @@ const NAV_ITEMS: { id: AdminSection; label: string; to: string; localOnly?: bool
   { id: "blog", label: "Blog", to: "/admin/blog-edit" },
   { id: "changelog", label: "Changelog", to: "/admin/changelog" },
   { id: "resume", label: "客製化履歷", to: "/admin/resume-company" },
+  { id: "profile", label: "個人知識庫", to: "/admin/profile" },
   { id: "ops", label: "Ops/Git", to: "/admin/ops", localOnly: true },
 ];
 
