@@ -6,6 +6,38 @@ export type ProfileStory = {
   result: string;
 };
 
+export type InterviewStory = {
+  id: string;
+  title: string;
+  situation: string;
+  task: string;
+  action: string;
+  result: string;
+  reflection: string;
+  visibility: "public" | "private";
+};
+
+export type InterviewKnowledge = {
+  careerNarrative: {
+    shortIntroduction: string;
+    careerTransition: string;
+    nextRoleMotivation: string;
+  };
+  selfAssessment: {
+    strengths: string[];
+    improvementArea: string;
+    workingStyle: string;
+  };
+  professionalViews: {
+    customerSuccess: string;
+    aiAndRag: string;
+    knowledgeManagement: string;
+  };
+  stories: InterviewStory[];
+  publicNotes: string[];
+  privateNotes: string[];
+};
+
 export type ProfileWorkExperience = {
   id: string;
   role: string;
@@ -52,14 +84,15 @@ export type Profile = {
     externalUrl: string;
     blogSlug: string;
   }[];
+  interviewKnowledge: InterviewKnowledge;
   factRules: string[];
 };
 
 /**
- * 履歷、FAQ 與 AI prompt 共用的唯一個人事實來源。
- * 僅收錄本人已確認的內容；未完成的履歷草稿與示範 seed 不得加入。
+ * D1 尚未初始化或暫時無法讀取時使用的已確認預設資料。
+ * 正式可編輯來源是 profile_documents；未完成內容與示範 seed 不得加入此備援。
  */
-export const PROFILE: Profile = {
+export const DEFAULT_PROFILE: Profile = {
   version: PROFILE_VERSION,
   personal: {
     name: "黃彥禎",
@@ -292,6 +325,26 @@ export const PROFILE: Profile = {
       blogSlug: "",
     },
   ],
+  interviewKnowledge: {
+    careerNarrative: {
+      shortIntroduction: "",
+      careerTransition: "",
+      nextRoleMotivation: "",
+    },
+    selfAssessment: {
+      strengths: [],
+      improvementArea: "",
+      workingStyle: "",
+    },
+    professionalViews: {
+      customerSuccess: "",
+      aiAndRag: "",
+      knowledgeManagement: "",
+    },
+    stories: [],
+    publicNotes: [],
+    privateNotes: [],
+  },
   factRules: [
     "只能引用此 Profile 明確記載的個人經歷、技能、數字與成果。",
     "不得捏造或推測未記載的公司、職稱、年資、客戶、專案、工具、數字或成果。",

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import {
   Bot,
@@ -11,7 +11,8 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { STATIC_FAQS, matchStaticFaq } from "../faq";
+import type { Profile } from "../../../data/profile";
+import { buildStaticFaqs, matchStaticFaq } from "../faq";
 import {
   consumeAIStream,
   getAIErrorMessage,
@@ -76,7 +77,8 @@ function ChatUsage({ usage }: { usage: AIUsage }): React.ReactElement {
 }
 
 /** Floating resume-only chat UI with local FAQ answers and streamed AI fallback. */
-export function PortfolioChat(): React.ReactElement {
+export function PortfolioChat({ profile }: { profile: Profile }): React.ReactElement {
+  const staticFaqs = useMemo(() => buildStaticFaqs(profile), [profile]);
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [draft, setDraft] = useState("");
@@ -229,7 +231,7 @@ export function PortfolioChat(): React.ReactElement {
 
     setDraft("");
     setError(null);
-    const faq = matchStaticFaq(question);
+    const faq = matchStaticFaq(question, staticFaqs);
     if (faq) {
       const userMessage: ChatMessage = {
         id: createMessageId("user"),
@@ -347,7 +349,7 @@ export function PortfolioChat(): React.ReactElement {
                   <Sparkles size={13} aria-hidden /> 不使用 AI 額度
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {STATIC_FAQS.map((faq) => (
+                  {staticFaqs.map((faq) => (
                     <button
                       key={faq.id}
                       type="button"

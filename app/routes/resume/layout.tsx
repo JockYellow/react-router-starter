@@ -1,10 +1,24 @@
 import { useState, useEffect } from "react";
-import { Link, Outlet, useLocation } from "react-router";
+import { Link, Outlet, useLoaderData, useLocation } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 import { Github, Mail, MessageSquare, Sparkles } from "lucide-react";
-import { PROFILE } from "~/data/profile";
+import { DEFAULT_PROFILE, type Profile } from "~/data/profile";
 import { PortfolioChat } from "~/features/ai/components/PortfolioChat";
+import { toPublicProfile } from "~/features/profile/profile-document";
+import { getPublishedProfile } from "~/features/profile/profile.server";
+import { requireBlogDb } from "~/lib/d1.server";
 
-function GlobalHeader() {
+export type ResumeOutletContext = { profile: Profile; publishedRevision: number };
+
+export async function loader({ context }: LoaderFunctionArgs) {
+  try {
+    return await getPublishedProfile(requireBlogDb(context));
+  } catch {
+    return { profile: toPublicProfile(DEFAULT_PROFILE), revision: 0, source: "default" as const };
+  }
+}
+
+function GlobalHeader({ profile }: { profile: Profile }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const { pathname } = useLocation();
   const showBackToResume = pathname !== "/resume";
@@ -31,7 +45,7 @@ function GlobalHeader() {
             to="/resume"
             className="font-bold text-neutral-800 hover:text-brand-500 transition-colors text-sm"
           >
-            {PROFILE.personal.name}{" "}
+            {profile.personal.name}{" "}
             <span className="hidden text-neutral-400 font-normal sm:inline">| Product Ops</span>
           </Link>
           {showBackToResume && (
@@ -61,14 +75,14 @@ function GlobalHeader() {
             <span className="hidden sm:inline">留言版</span>
           </Link>
           <a
-            href={`mailto:${PROFILE.personal.email}`}
+            href={`mailto:${profile.personal.email}`}
             className="btn-ghost text-xs flex items-center gap-1.5"
           >
             <Mail size={13} />
             <span className="hidden sm:inline">Email</span>
           </a>
           <a
-            href={PROFILE.personal.github}
+            href={profile.personal.github}
             target="_blank"
             rel="noreferrer"
             className="btn-ghost text-xs flex items-center gap-1.5"
@@ -83,18 +97,19 @@ function GlobalHeader() {
 }
 
 export default function ResumeLayout() {
+  const { profile, revision } = useLoaderData<typeof loader>();
   return (
     <div className="resume-shell min-h-screen pb-20">
       <div className="resume-noise" aria-hidden />
       <div className="resume-aurora" aria-hidden />
 
-      <GlobalHeader />
+      <GlobalHeader profile={profile} />
 
       <div className="resume-content relative z-10 mx-auto w-full max-w-[1200px] px-2 md:px-4">
-        <Outlet />
+        <Outlet context={{ profile, publishedRevision: revision } satisfies ResumeOutletContext} />
       </div>
 
-      <PortfolioChat />
+      <PortfolioChat profile={profile} />
     </div>
   );
 }

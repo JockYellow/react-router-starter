@@ -2,7 +2,8 @@ import type { ActionFunctionArgs } from "react-router";
 
 import { AIError, normalizeAIError } from "./errors";
 import { OpenAIProvider } from "./openai-provider.server";
-import { assertPromptCacheVersion } from "./prompt";
+import { getPublishedProfile } from "../profile/profile.server";
+import { assertPromptCacheVersion, buildEffectivePromptCacheKey } from "./prompt";
 import {
   cleanupExpiredAIUsage,
   consumeAIRateLimit,
@@ -128,6 +129,7 @@ export async function handleAIAction(
       secret: rateLimitSecret,
       dailyGlobalLimit: env.AI_DAILY_REQUEST_LIMIT,
     });
+    const publishedProfile = await getPublishedProfile(env.BLOG_DB);
     if (executionContext && shouldCleanupAIUsage(requestId)) {
       executionContext.waitUntil(cleanupExpiredAIUsage(env.BLOG_DB).catch(() => undefined));
     }
@@ -142,7 +144,9 @@ export async function handleAIAction(
       input,
       model: modelForFeature(env, feature),
       maxOutputTokens: feature === "company-fit" ? 1_000 : 700,
-      promptCacheKey,
+      promptCacheKey: buildEffectivePromptCacheKey(promptCacheKey, publishedProfile.revision),
+      profile: publishedProfile.profile,
+      profileRevision: publishedProfile.revision,
       abortSignal: request.signal,
       timeoutMs: parseTimeout(env.AI_REQUEST_TIMEOUT_MS),
       rateLimit: rateLimit.usage,

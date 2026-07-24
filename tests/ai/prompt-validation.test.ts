@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { PROFILE, PROFILE_VERSION } from "../../app/data/profile";
+import { DEFAULT_PROFILE, PROFILE_VERSION } from "../../app/data/profile";
 import { AIError } from "../../app/features/ai/errors";
 import {
-  STABLE_PROFILE_PREFIX,
   assertPromptCacheVersion,
+  buildEffectivePromptCacheKey,
   buildOpenAIInput,
+  buildStableProfilePrefix,
 } from "../../app/features/ai/prompt";
 import {
   AI_INPUT_LIMITS,
@@ -15,11 +16,12 @@ import {
 } from "../../app/features/ai/validation";
 
 test("canonical profile and stable prefix contain only verified content", () => {
-  assert.equal(PROFILE.version, PROFILE_VERSION);
+  const stablePrefix = buildStableProfilePrefix(DEFAULT_PROFILE, { revision: 1 });
+  assert.equal(DEFAULT_PROFILE.version, PROFILE_VERSION);
   assert.equal(PROFILE_VERSION, "huang-profile-v1");
-  assert.match(STABLE_PROFILE_PREFIX, /黃彥禎/);
-  assert.doesNotMatch(STABLE_PROFILE_PREFIX, /【待補充】|模板公司|提升 40%|CI\/CD pipeline/);
-  assert.ok(STABLE_PROFILE_PREFIX.length > 4_000, "stable prefix should exceed the cache eligibility floor");
+  assert.match(stablePrefix, /黃彥禎/);
+  assert.doesNotMatch(stablePrefix, /【待補充】|模板公司|提升 40%|CI\/CD pipeline/);
+  assert.ok(stablePrefix.length > 4_000, "stable prefix should exceed the cache eligibility floor");
 });
 
 test("company dynamic material is always after the cache breakpoint", () => {
@@ -28,7 +30,7 @@ test("company dynamic material is always after the cache breakpoint", () => {
     companyName: marker,
     jobTitle: "Customer Success",
     jobDescription: "協助企業導入 SaaS。",
-  });
+  }, DEFAULT_PROFILE, 3);
   const rendered = JSON.stringify(items);
 
   assert.equal(items[0]?.role, "developer");
@@ -39,6 +41,7 @@ test("company dynamic material is always after the cache breakpoint", () => {
 
 test("prompt cache key must match the profile version", () => {
   assert.doesNotThrow(() => assertPromptCacheVersion(PROFILE_VERSION));
+  assert.equal(buildEffectivePromptCacheKey(PROFILE_VERSION, 7), "huang-profile-v1-r7");
   assert.throws(
     () => assertPromptCacheVersion("huang-profile-v2"),
     (error: unknown) => error instanceof AIError && error.code === "SERVER_MISCONFIGURED",

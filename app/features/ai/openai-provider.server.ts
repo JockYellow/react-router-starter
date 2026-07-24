@@ -119,7 +119,7 @@ export class OpenAIProvider implements AIProvider {
         },
         body: JSON.stringify({
           model: input.model,
-          input: buildOpenAIInput(input.feature, input.input),
+          input: buildOpenAIInput(input.feature, input.input, input.profile, input.profileRevision),
           stream: true,
           store: false,
           max_output_tokens: input.maxOutputTokens,

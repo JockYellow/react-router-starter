@@ -1,3 +1,5 @@
+import type { Profile } from "../../data/profile";
+
 export type AIFeature = "company-fit" | "chat";
 
 export type AIChatRole = "user" | "assistant";
@@ -44,6 +46,8 @@ export interface AIRequest {
   model: string;
   maxOutputTokens: number;
   promptCacheKey: string;
+  profile: Profile;
+  profileRevision: number;
   abortSignal: AbortSignal;
   timeoutMs: number;
   rateLimit: AIRateLimitUsage;
