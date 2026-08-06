@@ -26,8 +26,12 @@ import {
   type ProfileStory,
   type ProfileWorkExperience,
 } from "../../data/profile";
-import { getCsrfToken, requireCsrf } from "../../features/admin/admin-auth.server";
+import { getCsrfToken } from "../../features/admin/admin-auth.server";
 import { buildStableProfilePrefix } from "../../features/ai/prompt";
+import {
+  handleProfileAdminAction,
+  type ProfileAdminResult,
+} from "../../features/profile/profile-admin.server";
 import {
   ProfileValidationError,
   cloneProfile,
@@ -36,15 +40,11 @@ import {
 } from "../../features/profile/profile-document";
 import {
   getProfileDocument,
-  publishProfileDraft,
-  resetProfileDraft,
-  saveProfileDraft,
   type ProfileDocument,
 } from "../../features/profile/profile.server";
 import { requireBlogDb } from "../../lib/d1.server";
 
 type LoaderData = { document: ProfileDocument; csrfToken: string };
-type ServerResult = { ok: true; document: ProfileDocument; message: string } | { ok: false; error: string };
 type PreviewMode = "public" | "admin" | null;
 
 function errorMessage(error: unknown): string {
@@ -62,27 +62,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
-  await requireCsrf(request, context);
-  const db = requireBlogDb(context);
-  try {
-    const body = await request.json() as { intent?: unknown; profile?: unknown };
-    if (body.intent === "save") {
-      const document = await saveProfileDraft(db, body.profile);
-      return Response.json({ ok: true, document, message: "草稿已儲存，公開內容尚未變更。" } satisfies ServerResult);
-    }
-    if (body.intent === "publish") {
-      await saveProfileDraft(db, body.profile);
-      const document = await publishProfileDraft(db);
-      return Response.json({ ok: true, document, message: `已發布 revision ${document.publishedRevision}。` } satisfies ServerResult);
-    }
-    if (body.intent === "reset") {
-      const document = await resetProfileDraft(db);
-      return Response.json({ ok: true, document, message: "草稿已重設為目前發布版本。" } satisfies ServerResult);
-    }
-    return Response.json({ ok: false, error: "不支援的操作。" } satisfies ServerResult, { status: 400 });
-  } catch (error) {
-    return Response.json({ ok: false, error: errorMessage(error) } satisfies ServerResult, { status: 400 });
-  }
+  return handleProfileAdminAction(request, context);
 }
 
 function id(prefix: string): string {
@@ -288,12 +268,19 @@ export default function AdminProfilePage() {
     if (intent === "publish" && !window.confirm("發布後履歷、FAQ 與公開 AI 會立即使用這個版本。確定發布？")) return;
     setBusy(intent);
     try {
-      const response = await fetch("/admin/profile", {
+      const response = await fetch("/api/admin/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": initial.csrfToken },
         body: JSON.stringify({ intent, ...(intent === "reset" ? {} : { profile }) }),
       });
-      const result = await response.json() as ServerResult;
+      const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+      if (!contentType.includes("application/json")) {
+        if (response.redirected || response.url.includes("/admin/login")) {
+          throw new Error("登入狀態已失效，請重新整理後重新登入。");
+        }
+        throw new Error("伺服器回傳格式異常，請稍後再試。");
+      }
+      const result = await response.json() as ProfileAdminResult;
       if (!response.ok || !result.ok) throw new Error(result.ok ? "操作失敗" : result.error);
       setDocument(result.document);
       setProfile(cloneProfile(result.document.draft));

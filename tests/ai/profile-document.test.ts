@@ -6,6 +6,7 @@ import { createAdminSessionCookie, getCsrfToken, requireCsrf } from "../../app/f
 import { buildStableProfilePrefix } from "../../app/features/ai/prompt";
 import { cloneProfile, parseProfile, toPublicProfile } from "../../app/features/profile/profile-document";
 import { getProfileDocument, getPublishedProfile, publishProfileDraft, saveProfileDraft } from "../../app/features/profile/profile.server";
+import { action as profileAdminApiAction } from "../../app/routes/api/admin/profile";
 
 type MemoryRow = {
   id: string;
@@ -100,4 +101,33 @@ test("admin session and matching CSRF token are required for profile writes", as
     () => requireCsrf(new Request(request.url, { method: "POST", headers: { Cookie: `${sessionPair}; ${csrfPair}` } }), context),
     (error: unknown) => error instanceof Response && error.status === 403,
   );
+});
+
+test("profile editor API returns JSON after saving instead of a rendered HTML document", async () => {
+  const context = {
+    env: {
+      BLOG_ADMIN_PASS: "test-password",
+      BLOG_ADMIN_SESSION_SECRET: "test-session-secret-at-least-32-characters",
+      BLOG_DB: memoryD1(),
+    },
+  } as never;
+  const url = "http://localhost/api/admin/profile";
+  const sessionCookie = await createAdminSessionCookie(new Request(url), context);
+  const sessionPair = sessionCookie.split(";")[0];
+  const csrf = await getCsrfToken(new Request(url, { headers: { Cookie: sessionPair } }), context);
+  const csrfPair = csrf.cookie.split(";")[0];
+  const request = new Request(url, {
+    method: "POST",
+    headers: {
+      Cookie: `${sessionPair}; ${csrfPair}`,
+      "Content-Type": "application/json",
+      "X-CSRF-Token": csrf.token,
+    },
+    body: JSON.stringify({ intent: "save", profile: DEFAULT_PROFILE }),
+  });
+
+  const response = await profileAdminApiAction({ request, context, params: {} } as never);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /application\/json/);
+  assert.equal((await response.json() as { ok?: boolean }).ok, true);
 });

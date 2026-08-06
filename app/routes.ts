@@ -30,6 +30,7 @@ export default [
   ]),
   route("api/ai/company-fit", "routes/api/ai/company-fit.tsx"),
   route("api/ai/chat", "routes/api/ai/chat.tsx"),
+  route("api/admin/profile", "routes/api/admin/profile.tsx"),
   route("api/admin", "routes/api/rng-prompt-admin.tsx"),
   route("api/data", "routes/api/rng-prompt-data.tsx"),
   route("api/output-configs", "routes/api/output-configs.tsx"),
