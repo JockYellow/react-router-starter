@@ -10,11 +10,29 @@ import { requireBlogDb } from "~/lib/d1.server";
 
 export type ResumeOutletContext = { profile: Profile; publishedRevision: number };
 
+const RESUME_INTRO =
+  "擅長從客戶使用數據中找到問題、設計流程、推動改善。\n從教育現場、SaaS 客戶成功到 AI 客服與知識庫導入，每一段經歷都在做同一件事——把混亂變成可運作的系統。\n對我來說，解決問題就像騎車爬坡——找到節奏，持續踩踏，終會抵達。";
+
+function withResumeIntro(profile: Profile): Profile {
+  return {
+    ...profile,
+    personal: {
+      ...profile.personal,
+      intro: RESUME_INTRO,
+    },
+  };
+}
+
 export async function loader({ context }: LoaderFunctionArgs) {
   try {
-    return await getPublishedProfile(requireBlogDb(context));
+    const published = await getPublishedProfile(requireBlogDb(context));
+    return { ...published, profile: withResumeIntro(published.profile) };
   } catch {
-    return { profile: toPublicProfile(DEFAULT_PROFILE), revision: 0, source: "default" as const };
+    return {
+      profile: withResumeIntro(toPublicProfile(DEFAULT_PROFILE)),
+      revision: 0,
+      source: "default" as const,
+    };
   }
 }
 
