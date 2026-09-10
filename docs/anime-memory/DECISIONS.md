@@ -141,3 +141,18 @@ Tags are optional and may evolve after real usage.
 **Decision:** Private seed input is staged into `anime_seed_queue` in D1, processed incrementally, and records MATCHED/AMBIGUOUS/UNMATCHED/SKIPPED/ERROR outcomes. A safely matched seed creates an `anime_decisions` row only when that anime has no existing decision; later manual/survey decisions take precedence.
 
 **Reason:** Staging makes external-provider matching inspectable and resumable without exposing raw source data in Git. Seed material is historical evidence, not an authority that should undo a newer user edit.
+
+## D-024 — Simplified Chinese fallback uses pinned OpenCC `cn -> tw`
+**Decision:** Use pinned `opencc-js` 1.4.2 with the `cn -> tw` conversion path for Bangumi `name_cn` values. Do not use the `twp` phrase-localization path for anime titles.
+
+**Reason:** `opencc-js` is pure JavaScript and works in the current bundler/Worker build without a native binary. The `tw` path performs Taiwan Traditional character conversion while minimizing extra phrase-level wording changes that could be undesirable in proper nouns and licensed titles.
+
+## D-025 — Chinese title enrichment is lazy and best-effort
+**Decision:** Do not enrich every title when a 100-item season is first cached. When the next unresolved card lacks `title_zh_tw`, query Bangumi for that anime, convert a safe `name_cn` match to zh-TW, cache the result, then reuse it. Failure to enrich must not block the survey card.
+
+**Reason:** This avoids large provider bursts and makes the first seasonal load fast while still converging toward a Chinese-first catalog as the user scans titles.
+
+## D-026 — Remote D1 seed verification does not block Batch B implementation
+**Decision:** Batch B UI may begin once Anime tests, repository typecheck, build, and Wrangler dry-run are green. Batch A remains open until private seed staging/resolution is executed against the real Cloudflare D1 environment and schema idempotency is verified there.
+
+**Reason:** The remaining Batch A work requires Cloudflare account/runtime access rather than more application architecture. Blocking all user-visible development on unavailable remote execution would add delay without reducing implementation risk.
