@@ -62,6 +62,7 @@
     "typecheck": "npm run typegen && tsc -b",
     "check": "tsc && react-router build && wrangler deploy --dry-run",
     "test:ai": "node --import tsx --test tests/ai/*.test.ts",
+    "test:anime": "node --import tsx --test tests/anime/*.test.ts",
     "test:e2e:ai": "playwright test tests/e2e/ai.spec.ts",
     "typecheck:ai": "tsc -p tsconfig.ai.json --noEmit",
     "sync:d1:remote-to-local": "node scripts/sync-d1-remote-to-local.mjs",
