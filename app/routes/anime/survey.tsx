@@ -9,15 +9,18 @@ import {
 } from "react-router";
 
 import { requireAdmin } from "../../features/admin/admin-auth.server";
+import { AnimeSurveyHotkeys } from "../../features/anime/AnimeSurveyHotkeys";
 import {
   getAnimePersonalRecord,
   savePrimaryDecision,
   saveSeenEvaluation,
 } from "../../features/anime/anime-record.server";
+import { getSurveyCandidateAtPosition } from "../../features/anime/anime-survey-navigation.server";
 import {
   ensureSurveyScopeCandidates,
   getNextUnresolvedSurveyCandidate,
   refreshSurveyProgress,
+  type SurveyCandidateRow,
 } from "../../features/anime/anime-survey.server";
 import {
   ANIME_EVALUATIONS,
@@ -66,28 +69,43 @@ function parseScopeFromForm(formData: FormData) {
   return { type: "TV_SEASON" as const, year, season: seasonValue };
 }
 
-function surveyUrl(year: number, season: AnimeSeason) {
-  return `/anime/survey?year=${year}&season=${season}`;
+function surveyUrl(year: number, season: AnimeSeason, position?: number | null) {
+  const params = new URLSearchParams({ year: String(year), season });
+  if (position && position > 0) params.set("position", String(position));
+  return `/anime/survey?${params.toString()}`;
 }
 
 export async function loader({ request, context }: LoaderFunctionArgs) {
   await requireAdmin(request, context);
   const db = requireBlogDb(context);
-  const scope = parseScope(new URL(request.url));
+  const url = new URL(request.url);
+  const scope = parseScope(url);
+  const rawPosition = Number(url.searchParams.get("position"));
+  const requestedPosition = Number.isInteger(rawPosition) && rawPosition > 0 ? rawPosition : null;
 
   try {
     const initialSummary = await ensureSurveyScopeCandidates(db, scope, { limit: 100 });
     const summary = (await refreshSurveyProgress(db, scope)) ?? initialSummary;
-    const candidate = await getNextUnresolvedSurveyCandidate(db, scope);
+    const candidate = requestedPosition
+      ? await getSurveyCandidateAtPosition(db, scope, requestedPosition)
+      : await getNextUnresolvedSurveyCandidate(db, scope);
     const record = candidate ? await getAnimePersonalRecord(db, candidate.anilistId) : null;
-    return { scope, summary, candidate, record, error: null as string | null };
+    return {
+      scope,
+      summary,
+      candidate,
+      record,
+      reviewMode: Boolean(requestedPosition),
+      error: null as string | null,
+    };
   } catch {
     return {
       scope,
       summary: null,
       candidate: null,
       record: null,
-      error: "這一季的候選資料目前載入失敗，可以稍後重新整理再試。",
+      reviewMode: Boolean(requestedPosition),
+      error: "這一季的候選資料目前載入失敗，可以重新整理再試。",
     };
   }
 }
@@ -134,7 +152,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
   throw new Response("Unknown survey action", { status: 400 });
 }
 
-function alternateTitles(candidate: NonNullable<Awaited<ReturnType<typeof loader>>["candidate"]>) {
+function alternateTitles(candidate: SurveyCandidateRow) {
   const primary = candidate.titleZhTw ?? candidate.titleNative ?? candidate.titleRomaji ?? candidate.titleEnglish;
   return Array.from(
     new Set([candidate.titleNative, candidate.titleRomaji, candidate.titleEnglish].filter(Boolean)),
@@ -153,16 +171,33 @@ export default function AnimeSurvey() {
   const data = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const submitting = navigation.state !== "idle";
-  const previous = adjacentSeason(data.scope.year, data.scope.season, -1);
-  const next = adjacentSeason(data.scope.year, data.scope.season, 1);
+  const previousSeason = adjacentSeason(data.scope.year, data.scope.season, -1);
+  const nextSeason = adjacentSeason(data.scope.year, data.scope.season, 1);
   const candidate = data.candidate;
   const record = data.record;
   const progress = data.summary && data.summary.candidateCount > 0
     ? Math.min(100, (data.summary.processedCount / data.summary.candidateCount) * 100)
     : 0;
+  const previousItemHref = candidate && candidate.position > 1
+    ? surveyUrl(data.scope.year, data.scope.season, candidate.position - 1)
+    : null;
+  const nextReviewHref = candidate && data.reviewMode && data.summary && candidate.position < data.summary.candidateCount
+    ? surveyUrl(data.scope.year, data.scope.season, candidate.position + 1)
+    : null;
 
   return (
     <main className="min-h-screen bg-neutral-950 px-4 py-6 text-neutral-100 md:py-10">
+      {candidate ? (
+        <AnimeSurveyHotkeys
+          year={data.scope.year}
+          season={data.scope.season}
+          anilistId={candidate.anilistId}
+          primaryEnabled={record?.status !== "SEEN"}
+          previousHref={previousItemHref}
+          disabled={submitting}
+        />
+      ) : null}
+
       <div className="mx-auto max-w-5xl">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -175,8 +210,8 @@ export default function AnimeSurvey() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Link to={surveyUrl(previous.year, previous.season)} className="rounded-xl px-3 py-2 text-sm font-bold text-neutral-400 hover:bg-neutral-900">上一季</Link>
-            <Link to={surveyUrl(next.year, next.season)} className="rounded-xl px-3 py-2 text-sm font-bold text-neutral-400 hover:bg-neutral-900">下一季</Link>
+            <Link to={surveyUrl(previousSeason.year, previousSeason.season)} className="rounded-xl px-3 py-2 text-sm font-bold text-neutral-400 hover:bg-neutral-900">上一季</Link>
+            <Link to={surveyUrl(nextSeason.year, nextSeason.season)} className="rounded-xl px-3 py-2 text-sm font-bold text-neutral-400 hover:bg-neutral-900">下一季</Link>
           </div>
         </header>
 
@@ -192,6 +227,22 @@ export default function AnimeSurvey() {
           </div>
         ) : null}
 
+        {candidate ? (
+          <div className="mt-4 flex min-h-8 items-center justify-between gap-3 text-xs font-bold text-neutral-500">
+            <div className="flex gap-2">
+              {previousItemHref ? (
+                <Link to={previousItemHref} className="rounded-lg px-2.5 py-1.5 hover:bg-neutral-900 hover:text-neutral-300">Z · 上一題</Link>
+              ) : null}
+              {data.reviewMode ? (
+                <Link to={surveyUrl(data.scope.year, data.scope.season)} className="rounded-lg px-2.5 py-1.5 hover:bg-neutral-900 hover:text-neutral-300">回到待答</Link>
+              ) : null}
+            </div>
+            {data.reviewMode && nextReviewHref ? (
+              <Link to={nextReviewHref} className="rounded-lg px-2.5 py-1.5 hover:bg-neutral-900 hover:text-neutral-300">下一題 →</Link>
+            ) : null}
+          </div>
+        ) : null}
+
         {data.error ? (
           <section className="mt-8 rounded-3xl border border-red-900/60 bg-red-950/30 p-6">
             <h2 className="font-black">候選載入失敗</h2>
@@ -201,7 +252,7 @@ export default function AnimeSurvey() {
             </Link>
           </section>
         ) : candidate ? (
-          <section className="mt-7 overflow-hidden rounded-[2rem] border border-neutral-800 bg-neutral-900 shadow-2xl">
+          <section className="mt-3 overflow-hidden rounded-[2rem] border border-neutral-800 bg-neutral-900 shadow-2xl">
             <div className="grid md:grid-cols-[minmax(260px,38%)_1fr]">
               <div className="bg-neutral-800">
                 {candidate.coverUrl ? (
@@ -213,7 +264,7 @@ export default function AnimeSurvey() {
 
               <div className="p-5 md:p-8">
                 <div className="flex items-center justify-between gap-3 text-xs font-bold text-neutral-500">
-                  <span>第 {candidate.position} 部</span>
+                  <span>第 {candidate.position} 部{data.reviewMode ? " · 修改模式" : ""}</span>
                   <span>{[candidate.format, candidate.episodes ? `${candidate.episodes} 集` : null, candidate.studio].filter(Boolean).join(" · ")}</span>
                 </div>
                 <h2 className="mt-4 text-3xl font-black leading-tight md:text-4xl">
@@ -227,19 +278,18 @@ export default function AnimeSurvey() {
 
                 {record?.status === "SEEN" ? (
                   <div className="mt-7">
-                    <div className="mb-5 flex items-center justify-between gap-3">
+                    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <div className="text-sm font-black">你看過這部</div>
-                        <div className="mt-1 text-xs text-neutral-500">補完觀看狀態與總評後，這題才會算完成。</div>
+                        <div className="mt-1 text-xs text-neutral-500">觀看狀態與總評完成後，這題才會計入季度進度。</div>
                       </div>
-                      <Form method="post">
+                      <Form method="post" className="flex gap-3">
                         <input type="hidden" name="intent" value="primary" />
                         <input type="hidden" name="year" value={data.scope.year} />
                         <input type="hidden" name="season" value={data.scope.season} />
                         <input type="hidden" name="anilistId" value={candidate.anilistId} />
-                        <button name="status" value="NOT_SEEN" disabled={submitting} className="text-xs font-bold text-neutral-500 hover:text-neutral-300">
-                          改成沒看
-                        </button>
+                        <button name="status" value="WANT" disabled={submitting} className="text-xs font-bold text-neutral-500 hover:text-neutral-300">改成想看</button>
+                        <button name="status" value="NOT_SEEN" disabled={submitting} className="text-xs font-bold text-neutral-500 hover:text-neutral-300">改成沒看</button>
                       </Form>
                     </div>
 
@@ -285,7 +335,7 @@ export default function AnimeSurvey() {
                         </div>
                       </fieldset>
 
-                      <details className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
+                      <details className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4" open={Boolean(record.note)}>
                         <summary className="cursor-pointer text-sm font-bold text-neutral-400">還想多留一句話</summary>
                         <textarea
                           name="note"
@@ -298,7 +348,7 @@ export default function AnimeSurvey() {
                       </details>
 
                       <button disabled={submitting} className="w-full rounded-2xl bg-white px-5 py-3.5 text-sm font-black text-neutral-950 disabled:opacity-50">
-                        {submitting ? "儲存中…" : "儲存並下一部"}
+                        {submitting ? "儲存中…" : data.reviewMode ? "儲存修改並回到待答" : "儲存並下一部"}
                       </button>
                     </Form>
                   </div>
@@ -310,13 +360,13 @@ export default function AnimeSurvey() {
                     <input type="hidden" name="anilistId" value={candidate.anilistId} />
                     <div className="grid gap-3 sm:grid-cols-3">
                       <button disabled={submitting} name="status" value="SEEN" className="rounded-2xl bg-white px-5 py-4 font-black text-neutral-950 disabled:opacity-50">
-                        看過
+                        看過 <span className="ml-1 text-xs font-bold text-neutral-500">A / ←</span>
                       </button>
                       <button disabled={submitting} name="status" value="WANT" className="rounded-2xl border border-neutral-600 px-5 py-4 font-black text-neutral-100 hover:bg-neutral-800 disabled:opacity-50">
-                        想看
+                        想看 <span className="ml-1 text-xs font-bold text-neutral-500">W / ↑</span>
                       </button>
                       <button disabled={submitting} name="status" value="NOT_SEEN" className="rounded-2xl border border-neutral-800 px-5 py-4 font-black text-neutral-500 hover:bg-neutral-800 disabled:opacity-50">
-                        沒看
+                        沒看 <span className="ml-1 text-xs font-bold text-neutral-600">D / →</span>
                       </button>
                     </div>
                   </Form>
@@ -331,7 +381,7 @@ export default function AnimeSurvey() {
             <p className="mt-2 text-sm text-neutral-500">可以回總覽挑下一季，或直接往下一季繼續。</p>
             <div className="mt-5 flex justify-center gap-2">
               <Link to="/anime" className="rounded-xl border border-neutral-700 px-4 py-2.5 text-sm font-bold">回總覽</Link>
-              <Link to={surveyUrl(next.year, next.season)} className="rounded-xl bg-white px-4 py-2.5 text-sm font-black text-neutral-950">下一季</Link>
+              <Link to={surveyUrl(nextSeason.year, nextSeason.season)} className="rounded-xl bg-white px-4 py-2.5 text-sm font-black text-neutral-950">下一季</Link>
             </div>
           </section>
         )}
