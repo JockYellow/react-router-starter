@@ -7,11 +7,13 @@ on:
   pull_request:
     paths:
       - "app/features/anime/**"
+      - "app/routes/anime/**"
       - "app/routes/api/admin/anime-netflix-seed.tsx"
       - "app/routes.ts"
       - "tests/anime/**"
       - "docs/anime-memory/**"
       - "package.json"
+      - "package-lock.json"
       - ".github/workflows/anime-memory-ci.yml"
 
 permissions:
