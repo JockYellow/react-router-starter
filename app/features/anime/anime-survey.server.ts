@@ -1,4 +1,5 @@
 import { cacheAniListAnimeBatch } from "./anime-catalog.server";
+import { ensureAnimeChineseTitle } from "./anime-chinese-title.server";
 import { ensureAnimeSchema } from "./anime.schema.server";
 import {
   animeSurveyScopeKey,
@@ -273,7 +274,21 @@ export async function getNextUnresolvedSurveyCandidate(
     .bind(scopeKey)
     .first<CandidateDbRow>();
 
-  return row ? mapCandidateRow(row) : null;
+  if (!row) return null;
+  const candidate = mapCandidateRow(row);
+  if (candidate.titleZhTw) return candidate;
+
+  try {
+    const enrichment = await ensureAnimeChineseTitle(db, candidate.anilistId);
+    if (enrichment.titleZhTw) {
+      return { ...candidate, titleZhTw: enrichment.titleZhTw };
+    }
+  } catch {
+    // Chinese-title enrichment is best-effort. Provider trouble must never block
+    // the reconstruction flow; the UI can fall back to native/Romaji/English.
+  }
+
+  return candidate;
 }
 
 export async function refreshSurveyProgress(
