@@ -9,11 +9,16 @@ import {
 } from "react-router";
 
 import { requireAdmin } from "../../features/admin/admin-auth.server";
+import { AnimeSeenAutosave } from "../../features/anime/AnimeSeenAutosave";
 import { AnimeSurveyHotkeys } from "../../features/anime/AnimeSurveyHotkeys";
 import {
   getAnimePersonalRecord,
   savePrimaryDecision,
+  saveSeenDetail,
   saveSeenEvaluation,
+  saveSeenNote,
+  saveSeenRating,
+  toggleSeenTag,
 } from "../../features/anime/anime-record.server";
 import { getSurveyCandidateAtPosition } from "../../features/anime/anime-survey-navigation.server";
 import {
@@ -110,6 +115,17 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
   }
 }
 
+export function shouldRevalidate({
+  formData,
+  defaultShouldRevalidate,
+}: {
+  formData?: FormData;
+  defaultShouldRevalidate: boolean;
+}) {
+  const intent = String(formData?.get("intent") ?? "");
+  return intent.endsWith("-autosave") ? false : defaultShouldRevalidate;
+}
+
 export async function action({ request, context }: ActionFunctionArgs) {
   await requireAdmin(request, context);
   const db = requireBlogDb(context);
@@ -121,6 +137,28 @@ export async function action({ request, context }: ActionFunctionArgs) {
   }
 
   const intent = String(formData.get("intent") ?? "");
+
+  if (intent === "seen-detail-autosave") {
+    await saveSeenDetail(db, anilistId, String(formData.get("detailStatus") ?? "") as AnimeWatchDetail);
+    await refreshSurveyProgress(db, scope);
+    return Response.json({ ok: true });
+  }
+
+  if (intent === "seen-rating-autosave") {
+    await saveSeenRating(db, anilistId, String(formData.get("rating") ?? "") as AnimeEvaluationKey);
+    await refreshSurveyProgress(db, scope);
+    return Response.json({ ok: true });
+  }
+
+  if (intent === "seen-tag-toggle-autosave") {
+    await toggleSeenTag(db, anilistId, String(formData.get("tag") ?? ""));
+    return Response.json({ ok: true });
+  }
+
+  if (intent === "seen-note-autosave") {
+    await saveSeenNote(db, anilistId, String(formData.get("note") ?? ""));
+    return Response.json({ ok: true });
+  }
 
   if (intent === "primary") {
     const status = String(formData.get("status") ?? "") as AnimePrimaryStatus;
@@ -184,6 +222,7 @@ export default function AnimeSurvey() {
   const nextReviewHref = candidate && data.reviewMode && data.summary && candidate.position < data.summary.candidateCount
     ? surveyUrl(data.scope.year, data.scope.season, candidate.position + 1)
     : null;
+  const seenFormId = candidate ? `anime-seen-${candidate.anilistId}` : "anime-seen";
 
   return (
     <main className="min-h-screen bg-neutral-950 px-4 py-6 text-neutral-100 md:py-10">
@@ -281,7 +320,7 @@ export default function AnimeSurvey() {
                     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <div className="text-sm font-black">你看過這部</div>
-                        <div className="mt-1 text-xs text-neutral-500">觀看狀態與總評完成後，這題才會計入季度進度。</div>
+                        <div className="mt-1 text-xs text-neutral-500">每個選擇都會先存；最後確認只負責前往下一部。</div>
                       </div>
                       <Form method="post" className="flex gap-3">
                         <input type="hidden" name="intent" value="primary" />
@@ -293,11 +332,20 @@ export default function AnimeSurvey() {
                       </Form>
                     </div>
 
-                    <Form method="post" className="space-y-6">
+                    <Form id={seenFormId} method="post" className="space-y-6">
                       <input type="hidden" name="intent" value="seen-evaluation" />
                       <input type="hidden" name="year" value={data.scope.year} />
                       <input type="hidden" name="season" value={data.scope.season} />
                       <input type="hidden" name="anilistId" value={candidate.anilistId} />
+
+                      <div className="flex justify-end">
+                        <AnimeSeenAutosave
+                          formId={seenFormId}
+                          year={data.scope.year}
+                          season={data.scope.season}
+                          anilistId={candidate.anilistId}
+                        />
+                      </div>
 
                       <fieldset>
                         <legend className="text-sm font-black">看到哪裡？</legend>
@@ -342,13 +390,13 @@ export default function AnimeSurvey() {
                           defaultValue={record.note ?? ""}
                           rows={3}
                           maxLength={4000}
-                          placeholder="完全可以不寫。只在真的有什麼想留下時再寫。"
+                          placeholder="完全可以不寫。離開輸入框時會自動儲存。"
                           className="mt-3 w-full resize-y rounded-xl border border-neutral-700 bg-neutral-900 p-3 text-sm outline-none focus:border-neutral-400"
                         />
                       </details>
 
                       <button disabled={submitting} className="w-full rounded-2xl bg-white px-5 py-3.5 text-sm font-black text-neutral-950 disabled:opacity-50">
-                        {submitting ? "儲存中…" : data.reviewMode ? "儲存修改並回到待答" : "儲存並下一部"}
+                        {submitting ? "處理中…" : data.reviewMode ? "確認修改並回到待答" : "確認並下一部"}
                       </button>
                     </Form>
                   </div>
