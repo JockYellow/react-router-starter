@@ -22,7 +22,8 @@ This checklist is intentionally split into small, independently verifiable segme
 - [x] Create `anime_evaluation_tags`.
 - [x] Create `anime_survey_progress`.
 - [x] Create `anime_survey_candidates` to freeze per-scope candidate membership/order.
-- [x] Add indexes for alias lookup, status filtering, year/season filtering, source lookup, evaluation filtering, and survey ordering.
+- [x] Create `anime_seed_queue` for private/resumable seed processing.
+- [x] Add indexes for alias lookup, status filtering, year/season filtering, source lookup, evaluation filtering, survey ordering, and seed queue status.
 - [x] Make schema creation logically idempotent with `CREATE TABLE/INDEX IF NOT EXISTS` and per-binding initialization caching.
 - [x] Keep schema isolated via `anime_*` names.
 - [ ] Execute schema twice against a real local/remote D1 environment as final idempotency verification.
@@ -49,7 +50,7 @@ This checklist is intentionally split into small, independently verifiable segme
 - [x] Add pure-domain tests covering alias/status behavior (execution still pending).
 
 ### A4. Netflix seed
-- [x] Read the latest reviewed Netflix decision set from the connected Google Sheet (2026-09-10 snapshot source).
+- [x] Read the latest reviewed Netflix decision set from the connected Google Sheet (2026-09-10 source snapshot; personal rows are not committed).
 - [x] Define deterministic Netflix review-status mapping.
 - [x] Exclude `誤判` from personal decisions.
 - [x] Map `沒看` to `NOT_SEEN`, not Seen.
@@ -57,20 +58,26 @@ This checklist is intentionally split into small, independently verifiable segme
 - [x] Implement conservative AniList title resolution: only unique exact normalized alias matches auto-bind.
 - [x] Implement idempotent `anime_sources` upsert for matched/ambiguous/unmatched rows.
 - [x] Persist intended decision/candidate snapshots for unresolved seed matches.
-- [x] Implement decision upsert only for safely matched canonical anime.
+- [x] Implement seed decision insert only for safely matched canonical anime.
+- [x] Ensure seed import never overwrites a newer manual/survey decision.
 - [x] Ensure imported matched decisions are skipped by `getNextUnresolvedSurveyCandidate()` and counted as processed.
-- [ ] Commit a versioned reviewed Netflix seed snapshot into the repository.
-- [ ] Add a controlled import entry point/script for the committed seed snapshot.
-- [ ] Execute the seed and review MATCHED / AMBIGUOUS / UNMATCHED counts before considering import complete.
+- [x] Add validated private seed input format (`netflix-seed-input.ts`).
+- [x] Add private D1 staging queue with PENDING/MATCHED/AMBIGUOUS/UNMATCHED/SKIPPED/ERROR states.
+- [x] Add resumable queue processing and retry support.
+- [x] Add admin+CSRF protected staging/resolve/retry API at `/api/admin/anime/netflix-seed`.
+- [x] Ignore local Anime Memory private-data paths in Git.
+- [ ] Stage the current reviewed rows into D1 through the private import path.
+- [ ] Execute the queue and review MATCHED / AMBIGUOUS / UNMATCHED / ERROR counts before considering seed complete.
 
 ### A5. Batch A verification
 - [ ] Existing routes remain unaffected after typecheck/build verification.
 - [ ] D1 schema initializes using existing `BLOG_DB` in an executable environment.
 - [ ] Re-running schema initialization causes no destructive changes.
-- [ ] Seed import is repeatable/idempotent in an executable environment.
+- [ ] Seed staging/import is repeatable/idempotent in an executable environment.
 - [ ] Review ambiguous/unmatched Netflix mappings rather than forcing them.
-- [ ] Run `node --import tsx --test tests/anime/*.test.ts`.
+- [ ] Run `node --import tsx --test tests/anime/*.test.ts` / `npm run test:anime`.
 - [ ] Run repository typecheck/build/Wrangler dry-run as appropriate.
+- [ ] Add/verify Anime Memory GitHub Actions CI.
 - [x] Update `STATUS.md` at meaningful checkpoints.
 - [x] Update #5 checklist/status at meaningful checkpoints.
 
