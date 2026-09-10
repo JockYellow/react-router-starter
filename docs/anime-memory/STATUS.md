@@ -14,7 +14,7 @@ Draft PR: #11 — `feat: build Anime Memory archive`
 
 **IN PROGRESS — Batch A (#5)**
 
-The project is past planning-only state. Domain types, the initial D1 schema, provider clients, conservative title normalization, and AniList-to-D1 catalog caching now exist. No user-facing Anime route has been added yet.
+The project is past planning-only state. The domain model, D1 schema, external provider clients, conservative title resolution, Netflix seed persistence logic, and stable seasonal survey-scope caching now exist. No user-facing Anime route has been added yet.
 
 ## Tracking
 
@@ -29,109 +29,116 @@ The project is past planning-only state. Domain types, the initial D1 schema, pr
 ## Completed
 
 ### Project setup / handoff
-- [x] Identified host repository: `JockYellow/react-router-starter`.
-- [x] Confirmed existing Cloudflare Worker + React Router SSR architecture.
-- [x] Confirmed existing `BLOG_DB` D1 binding is already used by multiple features.
-- [x] Decided to reuse `BLOG_DB`; no Anime-only D1 is planned.
-- [x] Created feature branch `feature/anime-memory`.
-- [x] Created GitHub roadmap/batch/handoff issues (#5–#10).
-- [x] Created Draft PR #11.
-- [x] Added canonical `README.md`, `TODO.md`, `DECISIONS.md`, and `STATUS.md` under `docs/anime-memory/`.
+- [x] Reuse existing `BLOG_DB`; no Anime-only D1.
+- [x] Feature branch `feature/anime-memory`.
+- [x] Roadmap/batch/handoff issues #5–#10.
+- [x] Draft PR #11.
+- [x] Canonical README / TODO / DECISIONS / STATUS docs under `docs/anime-memory/`.
 
 ### A0 — Domain foundation
-- [x] Added `app/features/anime/anime.types.ts`.
-- [x] Added stable keys/types for seasons, primary decisions, detailed viewing status, overall evaluation, survey scopes, and the initial 15 evaluation tags.
-- [x] Added deterministic survey scope keys (`tv:YEAR:SEASON`, `movie:YEAR`).
-- [x] Added conservative title/alias normalization helpers.
+- [x] `app/features/anime/anime.types.ts`.
+- [x] Stable keys for seasons, primary decisions, viewing detail, evaluation, survey scopes and 15 concrete evaluation tags.
+- [x] Deterministic scope keys (`tv:YEAR:SEASON`, `movie:YEAR`).
+- [x] Conservative title/alias normalization helpers.
+- [x] Pure domain tests added under `tests/anime/anime-domain.test.ts` (not executable-verified yet).
 
 ### A1 — D1 schema implementation
-- [x] Added idempotent `ensureAnimeSchema(db)` using the existing D1 Worker binding model.
-- [x] Added `anime_catalog`.
-- [x] Added `anime_aliases`.
-- [x] Added `anime_decisions`.
-- [x] Added `anime_sources` with explicit `MATCHED / AMBIGUOUS / UNMATCHED` provenance states.
-- [x] Added `anime_evaluations`.
-- [x] Added `anime_evaluation_tags`.
-- [x] Added `anime_survey_progress`.
-- [x] Added `anime_survey_candidates` to freeze each survey candidate set/order.
-- [x] Added indexes for primary filter/search paths.
-- [x] Cached schema initialization per D1 binding object for a Worker isolate; failed initialization can retry.
+- [x] Idempotent `ensureAnimeSchema(db)` using existing Worker D1 binding pattern.
+- [x] `anime_catalog`.
+- [x] `anime_aliases`.
+- [x] `anime_decisions`.
+- [x] `anime_sources` with `MATCHED / AMBIGUOUS / UNMATCHED` provenance states.
+- [x] `anime_evaluations`.
+- [x] `anime_evaluation_tags`.
+- [x] `anime_survey_progress`.
+- [x] `anime_survey_candidates` to freeze candidate membership/order per scope.
+- [x] Primary filter/search/order indexes.
 
-### A2 — Provider layer (partial)
-- [x] Added shared provider HTTP timeout/error wrapper.
-- [x] Added AniList GraphQL client.
-- [x] AniList seasonal discovery by year + season.
-- [x] AniList movie discovery by year.
-- [x] AniList anime title search (returns multiple candidates rather than assuming the first result is correct).
-- [x] Added Bangumi v0 subject search client filtered to anime/non-NSFW.
-- [x] Bangumi client sends an identifiable project User-Agent.
-- [x] Added AniList metadata/alias D1 cache functions.
+### A2 — Provider layer
+- [x] Shared provider timeout/error wrapper.
+- [x] AniList GraphQL seasonal discovery.
+- [x] AniList movie-by-year discovery.
+- [x] AniList title search that returns multiple candidates.
+- [x] Bangumi v0 anime search client with identifiable User-Agent.
+- [x] AniList metadata/alias D1 cache.
+- [x] Stable survey-scope orchestration: provider fetch -> catalog cache -> frozen candidate positions.
+- [x] Read APIs for full scope and next unresolved candidate.
+- [x] Progress refresh based on actual decisions.
 - [ ] Reliable Simplified Chinese -> Taiwan Traditional conversion/selection.
-- [ ] End-to-end title resolver that safely links a Bangumi subject to an AniList record.
-- [ ] Provider cache/read orchestration for a full seasonal survey scope.
+- [ ] End-to-end Chinese-title enrichment of newly discovered survey candidates.
 
-### A4 — Netflix source preparation (partial)
-- [x] Re-read the live reviewed Google Sheet (`動畫候選`) on 2026-09-10 rather than trusting the old local prototype list.
-- [x] Confirmed the current sheet still contains the formal decisions used by the import model (看完 / 看完一季／系列未追完 / 看過一部分 / 棄番 / 沒看 / 誤判, etc.).
-- [ ] Implement deterministic seed import from the reviewed data.
-- [ ] Resolve Japanese anime to AniList IDs where evidence is strong.
-- [ ] Preserve other-region/unmatched/ambiguous rows as provenance instead of forcing AniList IDs.
+### A3 — Safe matching
+- [x] NFKC/case/punctuation/whitespace normalization only.
+- [x] No broad substring auto-match.
+- [x] AniList resolver only auto-matches a unique exact normalized alias (or unique exact alias narrowed by year when available).
+- [x] Search results without exact alias are `AMBIGUOUS`, not silently accepted.
+- [x] Bangumi resolver requires exact normalized source-name evidence and uses year as a narrowing signal when available.
+
+### A4 — Netflix seed implementation (partial)
+- [x] Re-read live reviewed Google Sheet `動畫候選` on 2026-09-10.
+- [x] Exported the current native Sheet to an XLSX snapshot in the execution environment for deterministic extraction; 109 non-empty reviewed title rows were confirmed.
+- [x] Current status counts confirmed from the snapshot: 69 看完, 6 看完一季／系列未追完, 11 看過一部分, 11 棄番, 9 沒看, 3 誤判.
+- [x] Deterministic status mapping implemented in `netflix-seed.ts`.
+- [x] `誤判` / deferred/unknown statuses do not create decisions.
+- [x] Safe per-row importer implemented in `netflix-seed.server.ts`.
+- [x] Matched rows cache canonical AniList metadata and use the reviewed Netflix title as a trusted zh-TW alias/display title.
+- [x] Matched rows upsert personal decisions.
+- [x] Ambiguous/unmatched rows preserve provenance, intended decision and candidate snapshots without creating a false canonical decision.
+- [x] Imported decisions are automatically skipped by the next-unresolved survey query and counted as processed.
+- [ ] Commit a versioned reviewed Netflix seed snapshot into the repository.
+- [ ] Add a controlled import entry point/script for that snapshot.
+- [ ] Execute import and review MATCHED / AMBIGUOUS / UNMATCHED results.
 
 ## Active segment
 
-### A2/A3/A4 — Provider resolution + safe seed import
+### A4/A5 — Versioned seed snapshot + executable verification
 
-Next implementation tasks:
+Next exact tasks:
 
-1. Add a safe AniList/Bangumi title-resolution layer.
-2. Decide and implement a reliable zh-TW conversion path without hand-maintaining a partial conversion dictionary.
-3. Add seed import types/status mapping and idempotent `anime_sources` writes.
-4. Resolve Netflix rows only when matching evidence is sufficient; preserve ambiguous/unmatched records explicitly.
-5. Add survey-scope cache/orchestration that persists candidate order in `anime_survey_candidates`.
-6. Perform executable type/build/D1 verification before closing Batch A.
+1. Commit the 2026-09-10 reviewed Netflix data as a versioned repository seed snapshot.
+2. Add a controlled seed-import command/entry point that consumes the committed snapshot.
+3. Add a reliable zh-TW conversion strategy for non-Netflix provider titles (do not use a handwritten partial mapping table).
+4. Execute pure-domain tests.
+5. Execute TypeScript typecheck/build/Wrangler dry-run in a repository-capable environment.
+6. Execute schema initialization twice against D1 and verify idempotency.
+7. Execute the Netflix seed, inspect ambiguous/unmatched rows, and only then close Batch A.
 
 ## Important decisions to preserve
 
 - TV survey progress is year + season.
 - Movies are tracked separately by year.
 - Survey candidate membership/order is persisted so progress cannot drift when third-party rankings change.
-- Primary survey choices are Seen / Want / Not Seen.
-- Seen expands in-place to detailed viewing status + one overall evaluation + optional concrete tags.
-- There is no mandatory separate quality score.
+- Primary choices are Seen / Want / Not Seen.
+- Seen expands to detailed viewing status + one overall evaluation + optional concrete tags.
+- No mandatory second quality score.
 - 'Why I watched it' is not required.
 - Free-text note is optional and secondary.
 - Every meaningful answer should persist continuously.
-- Chinese-first display titles are required for efficient recall.
-- AniList is the planned canonical external Anime ID/provider; Bangumi is a Chinese-title fallback/source.
+- Chinese-first display titles are required.
+- AniList is the canonical external Anime ID/provider; Bangumi is a Chinese-title fallback/source.
 - Netflix is seed/provenance, not canonical identity.
-- Ambiguous external title matches must remain reviewable; no broad substring auto-match.
+- Ambiguous provider matches remain reviewable.
+- Non-Japanese/unmatched Netflix animation must not be silently discarded or forced into AniList.
 - Smart recommendation/gap-filling is out of scope.
 - JSON/CSV export is required before project completion.
 
 ## Verification status
 
 ### Verified by repository inspection / current official docs
-- Existing `BLOG_DB` binding is present in `wrangler.json`.
-- Existing repository features already use D1 through Worker bindings.
+- Existing `BLOG_DB` binding is present and already used by site features.
 - Current Cloudflare D1 Worker API supports prepared statements and `batch()`.
-- Current AniList API supports POST GraphQL requests, seasonal filters, pagination, and anime title search.
-- Current Bangumi v0 API exposes subject search; official guidance requests an identifiable User-Agent for non-browser API clients.
+- Current AniList API supports POST GraphQL, seasonal filtering, pagination and title search.
+- Current Bangumi v0 API exposes subject search and documents an identifiable User-Agent expectation for non-browser clients.
 
 ### Not yet executable-verified
-- TypeScript build/typecheck for the new files.
-- D1 schema execution against local or remote `blog-db`.
-- Live AniList/Bangumi requests from the repository runtime.
+- New Anime TypeScript files compile in the repository build.
+- Domain tests pass.
+- D1 schema executes successfully against local/remote `blog-db`.
+- Live provider calls work from the deployed Worker runtime.
+- Netflix seed import result counts.
 
-The ChatGPT execution container cannot directly clone/install/run this GitHub repository because outbound GitHub network access is unavailable there. Do not mark executable verification complete until it is run through the repository's normal development/CI/Cloudflare environment.
-
-## Known constraints / risks
-
-- ChatGPT/GitHub access can modify repository code but does not expose the Cloudflare dashboard directly.
-- This is acceptable for schema design because the existing `BLOG_DB` binding already exists.
-- The repository has no OpenCC dependency at this point. Do not introduce an untracked or incomplete handwritten Simplified/Traditional conversion table.
-- AniList itself warns that title search is not a unique lookup; seed matching must evaluate candidates rather than trusting result #1.
-- The reviewed Netflix sheet contains some non-Japanese animation. These records must not be silently dropped or forced into AniList if no canonical Anime entry exists.
+The ChatGPT container cannot directly clone/install/run this GitHub repository because outbound GitHub network access is unavailable there. Do not mark executable verification complete until run through the repository's normal local/CI/Cloudflare environment.
 
 ## Next exact step for a new developer/session
 
-Read `README.md`, `TODO.md`, and `DECISIONS.md`, then open #5 and Draft PR #11. Continue the A2/A3/A4 provider-resolution/seed work on `feature/anime-memory`. Do not start Batch B UI until Batch A has executable schema/build verification and the seed/candidate-cache path is stable.
+Read `README.md`, `TODO.md`, `DECISIONS.md`, issue #5 and Draft PR #11. Continue with the versioned Netflix seed snapshot/import entry point on `feature/anime-memory`, then solve provider zh-TW conversion and perform executable Batch A verification. Do not start Batch B UI before those foundation checks are complete.
