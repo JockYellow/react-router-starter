@@ -17,11 +17,15 @@ export type ReviewedNetflixSeedRow = {
   title: string;
   category?: string | null;
   format?: string | null;
+  viewingRecordCount?: number | null;
+  distinctTitleCount?: number | null;
   firstWatchedAt?: string | null;
   lastWatchedAt?: string | null;
   reviewStatus: string;
   evidence?: string | null;
   verificationStatus?: string | null;
+  verificationUrl?: string | null;
+  sourceRowNumber?: number | null;
 };
 
 export type NetflixDecisionMapping = {

@@ -112,6 +112,20 @@ async function createAnimeSchema(db: D1Database) {
       FOREIGN KEY (scope_key) REFERENCES anime_survey_progress(scope_key) ON DELETE CASCADE,
       FOREIGN KEY (anilist_id) REFERENCES anime_catalog(anilist_id) ON DELETE CASCADE
     )`,
+    `CREATE TABLE IF NOT EXISTS anime_seed_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source TEXT NOT NULL,
+      source_ref TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      queue_status TEXT NOT NULL DEFAULT 'PENDING' CHECK (
+        queue_status IN ('PENDING', 'MATCHED', 'AMBIGUOUS', 'UNMATCHED', 'SKIPPED', 'ERROR')
+      ),
+      attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+      last_error TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE (source, source_ref)
+    )`,
     `CREATE INDEX IF NOT EXISTS idx_anime_catalog_year_season_format
       ON anime_catalog (year, season, format)`,
     `CREATE INDEX IF NOT EXISTS idx_anime_catalog_mal_id
@@ -134,6 +148,8 @@ async function createAnimeSchema(db: D1Database) {
       ON anime_survey_progress (updated_at DESC)`,
     `CREATE INDEX IF NOT EXISTS idx_anime_survey_candidates_scope_position
       ON anime_survey_candidates (scope_key, position)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_seed_queue_source_status
+      ON anime_seed_queue (source, queue_status, updated_at)`,
   ].map((sql) => db.prepare(sql));
 
   await db.batch(statements);

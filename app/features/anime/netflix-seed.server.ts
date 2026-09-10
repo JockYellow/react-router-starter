@@ -74,10 +74,14 @@ async function upsertNetflixSource(
       JSON.stringify({
         category: row.category ?? null,
         format: row.format ?? null,
+        viewingRecordCount: row.viewingRecordCount ?? null,
+        distinctTitleCount: row.distinctTitleCount ?? null,
         firstWatchedAt: row.firstWatchedAt ?? null,
         lastWatchedAt: row.lastWatchedAt ?? null,
         evidence: row.evidence ?? null,
         verificationStatus: row.verificationStatus ?? null,
+        verificationUrl: row.verificationUrl ?? null,
+        sourceRowNumber: row.sourceRowNumber ?? null,
         ...options.metadata,
       }),
       now,
@@ -86,7 +90,7 @@ async function upsertNetflixSource(
     .run();
 }
 
-async function upsertDecision(
+async function insertSeedDecisionIfMissing(
   db: D1Database,
   anilistId: number,
   status: "SEEN" | "WANT" | "NOT_SEEN",
@@ -95,17 +99,13 @@ async function upsertDecision(
   const now = Date.now();
   await db
     .prepare(
-      `INSERT INTO anime_decisions (
+      `INSERT OR IGNORE INTO anime_decisions (
         anilist_id,
         status,
         detail_status,
         decided_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(anilist_id) DO UPDATE SET
-        status = excluded.status,
-        detail_status = excluded.detail_status,
-        updated_at = excluded.updated_at`,
+      ) VALUES (?, ?, ?, ?, ?)`,
     )
     .bind(anilistId, status, detailStatus, now, now)
     .run();
@@ -132,7 +132,8 @@ export async function importReviewedNetflixRow(
         candidates: candidateSnapshot(resolution),
       },
     });
-    await upsertDecision(db, resolution.anime.id, mapping.status, mapping.detailStatus);
+    // Seed data fills missing history only. A later manual/survey answer always wins.
+    await insertSeedDecisionIfMissing(db, resolution.anime.id, mapping.status, mapping.detailStatus);
     return "MATCHED";
   }
 
