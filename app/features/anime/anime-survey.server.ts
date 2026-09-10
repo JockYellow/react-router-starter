@@ -119,9 +119,16 @@ async function getExistingScope(
       `SELECT
         p.*,
         COALESCE((
-          SELECT COUNT(*)
+          SELECT SUM(
+            CASE
+              WHEN d.status IN ('WANT', 'NOT_SEEN') THEN 1
+              WHEN d.status = 'SEEN' AND d.detail_status IS NOT NULL AND e.rating IS NOT NULL THEN 1
+              ELSE 0
+            END
+          )
           FROM anime_survey_candidates c
-          JOIN anime_decisions d ON d.anilist_id = c.anilist_id
+          LEFT JOIN anime_decisions d ON d.anilist_id = c.anilist_id
+          LEFT JOIN anime_evaluations e ON e.anilist_id = c.anilist_id
           WHERE c.scope_key = p.scope_key
         ), 0) AS processed_count
       FROM anime_survey_progress p
@@ -266,8 +273,15 @@ export async function getNextUnresolvedSurveyCandidate(
       FROM anime_survey_candidates c
       JOIN anime_catalog a ON a.anilist_id = c.anilist_id
       LEFT JOIN anime_decisions d ON d.anilist_id = c.anilist_id
+      LEFT JOIN anime_evaluations e ON e.anilist_id = c.anilist_id
       WHERE c.scope_key = ?
-        AND d.anilist_id IS NULL
+        AND (
+          d.anilist_id IS NULL
+          OR (
+            d.status = 'SEEN'
+            AND (d.detail_status IS NULL OR e.rating IS NULL)
+          )
+        )
       ORDER BY c.position ASC
       LIMIT 1`,
     )
@@ -303,10 +317,23 @@ export async function refreshSurveyProgress(
     .prepare(
       `SELECT
         COUNT(*) AS candidate_count,
-        COALESCE(SUM(CASE WHEN d.anilist_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS processed_count,
-        COALESCE(MAX(CASE WHEN d.anilist_id IS NOT NULL THEN c.position ELSE 0 END), 0) AS last_position
+        COALESCE(SUM(
+          CASE
+            WHEN d.status IN ('WANT', 'NOT_SEEN') THEN 1
+            WHEN d.status = 'SEEN' AND d.detail_status IS NOT NULL AND e.rating IS NOT NULL THEN 1
+            ELSE 0
+          END
+        ), 0) AS processed_count,
+        COALESCE(MAX(
+          CASE
+            WHEN d.status IN ('WANT', 'NOT_SEEN') THEN c.position
+            WHEN d.status = 'SEEN' AND d.detail_status IS NOT NULL AND e.rating IS NOT NULL THEN c.position
+            ELSE 0
+          END
+        ), 0) AS last_position
       FROM anime_survey_candidates c
       LEFT JOIN anime_decisions d ON d.anilist_id = c.anilist_id
+      LEFT JOIN anime_evaluations e ON e.anilist_id = c.anilist_id
       WHERE c.scope_key = ?`,
     )
     .bind(scopeKey)
