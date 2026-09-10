@@ -131,3 +131,13 @@ Tags are optional and may evolve after real usage.
 **Decision:** When a reviewed Netflix row is safely matched to an AniList record, its reviewed display title may populate `title_zh_tw` and a `resolved:zh-tw` alias. An unmatched Netflix title must not be attached to a guessed AniList record merely to obtain Chinese display text.
 
 **Reason:** This lets known Netflix titles immediately benefit the Chinese-first UI without weakening identity matching rules.
+
+## D-022 — Personal Anime Memory data never enters the public Git repository
+**Decision:** Reviewed Netflix rows, watched-title snapshots, ratings, notes, and exported personal Anime Memory datasets must not be committed to this repository. The public repo versions only schema, import formats, code, tests, and non-personal aggregate development notes. Private source data stays in D1 or an ignored local/private file.
+
+**Reason:** Git history is durable and this repository is public. Deleting a file later would not reliably remove personal viewing history from prior commits.
+
+## D-023 — Seed imports are staged privately and must not overwrite manual decisions
+**Decision:** Private seed input is staged into `anime_seed_queue` in D1, processed incrementally, and records MATCHED/AMBIGUOUS/UNMATCHED/SKIPPED/ERROR outcomes. A safely matched seed creates an `anime_decisions` row only when that anime has no existing decision; later manual/survey decisions take precedence.
+
+**Reason:** Staging makes external-provider matching inspectable and resumable without exposing raw source data in Git. Seed material is historical evidence, not an authority that should undo a newer user edit.
