@@ -9,6 +9,8 @@ export default [
   route("blog", "routes/blog/index.tsx"),
   route("blog/:slug", "routes/blog/$slug.tsx"),
   route("changelog", "routes/changelog.tsx"),
+  route("anime", "routes/anime/index.tsx"),
+  route("anime/survey", "routes/anime/survey.tsx"),
   route("admin/login", "routes/admin/login.tsx"),
   route("admin/blog-edit", "routes/admin/blog-edit.tsx"),
   route("admin", "routes/admin/index.tsx"),
