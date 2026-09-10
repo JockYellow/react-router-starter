@@ -132,6 +132,87 @@ export async function saveSeenDetail(
     .run();
 }
 
+export async function toggleSeenTag(
+  db: D1Database,
+  anilistId: number,
+  tag: string,
+): Promise<void> {
+  if (!isAnimeEvaluationTagKey(tag)) throw new Error("Invalid Anime evaluation tag");
+  await ensureAnimeSchema(db);
+
+  const existing = await db
+    .prepare("SELECT 1 AS found FROM anime_evaluation_tags WHERE anilist_id = ? AND tag_key = ?")
+    .bind(anilistId, tag)
+    .first<{ found: number }>();
+
+  if (existing) {
+    await db
+      .prepare("DELETE FROM anime_evaluation_tags WHERE anilist_id = ? AND tag_key = ?")
+      .bind(anilistId, tag)
+      .run();
+    return;
+  }
+
+  await db
+    .prepare(
+      `INSERT INTO anime_evaluation_tags (anilist_id, tag_key, created_at)
+      VALUES (?, ?, ?)`,
+    )
+    .bind(anilistId, tag, Date.now())
+    .run();
+}
+
+export async function saveSeenNote(
+  db: D1Database,
+  anilistId: number,
+  noteInput: string | null,
+): Promise<void> {
+  await ensureAnimeSchema(db);
+  const note = noteInput?.trim().slice(0, 4000) || null;
+  const now = Date.now();
+
+  await db
+    .prepare(
+      `INSERT INTO anime_evaluations (anilist_id, rating, note, updated_at)
+      VALUES (?, NULL, ?, ?)
+      ON CONFLICT(anilist_id) DO UPDATE SET
+        note = excluded.note,
+        updated_at = excluded.updated_at`,
+    )
+    .bind(anilistId, note, now)
+    .run();
+}
+
+export async function saveSeenRating(
+  db: D1Database,
+  anilistId: number,
+  rating: AnimeEvaluationKey,
+): Promise<void> {
+  if (!ANIME_EVALUATION_KEYS.includes(rating)) throw new Error("Invalid Anime evaluation");
+  await ensureAnimeSchema(db);
+
+  const decision = await db
+    .prepare("SELECT status, detail_status FROM anime_decisions WHERE anilist_id = ?")
+    .bind(anilistId)
+    .first<{ status: AnimePrimaryStatus; detail_status: AnimeWatchDetail | null }>();
+
+  if (!decision || decision.status !== "SEEN" || !decision.detail_status) {
+    throw new Error("Viewing detail is required before rating");
+  }
+
+  const now = Date.now();
+  await db
+    .prepare(
+      `INSERT INTO anime_evaluations (anilist_id, rating, note, updated_at)
+      VALUES (?, ?, NULL, ?)
+      ON CONFLICT(anilist_id) DO UPDATE SET
+        rating = excluded.rating,
+        updated_at = excluded.updated_at`,
+    )
+    .bind(anilistId, rating, now)
+    .run();
+}
+
 export async function saveSeenEvaluation(
   db: D1Database,
   input: {
