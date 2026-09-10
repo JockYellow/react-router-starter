@@ -1,0 +1,48 @@
+name: Anime Memory CI
+
+on:
+  push:
+    branches:
+      - feature/anime-memory
+  pull_request:
+    paths:
+      - "app/features/anime/**"
+      - "app/routes/api/admin/anime-netflix-seed.tsx"
+      - "app/routes.ts"
+      - "tests/anime/**"
+      - "docs/anime-memory/**"
+      - "package.json"
+      - ".github/workflows/anime-memory-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Anime unit tests
+        run: npm run test:anime
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Wrangler dry run
+        run: npx wrangler deploy --dry-run
