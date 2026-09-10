@@ -8,100 +8,121 @@ Last updated: 2026-09-10
 - Base: `main`
 - Draft PR: #11 — `feat: build Anime Memory archive`
 - Roadmap: #9
-- Active batch: #5 — Batch A
+- Active batch: #6 — Batch B
+- Batch A: #5 — code-complete; remote D1/private seed verification remains open
 
 ## Current overall state
 
-**IN PROGRESS — Batch A foundation is substantially implemented.**
+**IN PROGRESS — Batch B seasonal survey is now implemented as a first usable vertical slice.**
 
-There is still no user-facing `/anime` page. The current work intentionally finishes data safety, provider/title handling, seed import, and executable verification before Batch B UI begins.
+The project is no longer data-foundation-only. Private `/anime` and `/anime/survey` routes exist, compile in the full application, and are covered by Anime Memory CI. The dashboard shows season-by-season progress from 2011 onward. The survey can load a frozen seasonal candidate sequence, display Chinese-first metadata, persist viewing decisions, and capture Seen detail + one overall evaluation + optional tags/note.
 
-## Completed
+## Verification snapshot
 
-### Project / handoff
+A GitHub Actions run after the first `/anime` UI slice passed:
+
+- [x] `npm ci`
+- [x] `npm run test:anime`
+- [x] repository typecheck
+- [x] React Router build
+- [x] Wrangler deploy dry-run
+
+A newer CI run is used for each subsequent Batch B change. Do not mark browser/runtime UX acceptance complete solely from compile CI.
+
+## Batch A — foundation status
+
+### Completed in code
 - [x] Reuse existing `BLOG_DB`; no Anime-only D1.
-- [x] Dedicated feature branch and Draft PR #11.
-- [x] Batch issues #5–#8 + roadmap #9.
-- [x] Canonical README / TODO / DECISIONS / STATUS docs.
-- [x] Documentation/handoff issue #10 completed.
+- [x] Stable domain keys for season/status/watch detail/evaluation/tags.
+- [x] `anime_catalog`, `anime_aliases`, `anime_decisions`, `anime_sources`.
+- [x] `anime_evaluations`, `anime_evaluation_tags`.
+- [x] `anime_survey_progress`, `anime_survey_candidates`.
+- [x] Private `anime_seed_queue`.
+- [x] AniList season/movie/title provider.
+- [x] Bangumi title fallback.
+- [x] Conservative exact-normalized title resolution; no broad substring auto-match.
+- [x] Frozen candidate membership/order per survey scope.
+- [x] Private Netflix seed staging/resolve/retry code and admin API.
+- [x] Seed data cannot overwrite later manual/survey decisions.
+- [x] `opencc-js` 1.4.2 pinned in manifest/lockfile.
+- [x] Bangumi `name_cn` -> OpenCC `cn -> tw` -> cached `title_zh_tw` path.
+- [x] Chinese-title enrichment is lazy and best-effort, so it does not burst requests for all 100 titles or block the survey when the fallback provider fails.
+- [x] Anime CI runs tests/typecheck/build/Wrangler dry-run.
 
-### Domain + D1
-- [x] Stable season/status/watch-detail/evaluation/tag keys.
-- [x] 15 concrete evaluation tags.
-- [x] `anime_catalog`.
-- [x] `anime_aliases`.
-- [x] `anime_decisions`.
-- [x] `anime_sources`.
-- [x] `anime_evaluations`.
-- [x] `anime_evaluation_tags`.
-- [x] `anime_survey_progress`.
-- [x] `anime_survey_candidates` freezes each survey scope's membership/order.
-- [x] `anime_seed_queue` stages private imports with PENDING/MATCHED/AMBIGUOUS/UNMATCHED/SKIPPED/ERROR states.
-- [x] Runtime `ensureAnimeSchema(db)` remains idempotent by construction (`IF NOT EXISTS`).
+### Still pending because it requires real Cloudflare/private-data execution
+- [ ] Execute schema against real remote `BLOG_DB` and verify repeated initialization.
+- [ ] Stage the reviewed private Netflix rows into real D1.
+- [ ] Resolve the private seed queue and inspect MATCHED / AMBIGUOUS / UNMATCHED / ERROR counts.
 
-### Provider / matching
-- [x] AniList season discovery, movie-year discovery, title search.
-- [x] AniList catalog/alias D1 cache.
-- [x] Bangumi v0 title search fallback.
-- [x] Shared provider timeout/error handling.
-- [x] Conservative exact-normalized alias matching; no broad substring auto-match.
-- [x] Ambiguous/unmatched source records remain reviewable rather than forced.
-- [x] Stable seasonal candidate orchestration + next-unresolved/progress reads.
-- [ ] Reliable Simplified Chinese -> Taiwan Traditional conversion/selection.
-- [ ] End-to-end Chinese title enrichment for newly discovered provider candidates.
+Per D-026, these runtime verification items keep #5 open but do not block Batch B UI development.
 
-### Netflix seed
-- [x] Latest reviewed Google Sheet was re-read on 2026-09-10; 109 reviewed rows were observed for migration planning.
-- [x] Status mapping preserves 看完 / 看完一季 / 部分 / 棄番 / 沒看 semantics and excludes 誤判.
-- [x] Reviewed seed row schema now preserves useful source metadata/count fields.
-- [x] Validated private seed input parser; max 500 rows per staging request.
-- [x] D1 staging queue is resumable and retryable.
-- [x] Controlled admin+CSRF API: `/api/admin/anime/netflix-seed`.
-- [x] Queue resolves in small batches (max 10) to reduce external-provider pressure.
-- [x] MATCHED rows populate canonical metadata/provenance.
-- [x] AMBIGUOUS / UNMATCHED rows never create false decisions.
-- [x] Seed decisions use insert-if-missing semantics and therefore cannot overwrite a later manual/survey decision.
-- [x] Local private-data paths are Git-ignored.
-- [ ] Stage the current reviewed dataset privately into D1.
-- [ ] Process the queue and inspect final match/error counts.
+## Batch B — implemented now
 
-## Privacy rule
+### Dashboard `/anime`
+- [x] Private/admin-authenticated route.
+- [x] Seen / Want / Favourite counts.
+- [x] Recent Anime Memory records.
+- [x] 2011-to-current-year TV seasonal matrix.
+- [x] Winter / Spring / Summer / Fall cells.
+- [x] Not-started / in-progress / completed states.
+- [x] Processed / candidate count and progress bar.
+- [x] Direct season links.
+- [x] Resume latest active season.
 
-This repository is public. **Never commit personal Anime Memory data**: watched-title lists, Netflix rows, personal ratings/tags/notes, or exported archives. Git versions only code/schema/import formats/tests and non-personal aggregate development notes. Private input belongs in ignored local files or D1.
-
-See DECISIONS D-022/D-023.
+### Seasonal survey `/anime/survey`
+- [x] Private/admin-authenticated route.
+- [x] Initializes/fetches one frozen seasonal candidate sequence (default 100).
+- [x] Chinese-first title with native/Romaji/English fallback/aliases.
+- [x] Poster, format, episode count and studio metadata when available.
+- [x] Primary `看過 / 想看 / 沒看` actions.
+- [x] Want / Not Seen save immediately and advance.
+- [x] Selecting Seen saves immediately but intentionally keeps the same card unresolved until viewing detail + overall evaluation are supplied.
+- [x] Seen detail: Complete / season complete / partial / dropped / movie-only.
+- [x] One overall evaluation: Favourite / Love / Recommend / Neutral / Dislike / Unrated.
+- [x] Optional 15 concrete tags.
+- [x] Optional secondary free-text note.
+- [x] Progress semantics require Seen records to have both detail + overall evaluation before they count as processed.
+- [x] Position-addressable review mode (`position=N`) for revisiting/editing an earlier card.
+- [x] Previous-item navigation and return-to-unresolved flow.
+- [x] Desktop primary hotkeys: A/Left = Seen, W/Up = Want, D/Right = Not Seen, Z = previous item.
+- [x] Hotkeys are disabled while typing in input/textarea/select/contenteditable controls.
 
 ## Active segment
 
-### A5 — Executable verification + Chinese-title completion
+### B5/B6 — persistence/recovery polish + efficient correction
 
 Next exact tasks:
 
-1. Add `test:anime` script and Anime Memory GitHub Actions CI.
-2. Run domain/schema/input tests in CI.
-3. Run repository typecheck, build, and Wrangler dry-run in CI.
-4. Fix any compile/test failures before progressing.
-5. Implement reliable zh-TW conversion/selection and end-to-end title enrichment.
-6. Verify schema against an executable D1 environment.
-7. Privately stage/process the reviewed Netflix dataset and review ambiguous/unmatched records.
-8. Close #5 only after these checks pass; then begin Batch B `/anime` + seasonal survey UI.
+1. Verify the latest previous-item/hotkey implementation in CI and fix any type/build issue.
+2. Update #6/TODO checkboxes to reflect the verified vertical slice.
+3. Add explicit persistent decision that Anime Memory pages are private/admin-authenticated by default.
+4. Improve Seen-flow persistence so meaningful partial choices survive an unexpected close without forcing a long final submit.
+5. Add browser-level/manual acceptance coverage for reload/resume, season switching and previous-item edits where feasible.
+6. Keep #5 remote D1/private seed verification separate; do not let it expand Batch B scope again.
 
-## Verification status
+## Privacy rule
 
-### Implemented but not yet execution-verified
-- New Anime TypeScript compiles with the entire repository.
-- New test files pass.
-- D1 schema executes against actual `blog-db`.
-- Live AniList/Bangumi calls work from the Worker runtime.
-- Private Netflix queue import result counts.
+This repository is public. Never commit personal Anime Memory rows, watched-title lists, Netflix rows, personal ratings/tags/notes, or exported archives. Git versions only code/schema/import contracts/tests and non-personal aggregate development notes. Private source data belongs in D1 or ignored local/private files.
 
-The current chat environment cannot directly run the repository's installed Node/Cloudflare toolchain. GitHub Actions is therefore the preferred immediate executable-verification path.
+## Important decisions to preserve
+
+- TV progress is year + season; movies are year-based separately.
+- Candidate membership/order is frozen per scope.
+- Seen / Want / Not Seen is the primary question.
+- Seen requires detailed viewing status + one overall evaluation to finish a survey item.
+- Tags and free-text note remain optional.
+- Chinese-first display is required, but title fallback failure must never block answering.
+- AniList is canonical identity; Bangumi improves Chinese-title coverage.
+- Personal data never enters public Git.
+- Seed data is historical evidence and never overrides newer manual decisions.
+- Smart recommendation/gap-filling remains out of scope.
+- JSON/CSV export remains required before final completion.
 
 ## Resume instructions for a new developer/chat
 
 1. Read this file.
-2. Read `docs/anime-memory/TODO.md` and `DECISIONS.md`.
-3. Open issue #5 and Draft PR #11.
+2. Read `docs/anime-memory/TODO.md`, `DECISIONS.md`, and `PRIVATE_DATA.md`.
+3. Open #6 (active), #5 (remote verification pending), and Draft PR #11.
 4. Continue on `feature/anime-memory`.
-5. Do not place private viewing data in GitHub.
-6. Do not start Batch B until Batch A verification/title enrichment is resolved, unless the roadmap is deliberately changed and documented.
+5. Check the latest Anime Memory CI before expanding the next segment.
+6. Continue B5/B6 persistence/recovery and correction UX; do not reopen solved Batch A architecture questions.
