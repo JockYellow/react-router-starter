@@ -116,3 +116,18 @@ Tags are optional and may evolve after real usage.
 **Decision:** Development is split into GitHub issues #5–#8 with #9 as roadmap and #10 as handoff discipline.
 
 **Reason:** Each segment should be independently reviewable, reportable, and resumable by another developer/conversation.
+
+## D-019 — Freeze survey candidate membership and order
+**Decision:** Each TV season/movie-year survey stores its candidate membership and position in `anime_survey_candidates` the first time the scope is initialized. Existing scopes reuse that stored sequence rather than rebuilding from current provider rankings.
+
+**Reason:** AniList popularity/score ordering can change over time. A durable personal progress marker must continue to refer to the same sequence after reloads or weeks/months of inactivity.
+
+## D-020 — Preserve unresolved provenance instead of forcing canonical identity
+**Decision:** `anime_sources.anilist_id` is nullable and each source row records `MATCHED`, `AMBIGUOUS`, or `UNMATCHED`. Only safely matched canonical anime create/update `anime_decisions` automatically.
+
+**Reason:** The reviewed Netflix data includes translated titles, potentially ambiguous names, and some non-Japanese animation. Losing those rows is unacceptable, but forcing them onto the wrong AniList record is worse. Unresolved rows remain inspectable with intended decision and candidate metadata.
+
+## D-021 — Reviewed Netflix title is trusted as zh-TW only after safe canonical match
+**Decision:** When a reviewed Netflix row is safely matched to an AniList record, its reviewed display title may populate `title_zh_tw` and a `resolved:zh-tw` alias. An unmatched Netflix title must not be attached to a guessed AniList record merely to obtain Chinese display text.
+
+**Reason:** This lets known Netflix titles immediately benefit the Chinese-first UI without weakening identity matching rules.
