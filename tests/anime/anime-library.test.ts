@@ -32,6 +32,18 @@ test("library query normalizes filters, removes invalid values, and clamps pagin
   assert.equal(query.offset, 0);
 });
 
+test("library query falls back when paging values are non-finite", () => {
+  const query = normalizeAnimeLibraryQuery({
+    limit: Number.NaN,
+    offset: Number.POSITIVE_INFINITY,
+    years: [Number.NaN, Number.POSITIVE_INFINITY, 2025],
+  });
+
+  assert.equal(query.limit, 48);
+  assert.equal(query.offset, 0);
+  assert.deepEqual(query.years, [2025]);
+});
+
 test("library search covers display titles and normalized aliases with escaped LIKE input", () => {
   const query = normalizeAnimeLibraryQuery({ search: "  My_ Hero%!!  " });
   const filter = buildAnimeLibrarySqlFilter(query);
