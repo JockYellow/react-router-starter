@@ -1,3 +1,4 @@
+import { animeCoverProxyPath } from "./anime-cover.server";
 import { ensureAnimeChineseTitle } from "./anime-chinese-title.server";
 import { ensureAnimeSchema } from "./anime.schema.server";
 import { animeSurveyScopeKey, type AnimeSurveyScope } from "./anime.types";
@@ -87,7 +88,7 @@ function mapCandidateRow(row: CandidateDbRow): SurveyCandidateRow {
     season: row.season,
     format: row.format,
     episodes: row.episodes,
-    coverUrl: row.cover_url,
+    coverUrl: row.cover_url ? animeCoverProxyPath(row.anime_id) : null,
     studio: row.studio,
     popularity: row.popularity,
     averageScore: row.average_score,
