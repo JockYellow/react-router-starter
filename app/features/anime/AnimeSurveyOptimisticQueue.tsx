@@ -36,6 +36,14 @@ function parseQueueResponse(value: unknown): QueueResponse | null {
   return { ok: true, items: value.items };
 }
 
+function parseSavedProcessedCount(value: unknown): number | null {
+  if (!isRecord(value) || value.ok !== true || !isRecord(value.summary)) return null;
+  const processedCount = value.summary.processedCount;
+  return typeof processedCount === "number" && Number.isFinite(processedCount)
+    ? processedCount
+    : null;
+}
+
 function initialSignature(items: readonly AnimeSurveyQueueItem[]): string {
   return items
     .map((item) => [
@@ -94,18 +102,9 @@ export function useAnimeSurveyOptimisticQueue(props: {
   useEffect(() => {
     if (lastScopeRef.current !== scopeKey) return;
     setDisplayProcessedCount((current) => Math.max(current, props.processedCount));
-    setQueue((current) => {
-      const incomingById = new Map(
-        props.initialItems.map((item) => [item.candidate.animeId, item] as const),
-      );
-      const refreshedCurrent = current.map((item) => incomingById.get(item.candidate.animeId) ?? item);
-      return mergeAnimeSurveyQueue(
-        refreshedCurrent,
-        props.initialItems,
-        handledIdsRef.current,
-        5,
-      );
-    });
+    setQueue(mergeAnimeSurveyQueue([], props.initialItems, handledIdsRef.current, 5));
+    setRefillError(null);
+    lastRefillKeyRef.current = "";
   }, [incomingSignature, props.initialItems, props.processedCount, scopeKey]);
 
   useEffect(() => {
@@ -134,11 +133,15 @@ export function useAnimeSurveyOptimisticQueue(props: {
         keepalive: true,
         headers: { Accept: "application/json" },
       });
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || `HTTP ${response.status}`);
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok || !isRecord(payload) || payload.ok !== true) {
+        throw new Error(`背景儲存失敗（HTTP ${response.status}）`);
       }
 
+      const persistedProcessedCount = parseSavedProcessedCount(payload);
+      if (persistedProcessedCount != null) {
+        setDisplayProcessedCount((current) => Math.max(current, persistedProcessedCount));
+      }
       setSaveJobs((current) => current.filter((item) => item.animeId !== job.animeId));
     } catch (error) {
       setSaveJobs((current) => current.map((item) => item.animeId === job.animeId
