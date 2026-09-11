@@ -30,7 +30,7 @@ function fakeSchemaDb(options: { failFirstBatch?: boolean } = {}) {
   };
 }
 
-test("Anime schema initializes once per D1 binding object", async () => {
+test("Anime schema initializes legacy and provider-neutral tables once per D1 binding object", async () => {
   const fake = fakeSchemaDb();
   await ensureAnimeSchema(fake.db);
   await ensureAnimeSchema(fake.db);
@@ -39,6 +39,16 @@ test("Anime schema initializes once per D1 binding object", async () => {
   assert.ok(fake.sql.some((statement) => statement.includes("CREATE TABLE IF NOT EXISTS anime_catalog")));
   assert.ok(fake.sql.some((statement) => statement.includes("CREATE TABLE IF NOT EXISTS anime_survey_load_state")));
   assert.ok(fake.sql.some((statement) => statement.includes("CREATE TABLE IF NOT EXISTS anime_seed_queue")));
+
+  assert.ok(fake.sql.some((statement) => statement.includes("CREATE TABLE IF NOT EXISTS anime_items")));
+  assert.ok(fake.sql.some((statement) => statement.includes("anime_id INTEGER PRIMARY KEY AUTOINCREMENT")));
+  assert.ok(fake.sql.some((statement) => statement.includes("CREATE TABLE IF NOT EXISTS anime_scope_candidates")));
+  assert.ok(fake.sql.some((statement) => statement.includes("CREATE TABLE IF NOT EXISTS anime_scope_load_state")));
+  assert.ok(fake.sql.some((statement) => statement.includes("provider TEXT NOT NULL")));
+  assert.ok(fake.sql.some((statement) => statement.includes("INSERT OR IGNORE INTO anime_items")));
+  assert.ok(fake.sql.some((statement) => statement.includes("FROM anime_catalog")));
+  assert.ok(fake.sql.some((statement) => statement.includes("INSERT OR IGNORE INTO anime_user_decisions")));
+  assert.ok(fake.sql.some((statement) => statement.includes("INSERT OR IGNORE INTO anime_scope_candidates")));
 });
 
 test("Anime schema cache is cleared after a failed initialization", async () => {
