@@ -1,6 +1,6 @@
 import type { AnimeSeason } from "../anime.types";
 
-export type AnimeCatalogProvider = "JIKAN" | "ANILIST";
+export type AnimeCatalogProvider = "BANGUMI" | "ANILIST";
 
 export type AnimeProviderRecord = {
   provider: AnimeCatalogProvider;
@@ -8,6 +8,7 @@ export type AnimeProviderRecord = {
   malId: number | null;
   anilistId: number | null;
   bangumiId: number | null;
+  titleZhTw: string | null;
   title: {
     romaji: string | null;
     english: string | null;
@@ -26,8 +27,11 @@ export type AnimeProviderRecord = {
   studio: string | null;
 };
 
-export type AnimeProviderPageBatch = {
+export type AnimeProviderBatch = {
   records: AnimeProviderRecord[];
-  page: number;
-  hasNextPage: boolean;
+  nextCursor: string | null;
+  done: boolean;
+  step: number;
+  stepTotal: number;
+  label: string;
 };
