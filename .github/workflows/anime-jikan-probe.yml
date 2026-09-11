@@ -1,0 +1,26 @@
+name: Anime Jikan Probe
+
+on:
+  push:
+    branches:
+      - refactor/anime-provider-neutral
+    paths:
+      - .github/workflows/anime-jikan-probe.yml
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe Jikan seasonal API
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://api.jikan.moe/v4/seasons/2011/winter?sfw=true&page=1'
+          code=$(curl --silent --show-error --location \
+            --header 'Accept: application/json' \
+            --header 'User-Agent: AnimeMemory/1.0 (+https://github.com/JockYellow/react-router-starter)' \
+            --output /tmp/jikan.json --write-out '%{http_code}' "$url")
+          echo "HTTP $code"
+          node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync("/tmp/jikan.json","utf8")); console.log({items:Array.isArray(p.data)?p.data.length:null,page:p.pagination?.current_page,next:p.pagination?.has_next_page}); if(!Array.isArray(p.data)||p.data.length===0) process.exit(2)'
+          test "$code" = "200"
