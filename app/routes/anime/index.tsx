@@ -84,6 +84,12 @@ export default function AnimeDashboard() {
           <div className="flex flex-wrap gap-2">
             <Link
               className="rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm font-bold hover:border-neutral-300"
+              to="/anime/watchlist"
+            >
+              想看清單 · {data.stats.want}
+            </Link>
+            <Link
+              className="rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm font-bold hover:border-neutral-300"
               to="/anime/library"
             >
               瀏覽 Library
