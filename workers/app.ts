@@ -14,6 +14,8 @@ const requestHandler = createRequestHandler(
   import.meta.env.MODE,
 );
 
+const BANGUMI_IMAGE_ORIGIN = "https://lain.bgm.tv";
+
 function isLocalHostname(hostname: string) {
   return (
     hostname === "localhost" ||
@@ -40,7 +42,7 @@ export default {
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline'",
         "style-src 'self' 'unsafe-inline'",
-        `img-src 'self' data:${mediaSrc}`,
+        `img-src 'self' data:${mediaSrc} ${BANGUMI_IMAGE_ORIGIN}`,
         `media-src 'self' blob:${mediaSrc}`,
         "font-src 'self' data:",
         `connect-src 'self'${toolbeltSrc}`,
