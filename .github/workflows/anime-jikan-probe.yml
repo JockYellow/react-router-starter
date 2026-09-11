@@ -12,15 +12,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Probe Jikan seasonal API
+      - name: Probe Jikan seasonal API with bounded retry
         shell: bash
         run: |
           set -euo pipefail
           url='https://api.jikan.moe/v4/seasons/2011/winter?sfw=true&page=1'
-          code=$(curl --silent --show-error --location \
-            --header 'Accept: application/json' \
-            --header 'User-Agent: AnimeMemory/1.0 (+https://github.com/JockYellow/react-router-starter)' \
-            --output /tmp/jikan.json --write-out '%{http_code}' "$url")
-          echo "HTTP $code"
-          node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync("/tmp/jikan.json","utf8")); console.log({items:Array.isArray(p.data)?p.data.length:null,page:p.pagination?.current_page,next:p.pagination?.has_next_page}); if(!Array.isArray(p.data)||p.data.length===0) process.exit(2)'
-          test "$code" = "200"
+          success=0
+          for attempt in 1 2 3; do
+            code=$(curl --silent --show-error --location \
+              --header 'Accept: application/json' \
+              --header 'User-Agent: AnimeMemory/1.0 (+https://github.com/JockYellow/react-router-starter)' \
+              --output /tmp/jikan.json --write-out '%{http_code}' "$url")
+            echo "attempt=$attempt HTTP $code"
+            node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync("/tmp/jikan.json","utf8")); console.log({status:p.status??null,type:p.type??null,message:p.message??null,items:Array.isArray(p.data)?p.data.length:null,page:p.pagination?.current_page??null,next:p.pagination?.has_next_page??null})'
+            if [ "$code" = "200" ] && node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync("/tmp/jikan.json","utf8")); process.exit(Array.isArray(p.data)&&p.data.length>0?0:1)'; then
+              success=1
+              break
+            fi
+            sleep $attempt
+          done
+          test "$success" = "1"
