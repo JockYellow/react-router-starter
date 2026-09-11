@@ -221,7 +221,9 @@ export default function AnimeLibrary() {
             </div>
 
             <fieldset className="mt-5 border-t border-neutral-200 pt-5">
-              <legend className="text-xs font-black uppercase tracking-wide text-neutral-400">印象標籤</legend>
+              <legend className="text-xs font-black uppercase tracking-wide text-neutral-400">
+                印象標籤 <span className="font-medium normal-case tracking-normal">（多選時需全部符合）</span>
+              </legend>
               <div className="mt-2 flex flex-wrap gap-2">
                 {ANIME_EVALUATION_TAGS.map((tag) => (
                   <label key={tag.key} className="cursor-pointer rounded-full border border-neutral-200 bg-white px-3 py-2 text-xs font-bold text-neutral-600 has-[:checked]:border-neutral-900 has-[:checked]:bg-neutral-900 has-[:checked]:text-white">
