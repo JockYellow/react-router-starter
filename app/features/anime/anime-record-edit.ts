@@ -68,7 +68,12 @@ export function normalizeAnimeRecordEdit(input: AnimeRecordEditInput): Normalize
 export function sanitizeAnimeLibraryReturnTo(value: string | null | undefined): string {
   const candidate = value?.trim();
   if (!candidate || candidate.length > 2000) return "/anime/library";
-  if (candidate === "/anime/library" || candidate.startsWith("/anime/library?")) {
+  if (
+    candidate === "/anime/library"
+    || candidate.startsWith("/anime/library?")
+    || candidate === "/anime/watchlist"
+    || candidate.startsWith("/anime/watchlist?")
+  ) {
     return candidate;
   }
   return "/anime/library";
