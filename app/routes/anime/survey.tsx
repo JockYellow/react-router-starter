@@ -11,6 +11,7 @@ import {
 import { requireAdmin } from "../../features/admin/admin-auth.server";
 import { AnimeSeenAutosave } from "../../features/anime/AnimeSeenAutosave";
 import { AnimeSurveyHotkeys } from "../../features/anime/AnimeSurveyHotkeys";
+import { AnimeSurveyInitializer } from "../../features/anime/AnimeSurveyInitializer";
 import {
   getAnimePersonalRecord,
   savePrimaryDecision,
@@ -20,6 +21,11 @@ import {
   saveSeenRating,
   toggleSeenTag,
 } from "../../features/anime/anime-record.server";
+import {
+  ensureSurveyInitialization,
+  processSurveyLoadStep,
+  retrySurveyLoadStep,
+} from "../../features/anime/anime-survey-load.server";
 import { getSurveyCandidateAtPosition } from "../../features/anime/anime-survey-navigation.server";
 import {
   ensureSurveyScopeCandidates,
@@ -89,6 +95,20 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
   const requestedPosition = Number.isInteger(rawPosition) && rawPosition > 0 ? rawPosition : null;
 
   try {
+    const initialization = await ensureSurveyInitialization(db, scope, { targetCount: 100 });
+    if (!initialization.ready && initialization.state) {
+      return {
+        scope,
+        summary: null,
+        candidate: null,
+        record: null,
+        reviewMode: Boolean(requestedPosition),
+        initializing: true,
+        loadState: initialization.state,
+        error: null as string | null,
+      };
+    }
+
     const initialSummary = await ensureSurveyScopeCandidates(db, scope, { limit: 100 });
     const summary = (await refreshSurveyProgress(db, scope)) ?? initialSummary;
     const candidate = requestedPosition
@@ -101,6 +121,8 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
       candidate,
       record,
       reviewMode: Boolean(requestedPosition),
+      initializing: false,
+      loadState: initialization.state,
       error: null as string | null,
     };
   } catch {
@@ -110,6 +132,8 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
       candidate: null,
       record: null,
       reviewMode: Boolean(requestedPosition),
+      initializing: false,
+      loadState: null,
       error: "這一季的候選資料目前載入失敗，可以重新整理再試。",
     };
   }
@@ -131,12 +155,20 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const db = requireBlogDb(context);
   const formData = await request.formData();
   const scope = parseScopeFromForm(formData);
+  const intent = String(formData.get("intent") ?? "");
+
+  if (intent === "initialize-step") {
+    return Response.json(await processSurveyLoadStep(db, scope, { targetCount: 100 }));
+  }
+
+  if (intent === "retry-load") {
+    return Response.json({ kind: "RETRYING" as const, state: await retrySurveyLoadStep(db, scope) });
+  }
+
   const anilistId = Number(formData.get("anilistId"));
   if (!Number.isInteger(anilistId) || anilistId <= 0) {
     throw new Response("Invalid anime id", { status: 400 });
   }
-
-  const intent = String(formData.get("intent") ?? "");
 
   if (intent === "seen-detail-autosave") {
     await saveSeenDetail(db, anilistId, String(formData.get("detailStatus") ?? "") as AnimeWatchDetail);
@@ -290,6 +322,8 @@ export default function AnimeSurvey() {
               重新整理
             </Link>
           </section>
+        ) : data.initializing && data.loadState ? (
+          <AnimeSurveyInitializer year={data.scope.year} season={data.scope.season} initialState={data.loadState} />
         ) : candidate ? (
           <section className="mt-3 overflow-hidden rounded-[2rem] border border-neutral-800 bg-neutral-900 shadow-2xl">
             <div className="grid md:grid-cols-[minmax(260px,38%)_1fr]">

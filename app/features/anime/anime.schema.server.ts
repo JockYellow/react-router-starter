@@ -112,6 +112,23 @@ async function createAnimeSchema(db: D1Database) {
       FOREIGN KEY (scope_key) REFERENCES anime_survey_progress(scope_key) ON DELETE CASCADE,
       FOREIGN KEY (anilist_id) REFERENCES anime_catalog(anilist_id) ON DELETE CASCADE
     )`,
+    `CREATE TABLE IF NOT EXISTS anime_survey_load_state (
+      scope_key TEXT PRIMARY KEY,
+      scope_type TEXT NOT NULL CHECK (scope_type IN ('TV_SEASON', 'MOVIE_YEAR')),
+      year INTEGER NOT NULL CHECK (year > 1900),
+      season TEXT CHECK (season IS NULL OR season IN ('WINTER', 'SPRING', 'SUMMER', 'FALL')),
+      phase TEXT NOT NULL CHECK (phase IN ('FETCHING_PROVIDER', 'BUILDING_SCOPE', 'READY', 'ERROR')),
+      resume_phase TEXT CHECK (resume_phase IS NULL OR resume_phase IN ('FETCHING_PROVIDER', 'BUILDING_SCOPE')),
+      target_count INTEGER NOT NULL DEFAULT 100 CHECK (target_count >= 0),
+      fetched_count INTEGER NOT NULL DEFAULT 0 CHECK (fetched_count >= 0),
+      next_page INTEGER NOT NULL DEFAULT 1 CHECK (next_page > 0),
+      retry_count INTEGER NOT NULL DEFAULT 0 CHECK (retry_count >= 0),
+      locked_until INTEGER,
+      last_error TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (scope_key) REFERENCES anime_survey_progress(scope_key) ON DELETE CASCADE
+    )`,
     `CREATE TABLE IF NOT EXISTS anime_seed_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       source TEXT NOT NULL,
@@ -148,6 +165,8 @@ async function createAnimeSchema(db: D1Database) {
       ON anime_survey_progress (updated_at DESC)`,
     `CREATE INDEX IF NOT EXISTS idx_anime_survey_candidates_scope_position
       ON anime_survey_candidates (scope_key, position)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_survey_load_state_phase
+      ON anime_survey_load_state (phase, updated_at)`,
     `CREATE INDEX IF NOT EXISTS idx_anime_seed_queue_source_status
       ON anime_seed_queue (source, queue_status, updated_at)`,
   ].map((sql) => db.prepare(sql));

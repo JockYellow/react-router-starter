@@ -37,6 +37,7 @@ test("Anime schema initializes once per D1 binding object", async () => {
 
   assert.equal(fake.batchCalls(), 1);
   assert.ok(fake.sql.some((statement) => statement.includes("CREATE TABLE IF NOT EXISTS anime_catalog")));
+  assert.ok(fake.sql.some((statement) => statement.includes("CREATE TABLE IF NOT EXISTS anime_survey_load_state")));
   assert.ok(fake.sql.some((statement) => statement.includes("CREATE TABLE IF NOT EXISTS anime_seed_queue")));
 });
 

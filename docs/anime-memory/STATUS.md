@@ -1,25 +1,26 @@
 # Anime Memory Status
 
-Last updated: 2026-09-10
+Last updated: 2026-09-11
 
 ## Current branch / review entry
 
-- Branch: `feature/anime-memory`
 - Base: `main`
-- Draft PR: #11 — `feat: build Anime Memory archive`
+- PR #11 — initial Anime Memory vertical slice — merged on 2026-09-10.
+- Active branch: `feature/anime-batch-b-reliability`
+- Active Draft PR: #12 — `feat(anime): finish Batch B loading reliability`
 - Roadmap: #9
 - Active batch: #6 — Batch B
 - Batch A: #5 — code-complete; remote D1/private seed verification remains open
 
 ## Current overall state
 
-**IN PROGRESS — Batch B seasonal survey is now implemented as a first usable vertical slice.**
+**Batch B is code-complete in PR #12. Remaining work is deployed browser acceptance.**
 
-The project is no longer data-foundation-only. Private `/anime` and `/anime/survey` routes exist, compile in the full application, and are covered by Anime Memory CI. The dashboard shows season-by-season progress from 2011 onward. The survey can load a frozen seasonal candidate sequence, display Chinese-first metadata, persist viewing decisions, and capture Seen detail + one overall evaluation + optional tags/note.
+`/anime` and `/anime/survey` are already on `main`. PR #12 adds the missing reliability/UX layer for first-time seasonal data loading: visible progress, 50-item provider batches, durable resume state, duplicate-load suppression, bounded automatic retries, and targeted failure recovery.
 
 ## Verification snapshot
 
-A GitHub Actions run after the first `/anime` UI slice passed:
+The Batch B reliability implementation passed the complete Anime Memory CI pipeline before the final docs-only checkpoint:
 
 - [x] `npm ci`
 - [x] `npm run test:anime`
@@ -27,102 +28,96 @@ A GitHub Actions run after the first `/anime` UI slice passed:
 - [x] React Router build
 - [x] Wrangler deploy dry-run
 
-A newer CI run is used for each subsequent Batch B change. Do not mark browser/runtime UX acceptance complete solely from compile CI.
+Provider retry unit tests and the load-state schema test are included. Browser/runtime acceptance against the deployed Cloudflare Worker/D1 is still required before #6 is closed.
 
 ## Batch A — foundation status
 
 ### Completed in code
 - [x] Reuse existing `BLOG_DB`; no Anime-only D1.
-- [x] Stable domain keys for season/status/watch detail/evaluation/tags.
-- [x] `anime_catalog`, `anime_aliases`, `anime_decisions`, `anime_sources`.
-- [x] `anime_evaluations`, `anime_evaluation_tags`.
-- [x] `anime_survey_progress`, `anime_survey_candidates`.
-- [x] Private `anime_seed_queue`.
-- [x] AniList season/movie/title provider.
-- [x] Bangumi title fallback.
-- [x] Conservative exact-normalized title resolution; no broad substring auto-match.
-- [x] Frozen candidate membership/order per survey scope.
-- [x] Private Netflix seed staging/resolve/retry code and admin API.
-- [x] Seed data cannot overwrite later manual/survey decisions.
-- [x] `opencc-js` 1.4.2 pinned in manifest/lockfile.
-- [x] Bangumi `name_cn` -> OpenCC `cn -> tw` -> cached `title_zh_tw` path.
-- [x] Chinese-title enrichment is lazy and best-effort, so it does not burst requests for all 100 titles or block the survey when the fallback provider fails.
-- [x] Anime CI runs tests/typecheck/build/Wrangler dry-run.
+- [x] Stable domain keys and `anime_*` schema.
+- [x] AniList discovery/search and catalog/alias cache.
+- [x] Bangumi + OpenCC zh-TW fallback.
+- [x] Conservative exact-normalized matching.
+- [x] Frozen seasonal candidate ordering.
+- [x] Private Netflix seed queue/API with safe precedence.
+- [x] Anime tests/typecheck/build/Wrangler dry-run in CI.
 
 ### Still pending because it requires real Cloudflare/private-data execution
-- [ ] Execute schema against real remote `BLOG_DB` and verify repeated initialization.
+- [ ] Execute schema repeatedly against real remote `BLOG_DB`.
 - [ ] Stage the reviewed private Netflix rows into real D1.
-- [ ] Resolve the private seed queue and inspect MATCHED / AMBIGUOUS / UNMATCHED / ERROR counts.
+- [ ] Resolve the seed queue and inspect MATCHED / AMBIGUOUS / UNMATCHED / ERROR counts.
 
-Per D-026, these runtime verification items keep #5 open but do not block Batch B UI development.
+These remain tracked in #5 and do not block Batch B/C development.
 
-## Batch B — implemented now
+## Batch B — completed in code
 
 ### Dashboard `/anime`
-- [x] Private/admin-authenticated route.
+- [x] Admin-authenticated route.
 - [x] Seen / Want / Favourite counts.
-- [x] Recent Anime Memory records.
-- [x] 2011-to-current-year TV seasonal matrix.
-- [x] Winter / Spring / Summer / Fall cells.
-- [x] Not-started / in-progress / completed states.
-- [x] Processed / candidate count and progress bar.
-- [x] Direct season links.
-- [x] Resume latest active season.
+- [x] Recent records.
+- [x] 2011-to-current-year seasonal matrix.
+- [x] Complete / in-progress / not-started states.
+- [x] Processed/candidate counts and resume action.
 
 ### Seasonal survey `/anime/survey`
-- [x] Private/admin-authenticated route.
-- [x] Initializes/fetches one frozen seasonal candidate sequence (default 100).
-- [x] Chinese-first title with native/Romaji/English fallback/aliases.
-- [x] Poster, format, episode count and studio metadata when available.
-- [x] Primary `看過 / 想看 / 沒看` actions.
-- [x] Want / Not Seen save immediately and advance.
-- [x] Selecting Seen saves immediately but intentionally keeps the same card unresolved until viewing detail + overall evaluation are supplied.
-- [x] Seen detail: Complete / season complete / partial / dropped / movie-only.
-- [x] One overall evaluation: Favourite / Love / Recommend / Neutral / Dislike / Unrated.
-- [x] Optional 15 concrete tags.
-- [x] Optional secondary free-text note.
-- [x] Progress semantics require Seen records to have both detail + overall evaluation before they count as processed.
-- [x] Position-addressable review mode (`position=N`) for revisiting/editing an earlier card.
-- [x] Previous-item navigation and return-to-unresolved flow.
-- [x] Desktop primary hotkeys: A/Left = Seen, W/Up = Want, D/Right = Not Seen, Z = previous item.
-- [x] Hotkeys are disabled while typing in input/textarea/select/contenteditable controls.
+- [x] Admin-authenticated route.
+- [x] Frozen candidate sequence.
+- [x] Chinese-first title + poster + recognition metadata.
+- [x] Seen / Want / Not Seen primary flow.
+- [x] Seen detail + one overall evaluation + optional tags/note.
+- [x] Incremental autosave.
+- [x] Previous-item/review mode.
+- [x] Desktop hotkeys with typing protection.
+
+### First-time season loading reliability — PR #12
+- [x] `anime_survey_load_state` persists loading state in D1.
+- [x] AniList loading runs in batches of at most 50 records.
+- [x] UI shows fetched / target count and current phase.
+- [x] Progress survives reloads; failed later pages do not restart page 1.
+- [x] 30-second per-scope D1 lease suppresses duplicate simultaneous initialization.
+- [x] Timeout/network/408/425/429/5xx use up to two bounded automatic retries.
+- [x] Retry uses exponential backoff + jitter and respects `Retry-After` within a wait cap.
+- [x] Exhausted errors show where loading stopped and expose a targeted retry button.
+- [x] Non-retryable 4xx fails immediately.
+- [x] Provider retry unit tests.
+- [x] Load-state schema test.
 
 ## Active segment
 
-### B5/B6 — persistence/recovery polish + efficient correction
+### B7 — deployed browser acceptance
 
-Next exact tasks:
+After PR #12 is merged/deployed:
 
-1. Verify the latest previous-item/hotkey implementation in CI and fix any type/build issue.
-2. Update #6/TODO checkboxes to reflect the verified vertical slice.
-3. Add explicit persistent decision that Anime Memory pages are private/admin-authenticated by default.
-4. Improve Seen-flow persistence so meaningful partial choices survive an unexpected close without forcing a long final submit.
-5. Add browser-level/manual acceptance coverage for reload/resume, season switching and previous-item edits where feasible.
-6. Keep #5 remote D1/private seed verification separate; do not let it expand Batch B scope again.
+1. Open a not-yet-initialized season and confirm progress visibly advances (normally 0 → 50 → up to 100 → build scope → first card).
+2. Reload during loading and confirm it resumes rather than restarts.
+3. Test a second tab/rapid repeat action and confirm duplicate load suppression.
+4. Confirm season switching.
+5. Confirm Seen autosave survives reload.
+6. Confirm Want/Not Seen remain reliable one-click actions.
+7. Confirm previous-item editing returns correctly to unresolved flow.
+8. Update/close #6 if those checks pass.
+9. Start Batch C: Library / detail / watchlist.
 
 ## Privacy rule
 
-This repository is public. Never commit personal Anime Memory rows, watched-title lists, Netflix rows, personal ratings/tags/notes, or exported archives. Git versions only code/schema/import contracts/tests and non-personal aggregate development notes. Private source data belongs in D1 or ignored local/private files.
+This repository is public. Never commit personal Anime Memory rows, Netflix rows, personal ratings/tags/notes, or exported archives. Private source data belongs in D1 or ignored local/private files.
 
 ## Important decisions to preserve
 
 - TV progress is year + season; movies are year-based separately.
 - Candidate membership/order is frozen per scope.
-- Seen / Want / Not Seen is the primary question.
-- Seen requires detailed viewing status + one overall evaluation to finish a survey item.
-- Tags and free-text note remain optional.
-- Chinese-first display is required, but title fallback failure must never block answering.
+- Seen requires viewing detail + one overall evaluation to count as processed.
+- Tags and note are optional.
+- First-time data loading must be visible, resumable, and resistant to accidental duplicate retries.
+- Chinese title fallback failure must never block answering.
 - AniList is canonical identity; Bangumi improves Chinese-title coverage.
 - Personal data never enters public Git.
-- Seed data is historical evidence and never overrides newer manual decisions.
-- Smart recommendation/gap-filling remains out of scope.
 - JSON/CSV export remains required before final completion.
 
 ## Resume instructions for a new developer/chat
 
-1. Read this file.
-2. Read `docs/anime-memory/TODO.md`, `DECISIONS.md`, and `PRIVATE_DATA.md`.
-3. Open #6 (active), #5 (remote verification pending), and Draft PR #11.
-4. Continue on `feature/anime-memory`.
-5. Check the latest Anime Memory CI before expanding the next segment.
-6. Continue B5/B6 persistence/recovery and correction UX; do not reopen solved Batch A architecture questions.
+1. Read this file, `TODO.md`, `DECISIONS.md`, and `PRIVATE_DATA.md`.
+2. Open #6, #5, and Draft PR #12.
+3. Continue on `feature/anime-batch-b-reliability` until #12 is merged.
+4. Do not reopen solved Batch A architecture questions; only #5 remote/private runtime verification remains there.
+5. After #12 merge/deploy, run the B7 browser acceptance checklist before starting Batch C.
