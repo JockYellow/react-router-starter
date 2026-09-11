@@ -40,7 +40,7 @@ export default [
   route("api/output-configs", "routes/api/output-configs.tsx"),
   route("api/rng-prompt/export", "routes/api/rng-prompt-export.tsx"),
   route("api/rng-prompt/import", "routes/api/rng-prompt-import.tsx"),
-  route("api/concert-events", "routes/tools/concert-events.tsx"),
+  route("api/concert-events", "routes/api/concert-events.tsx"),
   route("api/blog-post", "routes/api/blog-post.tsx"),
   route("api/blog-media/image", "routes/api/blog-media.image.tsx"),
   route("api/blog-media/video/init", "routes/api/blog-media.video.init.tsx"),
