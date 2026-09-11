@@ -47,87 +47,50 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 
 ## Batch B — Seasonal survey, progress & evaluation (#6)
 
-**State: active. Core survey is implemented; first-load reliability is in PR #12 and browser acceptance remains.**
+**State: code-complete in PR #12; deployed browser acceptance pending.**
 
-### B0. Dashboard shell
-- [x] Add private/admin-authenticated `/anime` route.
-- [x] Show total Seen count.
-- [x] Show Want count.
-- [x] Show Favourite count.
-- [x] Show recent Anime Memory activity.
-- [x] Provide direct season/resume actions.
-- [ ] Add Library/Watchlist shortcuts when Batch C routes exist.
-
-### B1. Seasonal progress matrix
-- [x] Track TV progress by year + Winter/Spring/Summer/Fall.
-- [x] Show complete / in-progress / not-started states.
-- [x] Make each season directly clickable.
-- [x] Show processed / candidate count and progress bar.
-- [x] Show most recently active season.
-- [x] Add `繼續盤點` resume action.
-
-### B2. Survey candidate flow
-- [x] Add private/admin-authenticated `/anime/survey` route.
-- [x] Load/freeze one seasonal candidate sequence (default 100).
-- [x] Continue from next unresolved candidate.
-- [x] Chinese-first title with safe fallback.
-- [x] Poster.
-- [x] Year/season context.
-- [x] Studio/format/episode metadata when available.
-- [x] Preserve native/Romaji/English title variants for recognition.
-- [x] Position-addressable review mode (`position=N`).
-
-### B3. Primary answer flow
-- [x] `看過` persists immediately and expands Seen details.
-- [x] `想看` saves immediately and advances.
-- [x] `沒看` saves immediately and advances.
-
-### B4. Seen detail/evaluation flow
-- [x] Completion: 看完.
-- [x] Completion: 看完一季／系列未追完.
-- [x] Completion: 看過部分.
-- [x] Completion: 棄番.
-- [x] Completion: 只看電影／特別篇.
-- [x] Overall evaluations: 最喜歡 / 很喜歡 / 值得看 / 普通 / 不太喜歡 / 記不清／不評.
-- [x] Optional 15 concrete evaluation tags.
-- [x] Optional note remains visually secondary.
-- [x] Seen item only counts as processed when viewing detail + overall evaluation exist.
-- [x] Incremental autosave for detail/rating/tag/note choices.
+### B0–B4. Dashboard / seasonal survey / answering / evaluation
+- [x] Private/admin-authenticated `/anime` dashboard.
+- [x] Seasonal progress matrix with counts/resume.
+- [x] `/anime/survey` with frozen candidate sequence.
+- [x] Chinese-first title, poster and recognition metadata.
+- [x] Seen / Want / Not Seen primary flow.
+- [x] Seen completion + one overall evaluation + optional 15 tags + optional note.
+- [x] Incremental Seen autosave.
+- [x] Position-addressable previous/edit mode.
 
 ### B5. Persistence, loading visibility & recovery
 - [x] Primary answers persist immediately.
-- [x] Seen flow stays on the same card until required detail/evaluation exists.
-- [x] Resume from next unresolved candidate after reload/device switch by D1 state.
-- [x] Previous-item navigation.
-- [x] Existing answer edit/upsert path.
+- [x] Resume from D1 after reload/device switch.
 - [x] Prevent duplicate records with canonical IDs/upserts.
-- [x] Provider loading/error retry state.
-- [x] Persist first-time seasonal load state in D1.
-- [x] Fetch first-time AniList season data in batches of at most 50 candidates.
-- [x] Show fetched/target progress and current load phase to the user.
+- [x] Persist first-time seasonal load state in `anime_survey_load_state`.
+- [x] Fetch AniList in batches of at most 50 candidates.
+- [x] Show fetched / target progress and current load phase.
 - [x] Resume from the saved provider page after reload/failure.
-- [x] Add short per-scope D1 load lock to suppress duplicate initialization.
-- [x] Automatically retry timeout/network/408/425/429/5xx with bounded exponential backoff.
-- [x] Respect provider `Retry-After` when available.
-- [x] After automatic retries are exhausted, show the stopped count/error and a targeted retry action.
-- [ ] Browser-level first-load progress acceptance test against deployed Worker/D1.
-- [ ] Browser-level stop/reload/resume acceptance test.
-- [ ] Browser-level previous-item edit acceptance test.
+- [x] Add short per-scope D1 lock to suppress duplicate initialization.
+- [x] Retry timeout/network/408/425/429/5xx with bounded exponential backoff + jitter.
+- [x] Respect provider `Retry-After` within a capped wait.
+- [x] Non-retryable 4xx fails immediately.
+- [x] Exhausted failures show stopped count/error and a targeted retry action.
+- [ ] Browser-level first-load progress acceptance against deployed Worker/D1.
+- [ ] Browser-level reload/resume acceptance.
+- [ ] Browser-level duplicate-tab/repeated-trigger acceptance.
 
 ### B6. Desktop efficiency
 - [x] A / Left = Seen.
 - [x] W / Up = Want.
 - [x] D / Right = Not Seen.
 - [x] Z = previous item.
-- [x] Disable shortcuts while typing in input/textarea/select/contenteditable.
-- [ ] Review shortcut behavior after real usage and simplify if any key feels error-prone.
+- [x] Disable shortcuts while typing.
+- [ ] Review shortcut behavior after real usage.
 
-### B7. Batch B verification / polish
-- [x] CI unit tests/typecheck/build/Wrangler dry-run for dashboard/survey slice.
-- [x] CI unit tests/typecheck/build/Wrangler dry-run for previous-item/hotkey slice.
-- [x] CI verification for incremental Seen autosave slice.
-- [x] Provider retry policy unit tests added.
-- [ ] Final CI on PR #12 head after reliability/docs changes.
+### B7. Verification / polish
+- [x] Dashboard/survey CI verified.
+- [x] Previous-item/hotkey CI verified.
+- [x] Incremental Seen autosave CI verified.
+- [x] Provider retry policy unit tests.
+- [x] Load-state schema test.
+- [x] Reliability implementation passed Anime tests, repository typecheck, React Router build, and Wrangler dry-run before the final docs-only checkpoint.
 - [ ] Manual/browser season-switch test.
 - [ ] Manual/browser Seen persistence test.
 - [ ] Manual/browser Want/Not Seen one-click test.
@@ -139,32 +102,23 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 ## Batch C — Library, detail page & watchlist (#7)
 
 ### C0. Library
-- [ ] Add `/anime/library`.
-- [ ] Poster-wall view.
+- [ ] Add `/anime/library` poster wall.
 - [ ] Search title/alias.
-- [ ] Filter by detailed watch status.
-- [ ] Filter by evaluation.
-- [ ] Filter by year/season.
-- [ ] Filter by evaluation tag.
-- [ ] Filter/search by studio where metadata exists.
+- [ ] Filter by watch status, evaluation, year/season, tag and studio.
 
 ### C1. Detail page
 - [ ] Add canonical anime detail route.
-- [ ] Personal record before third-party metadata.
-- [ ] Show/edit viewing status/detail.
-- [ ] Show/edit overall evaluation.
-- [ ] Show/edit tags/note.
+- [ ] Show/edit personal viewing status, evaluation, tags and note.
 - [ ] Show core catalog metadata.
 
 ### C2. Watchlist
 - [ ] Add `/anime/watchlist`.
-- [ ] Show Want records with posters/metadata.
-- [ ] Sort by added time/year/provider popularity where useful.
+- [ ] Show/sort Want records.
 - [ ] Want -> Seen transition reuses standard evaluation flow.
 - [ ] Allow safe removal/status change.
 
 ### C3. Verification
-- [ ] Every survey record can be found in Library/Watchlist.
+- [ ] Survey records appear correctly in Library/Watchlist.
 - [ ] Search/filter combinations work.
 - [ ] Detail edits persist.
 - [ ] Update #7 / STATUS.
@@ -174,35 +128,29 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 ## Batch D — Movies, export, mobile UX & QA (#8)
 
 ### D0. Movie survey
-- [ ] Track movies by year rather than season.
-- [ ] Reuse primary decision + Seen evaluation flow.
-- [ ] Show movie-year progress separately.
+- [ ] Track movies by year separately and reuse the answer flow.
 
 ### D1. Export
-- [ ] Full JSON export.
+- [ ] JSON export.
 - [ ] CSV export.
 - [ ] Include canonical IDs/title variants/status/detail/evaluation/tags/note/provenance where useful.
-- [ ] Verify export is understandable outside the app.
 
 ### D2. Mobile UX
-- [ ] Responsive survey card.
-- [ ] Comfortable tap targets and accidental-action protection.
-- [ ] Library grid adapts to small screens.
-- [ ] Progress matrix remains usable on mobile.
+- [ ] Responsive survey card and progress matrix.
+- [ ] Comfortable tap targets / accidental-action protection.
+- [ ] Responsive Library grid.
 
 ### D3. Reliability / QA
 - [x] Base provider timeout + retry/backoff policy implemented in Batch B.
-- [ ] Provider partial-data handling acceptance tests.
+- [ ] Provider partial-data acceptance tests.
 - [ ] D1 failure handling beyond first-load resumability.
 - [ ] Decision/evaluation persistence integration tests.
-- [ ] Final typecheck/build/Wrangler dry-run.
-- [ ] Existing major routes smoke-check.
+- [ ] Final typecheck/build/Wrangler dry-run and major-route smoke check.
 
 ### D4. Handoff / deploy
 - [ ] Document first-run/runtime assumptions.
 - [ ] Confirm no new Cloudflare database provisioning is required.
-- [ ] Finalize `STATUS.md`.
-- [ ] Close completed issues and prepare final PR for merge.
+- [ ] Finalize `STATUS.md` and close completed issues.
 
 ---
 
