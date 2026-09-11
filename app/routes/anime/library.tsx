@@ -87,9 +87,6 @@ export default function AnimeLibrary() {
     + (data.query.search ? 1 : 0);
   const currentStart = data.total === 0 ? 0 : data.query.offset + 1;
   const currentEnd = Math.min(data.total, data.query.offset + data.items.length);
-  const availableYears = Array.from(
-    new Set(data.items.map((item) => item.year).filter((year): year is number => year != null)),
-  ).sort((a, b) => b - a);
 
   const pageHref = (offset: number) => {
     const params = new URLSearchParams(searchParams);
@@ -209,23 +206,18 @@ export default function AnimeLibrary() {
                 </div>
               </fieldset>
 
-              <fieldset>
-                <legend className="text-xs font-black uppercase tracking-wide text-neutral-400">年份</legend>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {availableYears.length ? availableYears.map((year) => (
-                    <label key={year} className="cursor-pointer rounded-full border border-neutral-200 bg-white px-3 py-2 text-xs font-bold has-[:checked]:border-neutral-900 has-[:checked]:bg-neutral-900 has-[:checked]:text-white">
-                      <input
-                        className="sr-only"
-                        type="checkbox"
-                        name="year"
-                        value={year}
-                        defaultChecked={data.query.years.includes(year)}
-                      />
-                      {year}
-                    </label>
-                  )) : <span className="text-xs text-neutral-400">目前結果沒有年份資料</span>}
-                </div>
-              </fieldset>
+              <label className="block">
+                <span className="text-xs font-black uppercase tracking-wide text-neutral-400">年份</span>
+                <input
+                  type="number"
+                  name="year"
+                  min={1901}
+                  max={2100}
+                  defaultValue={data.query.years[0] ?? ""}
+                  placeholder="例如 2024"
+                  className="mt-2 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-neutral-400"
+                />
+              </label>
             </div>
 
             <fieldset className="mt-5 border-t border-neutral-200 pt-5">
