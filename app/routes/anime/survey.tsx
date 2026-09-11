@@ -114,7 +114,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
     const candidate = requestedPosition
       ? await getSurveyCandidateAtPosition(db, scope, requestedPosition)
       : await getNextUnresolvedSurveyCandidate(db, scope);
-    const record = candidate ? await getAnimePersonalRecord(db, candidate.anilistId) : null;
+    const record = candidate ? await getAnimePersonalRecord(db, candidate.animeId) : null;
     return {
       scope,
       summary,
@@ -125,7 +125,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
       loadState: initialization.state,
       error: null as string | null,
     };
-  } catch {
+  } catch (error) {
     return {
       scope,
       summary: null,
@@ -134,7 +134,9 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
       reviewMode: Boolean(requestedPosition),
       initializing: false,
       loadState: null,
-      error: "這一季的候選資料目前載入失敗，可以重新整理再試。",
+      error: error instanceof Error
+        ? `這一季的候選資料目前載入失敗：${error.message}`
+        : "這一季的候選資料目前載入失敗，可以重新整理再試。",
     };
   }
 }
@@ -165,30 +167,32 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return Response.json({ kind: "RETRYING" as const, state: await retrySurveyLoadStep(db, scope) });
   }
 
-  const anilistId = Number(formData.get("anilistId"));
-  if (!Number.isInteger(anilistId) || anilistId <= 0) {
+  const animeId = Number(formData.get("animeId"));
+  if (!Number.isInteger(animeId) || animeId <= 0) {
     throw new Response("Invalid anime id", { status: 400 });
   }
 
   if (intent === "seen-detail-autosave") {
-    await saveSeenDetail(db, anilistId, String(formData.get("detailStatus") ?? "") as AnimeWatchDetail);
+    await saveSeenDetail(db, animeId, String(formData.get("detailStatus") ?? "") as AnimeWatchDetail);
     await refreshSurveyProgress(db, scope);
     return Response.json({ ok: true });
   }
 
   if (intent === "seen-rating-autosave") {
-    await saveSeenRating(db, anilistId, String(formData.get("rating") ?? "") as AnimeEvaluationKey);
+    const detailStatus = String(formData.get("detailStatus") ?? "") as AnimeWatchDetail;
+    await saveSeenDetail(db, animeId, detailStatus);
+    await saveSeenRating(db, animeId, String(formData.get("rating") ?? "") as AnimeEvaluationKey);
     await refreshSurveyProgress(db, scope);
     return Response.json({ ok: true });
   }
 
   if (intent === "seen-tag-toggle-autosave") {
-    await toggleSeenTag(db, anilistId, String(formData.get("tag") ?? ""));
+    await toggleSeenTag(db, animeId, String(formData.get("tag") ?? ""));
     return Response.json({ ok: true });
   }
 
   if (intent === "seen-note-autosave") {
-    await saveSeenNote(db, anilistId, String(formData.get("note") ?? ""));
+    await saveSeenNote(db, animeId, String(formData.get("note") ?? ""));
     return Response.json({ ok: true });
   }
 
@@ -197,7 +201,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     if (status !== "SEEN" && status !== "WANT" && status !== "NOT_SEEN") {
       throw new Response("Invalid primary decision", { status: 400 });
     }
-    await savePrimaryDecision(db, anilistId, status);
+    await savePrimaryDecision(db, animeId, status);
     await refreshSurveyProgress(db, scope);
     return redirect(surveyUrl(scope.year, scope.season));
   }
@@ -209,7 +213,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     const note = String(formData.get("note") ?? "");
 
     await saveSeenEvaluation(db, {
-      anilistId,
+      animeId,
       detailStatus,
       rating,
       tags,
@@ -254,7 +258,7 @@ export default function AnimeSurvey() {
   const nextReviewHref = candidate && data.reviewMode && data.summary && candidate.position < data.summary.candidateCount
     ? surveyUrl(data.scope.year, data.scope.season, candidate.position + 1)
     : null;
-  const seenFormId = candidate ? `anime-seen-${candidate.anilistId}` : "anime-seen";
+  const seenFormId = candidate ? `anime-seen-${candidate.animeId}` : "anime-seen";
 
   return (
     <main className="min-h-screen bg-neutral-950 px-4 py-6 text-neutral-100 md:py-10">
@@ -262,7 +266,7 @@ export default function AnimeSurvey() {
         <AnimeSurveyHotkeys
           year={data.scope.year}
           season={data.scope.season}
-          anilistId={candidate.anilistId}
+          animeId={candidate.animeId}
           primaryEnabled={record?.status !== "SEEN"}
           previousHref={previousItemHref}
           disabled={submitting}
@@ -360,7 +364,7 @@ export default function AnimeSurvey() {
                         <input type="hidden" name="intent" value="primary" />
                         <input type="hidden" name="year" value={data.scope.year} />
                         <input type="hidden" name="season" value={data.scope.season} />
-                        <input type="hidden" name="anilistId" value={candidate.anilistId} />
+                        <input type="hidden" name="animeId" value={candidate.animeId} />
                         <button name="status" value="WANT" disabled={submitting} className="text-xs font-bold text-neutral-500 hover:text-neutral-300">改成想看</button>
                         <button name="status" value="NOT_SEEN" disabled={submitting} className="text-xs font-bold text-neutral-500 hover:text-neutral-300">改成沒看</button>
                       </Form>
@@ -370,14 +374,14 @@ export default function AnimeSurvey() {
                       <input type="hidden" name="intent" value="seen-evaluation" />
                       <input type="hidden" name="year" value={data.scope.year} />
                       <input type="hidden" name="season" value={data.scope.season} />
-                      <input type="hidden" name="anilistId" value={candidate.anilistId} />
+                      <input type="hidden" name="animeId" value={candidate.animeId} />
 
                       <div className="flex justify-end">
                         <AnimeSeenAutosave
                           formId={seenFormId}
                           year={data.scope.year}
                           season={data.scope.season}
-                          anilistId={candidate.anilistId}
+                          animeId={candidate.animeId}
                         />
                       </div>
 
@@ -439,7 +443,7 @@ export default function AnimeSurvey() {
                     <input type="hidden" name="intent" value="primary" />
                     <input type="hidden" name="year" value={data.scope.year} />
                     <input type="hidden" name="season" value={data.scope.season} />
-                    <input type="hidden" name="anilistId" value={candidate.anilistId} />
+                    <input type="hidden" name="animeId" value={candidate.animeId} />
                     <div className="grid gap-3 sm:grid-cols-3">
                       <button disabled={submitting} name="status" value="SEEN" className="rounded-2xl bg-white px-5 py-4 font-black text-neutral-950 disabled:opacity-50">
                         看過 <span className="ml-1 text-xs font-bold text-neutral-500">A / ←</span>
