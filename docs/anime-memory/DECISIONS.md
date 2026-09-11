@@ -8,7 +8,7 @@ This file records decisions that should survive chat/session replacement.
 **Reason:** The host application already uses this D1 binding for multiple independent features. Anime tables are isolated with an `anime_*` prefix, so a separate Cloudflare database is unnecessary for the initial product.
 
 ## D-002 — Runtime-safe schema initialization
-**Decision:** Initial Anime schema will follow the repository's existing `CREATE TABLE IF NOT EXISTS` pattern via `ensureAnimeSchema(db)`.
+**Decision:** Initial Anime schema follows the repository's existing `CREATE TABLE IF NOT EXISTS` pattern via `ensureAnimeSchema(db)`.
 
 **Reason:** This avoids requiring Cloudflare dashboard access or a separate first-time D1 provisioning step. Schema creation must remain idempotent and non-destructive.
 
@@ -28,7 +28,7 @@ This file records decisions that should survive chat/session replacement.
 **Reason:** The user wants viewing history and personal placement recorded together, but Want/Not Seen must remain fast one-step actions.
 
 ## D-006 — Only one overall evaluation scale
-**Decision:** No separate mandatory 'quality' and 'liking' scores.
+**Decision:** No separate mandatory quality and liking scores.
 
 Overall evaluation options:
 - 最喜歡
@@ -82,10 +82,10 @@ Tags are optional and may evolve after real usage.
 
 **Reason:** English-only titles materially reduce recall efficiency for this user.
 
-## D-012 — AniList is canonical provider ID; Bangumi is a title fallback
-**Decision:** Use AniList ID as primary external catalog identity in the initial architecture. Use Bangumi primarily to improve Chinese-title coverage when needed.
+## D-012 — AniList canonical identity (superseded)
+**Original decision:** Use AniList ID as primary external catalog identity and use Bangumi primarily for Chinese-title coverage.
 
-**Reason:** It gives the survey a stable canonical ID while allowing better Chinese display names.
+**Status:** Superseded by D-030 after real deployed AniList API failures. Legacy AniList IDs remain useful external identifiers and migration keys, but are no longer the application's canonical identity.
 
 ## D-013 — Provider calls are server-side and cached
 **Decision:** Browser pages call the application's server routes/loaders; provider results are normalized and cached into D1.
@@ -93,12 +93,12 @@ Tags are optional and may evolve after real usage.
 **Reason:** Reduces repeated external API calls, centralizes error handling, and prevents the UI from depending on direct third-party browser requests.
 
 ## D-014 — Netflix is provenance/seed, not canonical catalog
-**Decision:** The reviewed Netflix history populates `anime_sources` and personal decisions, then maps into canonical anime records.
+**Decision:** The reviewed Netflix history populates source/provenance and personal decisions, then maps into canonical anime records.
 
 **Reason:** Netflix naming is useful evidence but not a reliable global anime identity system.
 
 ## D-015 — Avoid unsafe fuzzy deduplication
-**Decision:** Prefer canonical-ID matches and exact normalized aliases. Ambiguous matches should remain reviewable rather than silently matched using broad substring logic.
+**Decision:** Prefer external-ID matches and exact normalized aliases. Ambiguous matches should remain reviewable rather than silently matched using broad substring logic.
 
 **Reason:** The local prototype demonstrated that loose title matching can create false positives.
 
@@ -118,17 +118,17 @@ Tags are optional and may evolve after real usage.
 **Reason:** Each segment should be independently reviewable, reportable, and resumable by another developer/conversation.
 
 ## D-019 — Freeze survey candidate membership and order
-**Decision:** Each TV season/movie-year survey stores its candidate membership and position in `anime_survey_candidates` the first time the scope is initialized. Existing scopes reuse that stored sequence rather than rebuilding from current provider rankings.
+**Decision:** Each TV season/movie-year survey stores candidate membership and position when the scope is initialized. Existing scopes reuse that stored sequence rather than rebuilding from current provider rankings.
 
-**Reason:** AniList popularity/score ordering can change over time. A durable personal progress marker must continue to refer to the same sequence after reloads or weeks/months of inactivity.
+**Reason:** Provider popularity/order can change over time. A durable personal progress marker must continue to refer to the same sequence after reloads or weeks/months of inactivity.
 
 ## D-020 — Preserve unresolved provenance instead of forcing canonical identity
-**Decision:** `anime_sources.anilist_id` is nullable and each source row records `MATCHED`, `AMBIGUOUS`, or `UNMATCHED`. Only safely matched canonical anime create/update `anime_decisions` automatically.
+**Decision:** External source rows may remain unresolved/ambiguous. Only safely matched canonical anime records create/update personal decisions automatically.
 
-**Reason:** The reviewed Netflix data includes translated titles, potentially ambiguous names, and some non-Japanese animation. Losing those rows is unacceptable, but forcing them onto the wrong AniList record is worse. Unresolved rows remain inspectable with intended decision and candidate metadata.
+**Reason:** Historical source titles can be translated, ambiguous, or non-Japanese animation. Losing them is unacceptable, but forcing them onto the wrong work is worse.
 
-## D-021 — Reviewed Netflix title is trusted as zh-TW only after safe canonical match
-**Decision:** When a reviewed Netflix row is safely matched to an AniList record, its reviewed display title may populate `title_zh_tw` and a `resolved:zh-tw` alias. An unmatched Netflix title must not be attached to a guessed AniList record merely to obtain Chinese display text.
+## D-021 — Reviewed Netflix title is trusted as zh-TW only after safe match
+**Decision:** When a reviewed Netflix row is safely matched, its reviewed display title may populate `title_zh_tw` and a `resolved:zh-tw` alias. An unmatched Netflix title must not be attached to a guessed work merely to obtain Chinese display text.
 
 **Reason:** This lets known Netflix titles immediately benefit the Chinese-first UI without weakening identity matching rules.
 
@@ -138,29 +138,29 @@ Tags are optional and may evolve after real usage.
 **Reason:** Git history is durable and this repository is public. Deleting a file later would not reliably remove personal viewing history from prior commits.
 
 ## D-023 — Seed imports are staged privately and must not overwrite manual decisions
-**Decision:** Private seed input is staged into `anime_seed_queue` in D1, processed incrementally, and records MATCHED/AMBIGUOUS/UNMATCHED/SKIPPED/ERROR outcomes. A safely matched seed creates an `anime_decisions` row only when that anime has no existing decision; later manual/survey decisions take precedence.
+**Decision:** Private seed input is staged into `anime_seed_queue` in D1, processed incrementally, and records MATCHED/AMBIGUOUS/UNMATCHED/SKIPPED/ERROR outcomes. A safely matched seed creates a decision only when that anime has no existing decision; later manual/survey decisions take precedence.
 
 **Reason:** Staging makes external-provider matching inspectable and resumable without exposing raw source data in Git. Seed material is historical evidence, not an authority that should undo a newer user edit.
 
 ## D-024 — Simplified Chinese fallback uses pinned OpenCC `cn -> tw`
-**Decision:** Use pinned `opencc-js` 1.4.2 with the `cn -> tw` conversion path for Bangumi `name_cn` values. Do not use the `twp` phrase-localization path for anime titles.
+**Decision:** Use pinned `opencc-js` 1.4.2 with the `cn -> tw` conversion path for Bangumi `name_cn` values. Do not use `twp` phrase localization for anime titles.
 
-**Reason:** `opencc-js` is pure JavaScript and works in the current bundler/Worker build without a native binary. The `tw` path performs Taiwan Traditional character conversion while minimizing extra phrase-level wording changes that could be undesirable in proper nouns and licensed titles.
+**Reason:** The user accepts Simplified-Chinese title wording as a practical fallback as long as the displayed characters are converted to Traditional Chinese. OpenCC character conversion must not be described as proof of an official Taiwan licensed title.
 
 ## D-025 — Chinese title enrichment is lazy and best-effort
-**Decision:** Do not enrich every title when a 100-item season is first cached. When the next unresolved card lacks `title_zh_tw`, query Bangumi for that anime, convert a safe `name_cn` match to zh-TW, cache the result, then reuse it. Failure to enrich must not block the survey card.
+**Decision:** Legacy/external records without Chinese titles may query Bangumi lazily when the current card is opened. Failure to enrich must not block the survey card.
 
-**Reason:** This avoids large provider bursts and makes the first seasonal load fast while still converging toward a Chinese-first catalog as the user scans titles.
+**Status:** Still applies to migrated legacy records. New Bangumi seasonal records already carry `name_cn` when available and convert it during normalization.
 
 ## D-026 — Remote D1 seed verification does not block Batch B implementation
 **Decision:** Batch B UI may begin once Anime tests, repository typecheck, build, and Wrangler dry-run are green. Batch A remains open until private seed staging/resolution is executed against the real Cloudflare D1 environment and schema idempotency is verified there.
 
-**Reason:** The remaining Batch A work requires Cloudflare account/runtime access rather than more application architecture. Blocking all user-visible development on unavailable remote execution would add delay without reducing implementation risk.
+**Reason:** The remaining Batch A work requires Cloudflare account/runtime access rather than more application architecture.
 
 ## D-027 — First-time seasonal loading must be visible and resumable
-**Decision:** A new TV season is initialized in small persisted batches rather than one opaque server request. The UI must show how many candidates have been fetched, what phase is running, and where a failure stopped. Progress is stored in D1 so reloads resume from the saved page instead of starting over.
+**Decision:** A new TV season is initialized in small persisted steps rather than one opaque server request. The UI must show candidate count, provider segment/phase, and where a failure stopped. Progress is stored in D1 so reloads resume instead of starting over.
 
-**Reason:** A silent long-running fetch looks broken and encourages unnecessary refresh/retry actions. Visible durable progress makes the system understandable and protects external-provider/API usage.
+**Reason:** A silent long-running fetch looks broken and encourages unnecessary refresh/retry actions. Visible durable progress makes the system understandable and protects provider/API usage.
 
 ## D-028 — Transient provider failures use bounded automatic retry
 **Decision:** Provider HTTP requests automatically retry timeout/network failures plus HTTP 408/425/429/5xx up to two retries with bounded exponential backoff and jitter. `Retry-After` is respected when supplied, subject to a maximum wait cap. Non-retryable 4xx responses fail immediately.
@@ -168,6 +168,27 @@ Tags are optional and may evolve after real usage.
 **Reason:** Short provider outages and rate limits should not require user intervention, but an application request must not wait indefinitely or retry permanently.
 
 ## D-029 — Duplicate seasonal initialization is suppressed with a short D1 lock
-**Decision:** `anime_survey_load_state` stores a short `locked_until` lease for each scope. A second tab/request observes BUSY and waits/synchronizes rather than issuing the same provider page request concurrently. Expired locks are recoverable.
+**Decision:** Seasonal load state stores a short `locked_until` lease for each scope. A second tab/request observes BUSY and waits/synchronizes rather than issuing the same provider request concurrently. Expired locks are recoverable.
 
-**Reason:** Users may refresh or click repeatedly when a network request is slow. Duplicate initialization would waste provider quota and can create confusing partial progress even when candidate inserts are idempotent.
+**Reason:** Users may refresh or click repeatedly when a network request is slow. Duplicate initialization would waste provider quota and can create confusing partial progress even when inserts are idempotent.
+
+## D-030 — Application identity is provider-neutral
+**Decision:** The application uses its own `anime_id` as the stable internal identity. `mal_id`, `anilist_id`, and `bangumi_id` are optional unique external identifiers on the same record.
+
+Legacy AniList-keyed tables remain during migration and are copied idempotently into provider-neutral `anime_items`, `anime_item_aliases`, `anime_user_*`, and `anime_scope_candidates` tables. Existing answers and frozen scope ordering must survive the migration.
+
+**Reason:** AniList returned deployed/manual-block 403 failures and cannot be allowed to determine whether the personal archive is usable. External provider availability must not define record identity.
+
+## D-031 — Bangumi browse API is the primary TV-season discovery source
+**Decision:** For a new TV season, scan all three months of that season for Bangumi Anime category `TV` and `WEB`. Follow offset pagination when a source segment exceeds one page. Do not impose the former top-100 candidate cap.
+
+After discovery completes, deduplicate by internal `anime_id`, then freeze the candidate order by collection popularity first and score second. Existing scopes are never rebuilt.
+
+Bangumi `name_cn` is converted with OpenCC `cn -> tw` and may be used as the practical Chinese display title. It is a fallback display name, not a claim that the wording is the official Taiwan licensed title.
+
+**Reason:** A complete scan better serves memory reconstruction than a popularity cutoff. A live probe on 2026-09-11 successfully returned historical TV and WEB data from Bangumi, while AniList was blocked and Jikan repeatedly returned upstream 504 errors.
+
+## D-032 — Provider migration uses versioned seasonal load state
+**Decision:** The Bangumi seasonal loader uses `anime_scope_load_state_v2`, separate from the earlier AniList/Jikan load-state experiments. Old failed 403 state must not block or resume the new provider flow.
+
+**Reason:** SQLite CHECK constraints and provider cursor semantics changed during the migration. A versioned state table is safer and clearer than trying to reinterpret an ERROR/page cursor that belonged to a different provider.
