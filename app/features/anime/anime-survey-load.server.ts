@@ -51,12 +51,54 @@ const LOAD_LOCK_MS = 30_000;
 const BANGUMI_PAGE_SIZE = 100;
 const BANGUMI_STREAM_STRIDE = 100_000;
 const BANGUMI_STREAM_COUNT = 6;
+const LOAD_STATE_TABLE = "anime_scope_load_state_v2";
+const loadSchemaPromises = new WeakMap<object, Promise<void>>();
 const SEASON_MONTHS: Record<AnimeSeason, readonly number[]> = {
   WINTER: [1, 2, 3],
   SPRING: [4, 5, 6],
   SUMMER: [7, 8, 9],
   FALL: [10, 11, 12],
 };
+
+async function ensureProviderLoadSchema(db: D1Database) {
+  const key = db as unknown as object;
+  const existing = loadSchemaPromises.get(key);
+  if (existing) return existing;
+  const pending = db
+    .batch([
+      db.prepare(
+        `CREATE TABLE IF NOT EXISTS ${LOAD_STATE_TABLE} (
+          scope_key TEXT PRIMARY KEY,
+          scope_type TEXT NOT NULL CHECK (scope_type IN ('TV_SEASON', 'MOVIE_YEAR')),
+          year INTEGER NOT NULL CHECK (year > 1900),
+          season TEXT CHECK (season IS NULL OR season IN ('WINTER', 'SPRING', 'SUMMER', 'FALL')),
+          provider TEXT NOT NULL CHECK (provider IN ('BANGUMI', 'ANILIST')),
+          phase TEXT NOT NULL CHECK (phase IN ('FETCHING_PROVIDER', 'BUILDING_SCOPE', 'READY', 'ERROR')),
+          resume_phase TEXT CHECK (resume_phase IS NULL OR resume_phase IN ('FETCHING_PROVIDER', 'BUILDING_SCOPE')),
+          target_count INTEGER NOT NULL DEFAULT 0 CHECK (target_count >= 0),
+          fetched_count INTEGER NOT NULL DEFAULT 0 CHECK (fetched_count >= 0),
+          next_page INTEGER NOT NULL DEFAULT 1 CHECK (next_page > 0),
+          retry_count INTEGER NOT NULL DEFAULT 0 CHECK (retry_count >= 0),
+          locked_until INTEGER,
+          last_error TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          FOREIGN KEY (scope_key) REFERENCES anime_survey_progress(scope_key) ON DELETE CASCADE
+        )`,
+      ),
+      db.prepare(
+        `CREATE INDEX IF NOT EXISTS idx_anime_scope_load_state_v2_phase
+         ON ${LOAD_STATE_TABLE} (phase, updated_at)`,
+      ),
+    ])
+    .then(() => undefined)
+    .catch((error) => {
+      loadSchemaPromises.delete(key);
+      throw error;
+    });
+  loadSchemaPromises.set(key, pending);
+  return pending;
+}
 
 function decodeBangumiPageKey(pageKey: number) {
   const ordinal = Math.max(0, Math.trunc(pageKey) - 1);
@@ -144,7 +186,7 @@ async function readLoadState(db: D1Database, scopeKey: string): Promise<LoadStat
     .prepare(
       `SELECT scope_key, provider, phase, target_count, fetched_count, next_page,
               retry_count, locked_until, last_error, updated_at, resume_phase
-       FROM anime_scope_load_state
+       FROM ${LOAD_STATE_TABLE}
        WHERE scope_key = ?`,
     )
     .bind(scopeKey)
@@ -195,6 +237,7 @@ export async function ensureSurveyInitialization(
   _options: { targetCount?: number } = {},
 ): Promise<{ ready: boolean; state: AnimeSurveyLoadState | null }> {
   await ensureAnimeSchema(db);
+  await ensureProviderLoadSchema(db);
   const scopeKey = animeSurveyScopeKey(scope);
   const existingLoad = await readLoadState(db, scopeKey);
   if (existingLoad?.phase === "READY") return { ready: true, state: mapLoadState(existingLoad) };
@@ -208,7 +251,7 @@ export async function ensureSurveyInitialization(
   ]);
 
   // Preserve any scope that was already established before the provider migration.
-  // Failed legacy load-state lives in the old table and does not control this path.
+  // Failed legacy load-state lives in older tables and does not control this path.
   if (!existingLoad && (candidates > 0 || existingProgress?.completed === 1)) {
     return { ready: true, state: null };
   }
@@ -234,7 +277,7 @@ export async function ensureSurveyInitialization(
       ),
     db
       .prepare(
-        `INSERT OR IGNORE INTO anime_scope_load_state (
+        `INSERT OR IGNORE INTO ${LOAD_STATE_TABLE} (
           scope_key, scope_type, year, season, provider, phase, resume_phase,
           target_count, fetched_count, next_page, retry_count,
           locked_until, last_error, created_at, updated_at
@@ -284,7 +327,7 @@ export async function processSurveyLoadStep(
 
   const lockResult = await db
     .prepare(
-      `UPDATE anime_scope_load_state
+      `UPDATE ${LOAD_STATE_TABLE}
        SET locked_until = ?, updated_at = ?
        WHERE scope_key = ?
          AND phase NOT IN ('READY', 'ERROR')
@@ -316,7 +359,7 @@ export async function processSurveyLoadStep(
           .bind(count, count === 0 ? 1 : 0, finishedAt, scopeKey),
         db
           .prepare(
-            `UPDATE anime_scope_load_state
+            `UPDATE ${LOAD_STATE_TABLE}
              SET phase = 'READY', resume_phase = NULL,
                  target_count = ?, fetched_count = ?,
                  locked_until = NULL, last_error = NULL, updated_at = ?
@@ -380,7 +423,7 @@ export async function processSurveyLoadStep(
 
     await db
       .prepare(
-        `UPDATE anime_scope_load_state
+        `UPDATE ${LOAD_STATE_TABLE}
          SET phase = ?, resume_phase = NULL,
              target_count = ?, fetched_count = ?, next_page = ?,
              locked_until = NULL, last_error = NULL, updated_at = ?
@@ -403,7 +446,7 @@ export async function processSurveyLoadStep(
     const message = error instanceof Error ? error.message : "Unknown survey load error";
     await db
       .prepare(
-        `UPDATE anime_scope_load_state
+        `UPDATE ${LOAD_STATE_TABLE}
          SET phase = 'ERROR', resume_phase = ?, retry_count = retry_count + 1,
              locked_until = NULL, last_error = ?, updated_at = ?
          WHERE scope_key = ?`,
@@ -421,11 +464,12 @@ export async function retrySurveyLoadStep(
   scope: AnimeSurveyScope,
 ): Promise<AnimeSurveyLoadState> {
   await ensureAnimeSchema(db);
+  await ensureProviderLoadSchema(db);
   const scopeKey = animeSurveyScopeKey(scope);
   const now = Date.now();
   await db
     .prepare(
-      `UPDATE anime_scope_load_state
+      `UPDATE ${LOAD_STATE_TABLE}
        SET phase = COALESCE(resume_phase, 'FETCHING_PROVIDER'),
            resume_phase = NULL, locked_until = NULL, last_error = NULL, updated_at = ?
        WHERE scope_key = ? AND phase = 'ERROR'`,
