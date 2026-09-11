@@ -17,6 +17,7 @@ export function AnimeSurveyHotkeys(props: {
   primaryEnabled: boolean;
   previousHref: string | null;
   disabled?: boolean;
+  onFastPrimary?: (status: "WANT" | "NOT_SEEN") => boolean | void;
 }) {
   const submit = useSubmit();
   const navigate = useNavigate();
@@ -43,6 +44,11 @@ export function AnimeSurveyHotkeys(props: {
       if (!status) return;
 
       event.preventDefault();
+      if (status !== "SEEN" && props.onFastPrimary) {
+        const handled = props.onFastPrimary(status);
+        if (handled !== false) return;
+      }
+
       const form = new FormData();
       form.set("intent", "primary");
       form.set("year", String(props.year));
@@ -58,6 +64,7 @@ export function AnimeSurveyHotkeys(props: {
     navigate,
     props.animeId,
     props.disabled,
+    props.onFastPrimary,
     props.previousHref,
     props.primaryEnabled,
     props.season,

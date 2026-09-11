@@ -12,6 +12,7 @@ import { requireAdmin } from "../../features/admin/admin-auth.server";
 import { AnimeSeenAutosave } from "../../features/anime/AnimeSeenAutosave";
 import { AnimeSurveyHotkeys } from "../../features/anime/AnimeSurveyHotkeys";
 import { AnimeSurveyInitializer } from "../../features/anime/AnimeSurveyInitializer";
+import { useAnimeSurveyOptimisticQueue } from "../../features/anime/AnimeSurveyOptimisticQueue";
 import {
   getAnimePersonalRecord,
   savePrimaryDecision,
@@ -29,7 +30,7 @@ import {
 import { getSurveyCandidateAtPosition } from "../../features/anime/anime-survey-navigation.server";
 import {
   ensureSurveyScopeCandidates,
-  getNextUnresolvedSurveyCandidate,
+  getNextUnresolvedSurveyCandidates,
   refreshSurveyProgress,
   type SurveyCandidateRow,
 } from "../../features/anime/anime-survey.server";
@@ -102,6 +103,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
         summary: null,
         candidate: null,
         record: null,
+        initialItems: [],
         reviewMode: Boolean(requestedPosition),
         initializing: true,
         loadState: initialization.state,
@@ -111,16 +113,39 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 
     const initialSummary = await ensureSurveyScopeCandidates(db, scope, { limit: 100 });
     const summary = (await refreshSurveyProgress(db, scope)) ?? initialSummary;
-    const candidate = requestedPosition
-      ? await getSurveyCandidateAtPosition(db, scope, requestedPosition)
-      : await getNextUnresolvedSurveyCandidate(db, scope);
-    const record = candidate ? await getAnimePersonalRecord(db, candidate.animeId) : null;
+
+    if (requestedPosition) {
+      const candidate = await getSurveyCandidateAtPosition(db, scope, requestedPosition);
+      const record = candidate ? await getAnimePersonalRecord(db, candidate.animeId) : null;
+      return {
+        scope,
+        summary,
+        candidate,
+        record,
+        initialItems: [],
+        reviewMode: true,
+        initializing: false,
+        loadState: initialization.state,
+        error: null as string | null,
+      };
+    }
+
+    const candidates = await getNextUnresolvedSurveyCandidates(db, scope, { limit: 5 });
+    const initialItems = await Promise.all(
+      candidates.map(async (candidate) => ({
+        candidate,
+        record: await getAnimePersonalRecord(db, candidate.animeId),
+      })),
+    );
+    const first = initialItems[0] ?? null;
+
     return {
       scope,
       summary,
-      candidate,
-      record,
-      reviewMode: Boolean(requestedPosition),
+      candidate: first?.candidate ?? null,
+      record: first?.record ?? null,
+      initialItems,
+      reviewMode: false,
       initializing: false,
       loadState: initialization.state,
       error: null as string | null,
@@ -131,6 +156,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
       summary: null,
       candidate: null,
       record: null,
+      initialItems: [],
       reviewMode: Boolean(requestedPosition),
       initializing: false,
       loadState: null,
@@ -196,6 +222,16 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return Response.json({ ok: true });
   }
 
+  if (intent === "primary-optimistic") {
+    const status = String(formData.get("status") ?? "") as AnimePrimaryStatus;
+    if (status !== "WANT" && status !== "NOT_SEEN") {
+      throw new Response("Invalid optimistic primary decision", { status: 400 });
+    }
+    await savePrimaryDecision(db, animeId, status);
+    const summary = await refreshSurveyProgress(db, scope);
+    return Response.json({ ok: true, summary });
+  }
+
   if (intent === "primary") {
     const status = String(formData.get("status") ?? "") as AnimePrimaryStatus;
     if (status !== "SEEN" && status !== "WANT" && status !== "NOT_SEEN") {
@@ -247,10 +283,22 @@ export default function AnimeSurvey() {
   const submitting = navigation.state !== "idle";
   const previousSeason = adjacentSeason(data.scope.year, data.scope.season, -1);
   const nextSeason = adjacentSeason(data.scope.year, data.scope.season, 1);
-  const candidate = data.candidate;
-  const record = data.record;
+  const optimisticEnabled = !data.reviewMode && !data.initializing && !data.error && Boolean(data.summary);
+  const optimistic = useAnimeSurveyOptimisticQueue({
+    year: data.scope.year,
+    season: data.scope.season,
+    initialItems: data.initialItems,
+    candidateCount: data.summary?.candidateCount ?? 0,
+    processedCount: data.summary?.processedCount ?? 0,
+    enabled: optimisticEnabled,
+  });
+  const candidate = data.reviewMode ? data.candidate : optimistic.currentItem?.candidate ?? null;
+  const record = data.reviewMode ? data.record : optimistic.currentItem?.record ?? null;
+  const processedCount = optimisticEnabled
+    ? optimistic.displayProcessedCount
+    : data.summary?.processedCount ?? 0;
   const progress = data.summary && data.summary.candidateCount > 0
-    ? Math.min(100, (data.summary.processedCount / data.summary.candidateCount) * 100)
+    ? Math.min(100, (processedCount / data.summary.candidateCount) * 100)
     : 0;
   const previousItemHref = candidate && candidate.position > 1
     ? surveyUrl(data.scope.year, data.scope.season, candidate.position - 1)
@@ -269,7 +317,8 @@ export default function AnimeSurvey() {
           animeId={candidate.animeId}
           primaryEnabled={record?.status !== "SEEN"}
           previousHref={previousItemHref}
-          disabled={submitting}
+          disabled={submitting || optimistic.waitingForQueue}
+          onFastPrimary={data.reviewMode ? undefined : optimistic.answerFast}
         />
       ) : null}
 
@@ -293,11 +342,37 @@ export default function AnimeSurvey() {
         {data.summary ? (
           <div className="mt-5">
             <div className="flex items-center justify-between text-xs font-bold text-neutral-500">
-              <span>{data.summary.processedCount} / {data.summary.candidateCount}</span>
+              <span>{processedCount} / {data.summary.candidateCount}</span>
               <span>{Math.round(progress)}%</span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-800">
               <div className="h-full rounded-full bg-white transition-all" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+        ) : null}
+
+        {!data.reviewMode && (optimistic.savingCount > 0 || optimistic.failedJobs.length > 0 || optimistic.refillError) ? (
+          <div className="mt-3 rounded-xl border border-neutral-800 bg-neutral-900/70 px-3 py-2 text-xs text-neutral-400">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>
+                {optimistic.failedJobs.length > 0
+                  ? `${optimistic.failedJobs.length} 筆背景儲存失敗，答案仍保留在本頁。`
+                  : optimistic.refillError
+                    ? optimistic.refillError
+                    : `背景儲存中：${optimistic.savingCount} 筆`}
+              </span>
+              <div className="flex gap-2">
+                {optimistic.failedJobs.length > 0 ? (
+                  <button type="button" onClick={optimistic.retryAllFailed} className="font-black text-neutral-200 hover:text-white">
+                    重試儲存
+                  </button>
+                ) : null}
+                {optimistic.refillError ? (
+                  <button type="button" onClick={optimistic.retryRefill} className="font-black text-neutral-200 hover:text-white">
+                    重試載入
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
         ) : null}
@@ -328,6 +403,18 @@ export default function AnimeSurvey() {
           </section>
         ) : data.initializing && data.loadState ? (
           <AnimeSurveyInitializer year={data.scope.year} season={data.scope.season} initialState={data.loadState} />
+        ) : !candidate && optimisticEnabled && !optimistic.isComplete ? (
+          <section className="mt-8 rounded-3xl border border-neutral-800 bg-neutral-900 p-8 text-center">
+            <h2 className="text-lg font-black">正在準備下一部</h2>
+            <p className="mt-2 text-sm text-neutral-500">
+              {optimistic.refillError ?? "候選佇列正在補充，已送出的答案仍會在背景保存。"}
+            </p>
+            {optimistic.refillError ? (
+              <button type="button" onClick={optimistic.retryRefill} className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-black text-neutral-950">
+                重試載入
+              </button>
+            ) : null}
+          </section>
         ) : candidate ? (
           <section className="mt-3 overflow-hidden rounded-[2rem] border border-neutral-800 bg-neutral-900 shadow-2xl">
             <div className="grid md:grid-cols-[minmax(260px,38%)_1fr]">
@@ -448,12 +535,24 @@ export default function AnimeSurvey() {
                       <button disabled={submitting} name="status" value="SEEN" className="rounded-2xl bg-white px-5 py-4 font-black text-neutral-950 disabled:opacity-50">
                         看過 <span className="ml-1 text-xs font-bold text-neutral-500">A / ←</span>
                       </button>
-                      <button disabled={submitting} name="status" value="WANT" className="rounded-2xl border border-neutral-600 px-5 py-4 font-black text-neutral-100 hover:bg-neutral-800 disabled:opacity-50">
-                        想看 <span className="ml-1 text-xs font-bold text-neutral-500">W / ↑</span>
-                      </button>
-                      <button disabled={submitting} name="status" value="NOT_SEEN" className="rounded-2xl border border-neutral-800 px-5 py-4 font-black text-neutral-500 hover:bg-neutral-800 disabled:opacity-50">
-                        沒看 <span className="ml-1 text-xs font-bold text-neutral-600">D / →</span>
-                      </button>
+                      {data.reviewMode ? (
+                        <button disabled={submitting} name="status" value="WANT" className="rounded-2xl border border-neutral-600 px-5 py-4 font-black text-neutral-100 hover:bg-neutral-800 disabled:opacity-50">
+                          想看 <span className="ml-1 text-xs font-bold text-neutral-500">W / ↑</span>
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => optimistic.answerFast("WANT")} className="rounded-2xl border border-neutral-600 px-5 py-4 font-black text-neutral-100 hover:bg-neutral-800">
+                          想看 <span className="ml-1 text-xs font-bold text-neutral-500">W / ↑</span>
+                        </button>
+                      )}
+                      {data.reviewMode ? (
+                        <button disabled={submitting} name="status" value="NOT_SEEN" className="rounded-2xl border border-neutral-800 px-5 py-4 font-black text-neutral-500 hover:bg-neutral-800 disabled:opacity-50">
+                          沒看 <span className="ml-1 text-xs font-bold text-neutral-600">D / →</span>
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => optimistic.answerFast("NOT_SEEN")} className="rounded-2xl border border-neutral-800 px-5 py-4 font-black text-neutral-500 hover:bg-neutral-800">
+                          沒看 <span className="ml-1 text-xs font-bold text-neutral-600">D / →</span>
+                        </button>
+                      )}
                     </div>
                   </Form>
                 )}

@@ -1,4 +1,6 @@
+import { ensureAnimeBangumiMetricsSchema } from "./anime-bangumi-metrics.server";
 import { cacheAnimeProviderBatch } from "./anime-catalog.server";
+import { compareAnimeSurveyRecognitionRank } from "./anime-survey-ranking";
 import { ensureAnimeSchema } from "./anime.schema.server";
 import { animeSurveyScopeKey, type AnimeSeason, type AnimeSurveyScope } from "./anime.types";
 import { fetchBangumiSeasonBatch } from "./providers/bangumi.server";
@@ -45,6 +47,14 @@ type LoadStateDbRow = {
 type ProgressDbRow = {
   candidate_count: number;
   completed: number;
+};
+
+type CandidateRankDbRow = {
+  anime_id: number;
+  existing_position: number;
+  collection_total: number | null;
+  bangumi_average_score: number | null;
+  format: string | null;
 };
 
 const LOAD_LOCK_MS = 30_000;
@@ -201,37 +211,66 @@ async function candidateCount(db: D1Database, scopeKey: string): Promise<number>
   return row?.count ?? 0;
 }
 
-async function sortFrozenCandidates(db: D1Database, scopeKey: string) {
-  const rows = await db
+async function sortFrozenCandidates(db: D1Database, scopeKey: string): Promise<void> {
+  await ensureAnimeBangumiMetricsSchema(db);
+
+  const answered = await db
     .prepare(
-      `SELECT c.anime_id
+      `SELECT 1 AS found
        FROM anime_scope_candidates c
-       JOIN anime_items i ON i.anime_id = c.anime_id
+       JOIN anime_user_decisions d ON d.anime_id = c.anime_id
        WHERE c.scope_key = ?
-       ORDER BY COALESCE(i.popularity, 0) DESC,
-                COALESCE(i.average_score, 0) DESC,
-                c.position ASC`,
+       LIMIT 1`,
     )
     .bind(scopeKey)
-    .all<{ anime_id: number }>();
+    .first<{ found: number }>();
 
-  const ids = (rows.results ?? []).map((row) => row.anime_id);
-  if (!ids.length) return;
+  // A scope with any user answer is already established. Never silently move its
+  // positions; corrected recognition ordering applies to newly-built scopes.
+  if (answered) return;
+
+  const rows = await db
+    .prepare(
+      `SELECT
+         c.anime_id,
+         c.position AS existing_position,
+         m.collection_total,
+         m.average_score AS bangumi_average_score,
+         COALESCE(m.format, i.format) AS format
+       FROM anime_scope_candidates c
+       JOIN anime_items i ON i.anime_id = c.anime_id
+       LEFT JOIN anime_bangumi_metrics m ON m.anime_id = c.anime_id
+       WHERE c.scope_key = ?`,
+    )
+    .bind(scopeKey)
+    .all<CandidateRankDbRow>();
+
+  const ranked = (rows.results ?? [])
+    .map((row) => ({
+      animeId: row.anime_id,
+      bangumiCollectionTotal: row.collection_total,
+      bangumiAverageScore: row.bangumi_average_score,
+      format: row.format,
+      existingPosition: row.existing_position,
+    }))
+    .sort(compareAnimeSurveyRecognitionRank);
+
+  if (!ranked.length) return;
 
   // D1 batch is transactional. Move all existing positions out of the final range,
-  // then rewrite them in popularity order without deleting the candidate set.
+  // then rewrite them without deleting the candidate set or user-linked rows.
   await db.batch([
     db
       .prepare("UPDATE anime_scope_candidates SET position = position + 1000000 WHERE scope_key = ?")
       .bind(scopeKey),
-    ...ids.map((animeId, index) =>
+    ...ranked.map((item, index) =>
       db
         .prepare(
           `UPDATE anime_scope_candidates
            SET position = ?
            WHERE scope_key = ? AND anime_id = ?`,
         )
-        .bind(index + 1, scopeKey, animeId),
+        .bind(index + 1, scopeKey, item.animeId),
     ),
   ]);
 }

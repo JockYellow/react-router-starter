@@ -5,150 +5,155 @@ Last updated: 2026-09-11
 ## Current branch / review entry
 
 - Base: `main`
-- PR #11 — initial Anime Memory vertical slice — merged 2026-09-10.
-- PR #12 — Batch B loading reliability — merged.
-- PR #13 — browser-direct AniList hotfix — merged; deployed testing still returned AniList 403.
-- PR #14 — provider-neutral identity + Bangumi seasonal discovery — merged 2026-09-11.
-- PR #15 — allow Bangumi cover CDN in CSP — merged; production diagnostics proved CSP was updated but covers still failed in the user's browser.
-- Active branch: `fix/anime-cover-proxy`
-- Active PR: #16 — `fix(anime): proxy cover images through Worker`
-- Roadmap: #9
-- Active batch: #6 — Batch B production acceptance.
-- Batch A: #5 — code-complete; remote private-seed verification remains open.
+- `main` currently includes PR #16 at merge commit `e8977fa825c9ebacc97f0a7f4ddc66a8d3ad6a3c`.
+- PR #14 — provider-neutral identity + Bangumi seasonal discovery — merged.
+- PR #15 — Bangumi CDN CSP allowlist — merged, but did not solve browser cover rendering by itself.
+- PR #16 — same-origin Anime cover proxy — merged and **production-accepted by the user; covers now render successfully**.
+- Active development branch: `feature/anime-survey-efficiency`.
+- Active batch: #6 — Batch B production acceptance + survey efficiency.
+- Batch A: #5 — code-complete; real private Netflix seed execution remains pending.
+- Roadmap: #9.
 
 ## Current overall state
 
-**The Bangumi seasonal/D1 path works in production: the user successfully initialized 2025 Winter. Cover rendering remains the active production defect. PR #16 replaces direct third-party image embedding with an authenticated same-origin Worker proxy.**
+**The core TV-season survey works in production.**
 
-AniList is no longer a required runtime provider. Jikan was rejected after repeated live 504 probes. Bangumi is the TV-season discovery source, while the application uses its own internal `anime_id` and keeps provider IDs optional.
+Confirmed in real production/D1:
+- Bangumi seasonal discovery works.
+- 2025 Winter initialized successfully.
+- Chinese fallback titles render.
+- same-origin cover route `/api/anime/cover/:animeId` works; the user confirmed posters display after PR #16.
+- Seen / Want / Not Seen and evaluation code paths are implemented.
 
-## Production finding — Anime covers
+AniList is no longer a required runtime provider. Jikan was rejected after repeated live 504 probes. Bangumi is the TV-season discovery source. Internal `anime_id` is the stable application identity; provider IDs are optional external identifiers.
 
-2025 Winter imported successfully, but anime posters still did not render after PR #15.
+## Immediate next phase — survey efficiency
 
-Production diagnostics now confirm:
-- The deployed `/anime` response already has the PR #15 CSP and explicitly allows `https://lain.bgm.tv`.
-- All 151 cover URLs returned by the 2025 Winter Bangumi TV/WEB scan use the `https://lain.bgm.tv` origin.
-- A browser-like request with the production Referer and Sec-Fetch headers receives HTTP 200 `image/jpeg` from a sampled Bangumi cover.
-- Therefore the remaining failure is not explained by stale deployment, the CSP allowlist, mixed content, or a simple Bangumi hotlink rejection.
-- Existing legacy rows may also contain AniList `s4.anilist.co` cover URLs because provider-neutral reconciliation preserves an existing non-null `cover_url`.
+The next development phase was explicitly approved by the user and should resume on branch `feature/anime-survey-efficiency`.
 
-PR #16 therefore removes browser dependence on provider image origins:
-- survey/dashboard expose `/api/anime/cover/:animeId` instead of the raw third-party URL;
-- the authenticated Worker reads the stored D1 `cover_url` itself;
-- only HTTPS `lain.bgm.tv` and legacy `s4.anilist.co` are accepted;
-- upstream non-image/error responses are rejected;
-- existing D1 rows and the already-imported 2025 Winter scope do not need to be rebuilt.
+### 1. Fix popularity ordering semantics
 
-## Provider-neutral / Bangumi architecture
+Current completed-season ordering is:
 
-### Identity
-- `anime_id` is the stable application identity.
-- `mal_id`, `anilist_id`, and `bangumi_id` are optional external IDs.
-- Existing AniList-keyed catalog/aliases/decisions/evaluations/tags/sources/frozen candidates are copied idempotently into provider-neutral tables.
-- Existing established survey scopes remain frozen.
-- Provider reconciliation uses external IDs first; without a shared ID, only a unique exact normalized alias + compatible year may merge. No fuzzy substring merge.
+`anime_items.popularity DESC -> average_score DESC -> existing position`
 
-### Seasonal discovery
-- One TV season scans all three months.
-- Each month scans Anime `TV` and `WEB`: six provider segments per season.
-- Offset pagination continues when a segment exceeds one page.
-- There is no top-100 seasonal cutoff.
-- `name_cn` is converted through pinned OpenCC `cn -> tw` for practical Traditional-Chinese display.
-- After complete discovery, candidates are frozen in collection-popularity / score order.
+Problem discovered during production use:
+- Bangumi maps `collection_total` into the shared `anime_items.popularity` field.
+- legacy AniList rows may already have a non-null popularity value.
+- `cacheAnimeProviderRecord()` currently updates with `popularity = COALESCE(popularity, ?)`, so a legacy AniList popularity value can survive even after the same item is matched to Bangumi.
+- AniList popularity and Bangumi `collection_total` are different metrics/scales, so mixing them can make the survey look incorrectly ordered even though a popularity sort is technically being applied.
 
-### Loading reliability
-- Visible six-segment progress plus current candidate count.
-- D1-persisted resume state.
-- 30-second per-scope lock suppresses duplicate simultaneous initialization.
-- timeout/network/408/425/429/5xx use bounded retry/backoff; `Retry-After` is respected.
-- failed provider steps resume without clearing already discovered candidates.
-- Bangumi loading uses versioned `anime_scope_load_state_v2`, so old AniList 403 ERROR state is ignored.
-- candidate reordering is performed in one D1 transactional batch without deleting the candidate set first.
+Required change:
+- keep a provider-specific Bangumi popularity / `collection_total` value instead of mixing it with legacy AniList popularity;
+- seasonal survey ranking should use Bangumi `collection_total` as the primary signal;
+- TV may be used as a small tie-break / priority over WEB/ONA if useful;
+- average score should only be a secondary tie-breaker;
+- no taste-model / fuzzy recommendation logic is required.
 
-## Verification snapshot
+Important compatibility requirement:
+- existing frozen/answered user records must not be lost;
+- decide explicitly whether an already-started scope is re-ranked or only newly-created scopes use the corrected ranking. Avoid silently moving previously answered positions without a documented migration rule.
 
-Provider/runtime verification:
-- AniList: unsuitable as a required runtime dependency in this deployment environment (403/manual block / unavailable responses).
-- Jikan historical season: unsuitable in the observed test window (three consecutive 504 upstream failures).
-- Bangumi historical browse: HTTP 200 with historical records.
-- 2025 Winter production initialization: successful.
-- Production CSP after PR #15: confirmed to include `https://lain.bgm.tv`.
-- 2025 Winter Bangumi cover origins: 151 / 151 use `https://lain.bgm.tv`.
-- browser-like Bangumi cover probe: HTTP 200 JPEG.
+### 2. Make Not Seen / Want transitions effectively instant
 
-PR #16 code-bearing head passed:
-- [x] Anime unit tests, including strict cover proxy URL allowlist tests
-- [x] repository typecheck
-- [x] React Router build
-- [x] Wrangler deploy dry-run
+Current primary-answer path is slower than necessary:
 
-True Cloudflare Worker image-proxy E2E still requires PR #16 merge/deploy.
+`POST -> D1 save -> refreshSurveyProgress() -> redirect -> full survey loader -> next candidate -> render -> next cover request`
 
-## Batch A — foundation status
+This causes visible latency when repeatedly pressing D / Right for `NOT_SEEN`.
 
-### Completed in code
-- [x] Reuse existing `BLOG_DB`; no Anime-only D1.
-- [x] Provider-neutral domain identity and compatibility migration.
-- [x] Conservative exact-normalized matching.
-- [x] Private Netflix seed queue/API with safe precedence.
-- [x] Anime tests/typecheck/build/Wrangler dry-run in CI.
+Target UX:
+- client keeps a small queue of upcoming unresolved candidates (about 3–5 is enough);
+- preload upcoming same-origin cover URLs;
+- `NOT_SEEN` and `WANT` advance the visible card optimistically/immediately;
+- persist the previous answer in the background with a fetcher/API action;
+- refill the queue as it is consumed;
+- progress count updates optimistically and reconciles with server state;
+- failed background persistence must surface a clear recoverable state and must not silently lose an answer;
+- `SEEN` remains different: selecting Seen should keep the current card open and reveal the detail/evaluation flow rather than auto-advance.
 
-### Still pending because it requires real Cloudflare/private-data execution
-- [ ] Execute schema repeatedly against real remote `BLOG_DB` and explicitly verify idempotency.
-- [ ] Stage the reviewed private Netflix rows into real D1.
-- [ ] Resolve the seed queue and inspect MATCHED / AMBIGUOUS / UNMATCHED / ERROR counts.
+Do not trade durability for speed. D1 remains source of truth; optimistic UI is only presentation/interaction behavior.
 
-## Batch B — implementation / acceptance status
+## Batch B acceptance still pending after efficiency work
 
-### Dashboard / survey implementation
-- [x] Admin-authenticated `/anime` dashboard and `/anime/survey`.
-- [x] Frozen candidate sequence.
-- [x] Chinese-first title + poster metadata.
-- [x] Seen / Want / Not Seen flow.
-- [x] Seen detail + evaluation + optional tags/note.
-- [x] Incremental autosave and previous-item/review mode.
-- [x] Desktop hotkeys with typing protection.
-- [x] Rating autosave safely carries current viewing-detail state.
+Production cover rendering is now accepted. Remaining browser acceptance:
+- reload during a newly-initializing season and confirm Bangumi month/category/offset resumes rather than restarting;
+- second-tab / repeated-trigger test confirms the D1 initialization lock prevents duplicate loading;
+- Seen detail/rating autosave survives reload;
+- Want / Not Seen persist reliably, including after the new optimistic flow;
+- previous-item/edit mode returns correctly to unresolved flow;
+- season switching remains reliable;
+- review desktop hotkey behavior after real use.
 
-### Provider loading / recovery
-- [x] visible provider progress.
-- [x] durable resume state.
-- [x] duplicate-load lock.
-- [x] bounded transient retry/backoff.
-- [x] provider-neutral identity migration.
-- [x] Bangumi complete seasonal TV+WEB scan implementation.
-- [x] old failed AniList load state does not control the new flow.
-- [x] real production/D1 initialization succeeded for 2025 Winter.
-- [ ] confirm same-origin cover rendering after PR #16 deployment.
-- [ ] continue the remaining browser persistence/reload/second-tab acceptance checks.
+Once these pass, update and close #6.
 
-## Remaining production acceptance
+## Batch A — still pending in production
 
-1. Merge/deploy PR #16 and reopen the already-imported 2025 Winter scope; the card image URL should now be same-origin `/api/anime/cover/:animeId` and render without re-importing data.
-2. Confirm several consecutive cards show covers, including any rows originally matched to legacy AniList data.
-3. Reload during a new season initialization and confirm the provider cursor resumes instead of restarting the season.
-4. Test a second tab/repeated initialization trigger and confirm the D1 lock prevents duplicate loading.
-5. Verify Seen autosave survives reload.
-6. Verify Want/Not Seen remain reliable one-click actions.
-7. Verify previous-item editing returns to unresolved flow correctly.
-8. If these pass, close Batch B (#6) and begin Batch C.
+Code is already present, but private execution has not been completed:
+- execute/verify schema repeatedly against real `BLOG_DB` for idempotency;
+- stage the reviewed private Netflix source rows into real D1;
+- resolve the seed queue and inspect MATCHED / AMBIGUOUS / UNMATCHED / ERROR counts;
+- verify seed writes do not overwrite later manual survey decisions.
 
-## Known intentional compatibility state
+Private Netflix/user rows must never be committed to this public repository.
 
-- Legacy AniList-keyed tables remain in D1 during this transition and are not deleted.
-- The production Bangumi flow uses `anime_scope_load_state_v2` so old provider cursors/errors are not misinterpreted.
-- AniList remains an optional external identifier / legacy seed matching source; survey availability no longer depends on its runtime API.
-- Cover source URLs remain stored in D1 for provider provenance; browser-facing URLs are same-origin proxy paths in PR #16.
+## Later roadmap after Batch B / Netflix seed
 
-## Privacy rule
+### Batch C — Library / detail / watchlist (#7)
+- `/anime/library` poster wall.
+- title/alias search.
+- filters: watch status, evaluation, year/season, tags, studio.
+- canonical `/anime/:id` detail/edit page.
+- `/anime/watchlist` with useful sorting and Want -> Seen flow.
 
-This repository is public. Never commit personal Anime Memory rows, Netflix rows, ratings, tags, notes, or exported personal archives. Private source data belongs in D1 or ignored local/private files.
+### Batch D — completion (#8)
+- movie survey by year.
+- JSON + CSV export.
+- mobile survey/library UX.
+- persistence / D1 / provider failure QA.
+- final deployment and first-run documentation.
+
+### Roadmap gap to add formally
+The existing #7/#8 roadmap does not fully cover two parts of the original product goal:
+- OVA / OAD / Special / other non-TV non-movie works;
+- pre-2011 classic/high-recognition gap-filling.
+
+Recommended product treatment:
+- do **not** add OVA/Special noise to every TV seasonal scan;
+- provide a separate later catch-up flow;
+- pre-2011 should use a high-recognition/high-popularity pass rather than forcing the user through every historical season.
+
+Smart recommendation / taste-model ranking remains out of scope unless the user later changes that decision.
+
+## Architecture notes that must not regress
+
+- `anime_id` is canonical internal identity.
+- Bangumi official browse is the required TV seasonal provider.
+- seasonal discovery scans all three months × TV/WEB and follows offset pagination; no top-100 cutoff.
+- Bangumi `name_cn` is converted with pinned OpenCC cn -> tw as a practical Chinese fallback; it is not claimed to be an authoritative Taiwan-localized title.
+- exact external ID or unique exact alias + compatible year only for provider reconciliation; no fuzzy substring merge.
+- legacy AniList tables remain for compatibility during transition.
+- cover browser URL is same-origin `/api/anime/cover/:animeId`; raw provider cover URLs stay in D1.
+- never commit personal Anime Memory/Netflix rows to GitHub.
+
+## Verification baseline
+
+Merged PR #16 passed:
+- Anime unit tests;
+- repository typecheck;
+- React Router build;
+- Wrangler deploy dry-run.
+
+Production user acceptance after merge:
+- 2025 Winter provider import: success.
+- cover proxy/rendering: success.
 
 ## Resume instructions for a new developer/chat
 
-1. Read this file, `TODO.md`, `DECISIONS.md`, and `PRIVATE_DATA.md`.
-2. Open PR #16 and issues #6 / #5.
-3. Do not restore AniList or Jikan as a required live seasonal provider without new evidence and an explicit architecture decision.
-4. The immediate acceptance target is same-origin cover rendering on the already-imported 2025 Winter scope after PR #16 deployment.
-5. After cover verification, finish the remaining Batch B browser acceptance checklist before starting Batch C.
+1. Read `STATUS.md`, `TODO.md`, `DECISIONS.md`, and issue #6.
+2. Continue from branch `feature/anime-survey-efficiency`.
+3. First implement the provider-specific Bangumi popularity fix and define migration behavior for already-started scopes.
+4. Then implement optimistic queue/preload for `NOT_SEEN` / `WANT`, while keeping `SEEN` on-card for evaluation.
+5. Add focused tests before running the full Anime CI, typecheck, build, and Wrangler dry-run.
+6. Update STATUS/TODO/#6 at the checkpoint.
+7. Do not merge any PR without explicit user instruction.
