@@ -144,7 +144,7 @@ export default function AnimeDashboard() {
           {data.recent.length ? (
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {data.recent.map((item) => (
-                <div key={item.anilistId} className="flex gap-3 rounded-2xl border border-neutral-200 bg-white p-3">
+                <div key={item.animeId} className="flex gap-3 rounded-2xl border border-neutral-200 bg-white p-3">
                   {item.coverUrl ? (
                     <img src={item.coverUrl} alt="" className="h-20 w-14 rounded-lg object-cover" />
                   ) : (
