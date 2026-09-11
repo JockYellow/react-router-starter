@@ -178,6 +178,22 @@ const CANDIDATE_SELECT = `
   JOIN anime_items a ON a.anime_id = c.anime_id
   LEFT JOIN anime_user_decisions d ON d.anime_id = c.anime_id`;
 
+async function enrichFirstCandidateTitle(
+  db: D1Database,
+  candidates: SurveyCandidateRow[],
+): Promise<SurveyCandidateRow[]> {
+  const first = candidates[0];
+  if (!first || first.titleZhTw) return candidates;
+
+  try {
+    const enrichment = await ensureAnimeChineseTitle(db, first.animeId);
+    if (!enrichment.titleZhTw) return candidates;
+    return [{ ...first, titleZhTw: enrichment.titleZhTw }, ...candidates.slice(1)];
+  } catch {
+    return candidates;
+  }
+}
+
 export async function getSurveyCandidates(
   db: D1Database,
   scope: AnimeSurveyScope,
@@ -191,14 +207,32 @@ export async function getSurveyCandidates(
   return (result.results ?? []).map(mapCandidateRow);
 }
 
-export async function getNextUnresolvedSurveyCandidate(
+/**
+ * Returns a small ordered queue of unresolved candidates for fast survey flow.
+ *
+ * Exclusions are used by the optimistic client so answers that are still being
+ * persisted cannot reappear during queue refill.
+ *
+ * @param db - BLOG_DB D1 binding.
+ * @param scope - Survey scope.
+ * @param options - Queue size and canonical anime ids to skip.
+ */
+export async function getNextUnresolvedSurveyCandidates(
   db: D1Database,
   scope: AnimeSurveyScope,
-): Promise<SurveyCandidateRow | null> {
+  options: { limit?: number; excludeAnimeIds?: readonly number[] } = {},
+): Promise<SurveyCandidateRow[]> {
   await ensureAnimeSchema(db);
   const scopeKey = animeSurveyScopeKey(scope);
+  const limit = Math.max(1, Math.min(Math.trunc(options.limit ?? 5), 10));
+  const excluded = Array.from(new Set(options.excludeAnimeIds ?? []))
+    .filter((animeId) => Number.isInteger(animeId) && animeId > 0)
+    .slice(0, 200);
+  const exclusionSql = excluded.length
+    ? `AND c.anime_id NOT IN (${excluded.map(() => "?").join(", ")})`
+    : "";
 
-  const row = await db
+  const rows = await db
     .prepare(
       `${CANDIDATE_SELECT}
        LEFT JOIN anime_user_evaluations e ON e.anime_id = c.anime_id
@@ -207,22 +241,22 @@ export async function getNextUnresolvedSurveyCandidate(
            d.anime_id IS NULL
            OR (d.status = 'SEEN' AND (d.detail_status IS NULL OR e.rating IS NULL))
          )
+         ${exclusionSql}
        ORDER BY c.position ASC
-       LIMIT 1`,
+       LIMIT ?`,
     )
-    .bind(scopeKey)
-    .first<CandidateDbRow>();
+    .bind(scopeKey, ...excluded, limit)
+    .all<CandidateDbRow>();
 
-  if (!row) return null;
-  const candidate = mapCandidateRow(row);
-  if (candidate.titleZhTw) return candidate;
+  return enrichFirstCandidateTitle(db, (rows.results ?? []).map(mapCandidateRow));
+}
 
-  try {
-    const enrichment = await ensureAnimeChineseTitle(db, candidate.animeId);
-    return enrichment.titleZhTw ? { ...candidate, titleZhTw: enrichment.titleZhTw } : candidate;
-  } catch {
-    return candidate;
-  }
+export async function getNextUnresolvedSurveyCandidate(
+  db: D1Database,
+  scope: AnimeSurveyScope,
+): Promise<SurveyCandidateRow | null> {
+  const candidates = await getNextUnresolvedSurveyCandidates(db, scope, { limit: 1 });
+  return candidates[0] ?? null;
 }
 
 export async function refreshSurveyProgress(
