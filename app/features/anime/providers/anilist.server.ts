@@ -28,6 +28,12 @@ export type AniListAnime = {
   studio: string | null;
 };
 
+export type AniListPageBatch = {
+  records: AniListAnime[];
+  page: number;
+  hasNextPage: boolean;
+};
+
 type AniListRawMedia = {
   id: number;
   idMal?: number | null;
@@ -99,6 +105,30 @@ const MEDIA_FIELDS = `
   }
 `;
 
+const SEASON_QUERY = `
+  query AnimeMemorySeason(
+    $page: Int!
+    $perPage: Int!
+    $season: MediaSeason!
+    $seasonYear: Int!
+    $formats: [MediaFormat!]
+  ) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo { currentPage hasNextPage }
+      media(
+        type: ANIME
+        season: $season
+        seasonYear: $seasonYear
+        format_in: $formats
+        isAdult: false
+        sort: [POPULARITY_DESC, SCORE_DESC]
+      ) {
+        ${MEDIA_FIELDS}
+      }
+    }
+  }
+`;
+
 function isAnimeSeason(value: string | null | undefined): value is AnimeSeason {
   return value === "WINTER" || value === "SPRING" || value === "SUMMER" || value === "FALL";
 }
@@ -160,6 +190,17 @@ async function queryAniList(
   return payload;
 }
 
+function normalizePage(payload: AniListPageResponse, requestedPage: number): AniListPageBatch {
+  const pageData = payload.data?.Page;
+  return {
+    records: (pageData?.media ?? [])
+      .filter((media): media is AniListRawMedia => Boolean(media))
+      .map(normalizeMedia),
+    page: pageData?.pageInfo?.currentPage ?? requestedPage,
+    hasNextPage: Boolean(pageData?.pageInfo?.hasNextPage),
+  };
+}
+
 async function collectPages(
   query: string,
   baseVariables: Record<string, unknown>,
@@ -177,18 +218,32 @@ async function collectPages(
       page,
       perPage,
     });
-
-    const pageData = payload.data?.Page;
-    const pageMedia = pageData?.media ?? [];
-    records.push(
-      ...pageMedia.filter((media): media is AniListRawMedia => Boolean(media)).map(normalizeMedia),
-    );
-
-    hasNextPage = Boolean(pageData?.pageInfo?.hasNextPage);
+    const batch = normalizePage(payload, page);
+    records.push(...batch.records);
+    hasNextPage = batch.hasNextPage;
     page += 1;
   }
 
   return records.slice(0, safeLimit);
+}
+
+export async function fetchAniListSeasonPage(options: {
+  year: number;
+  season: AnimeSeason;
+  page: number;
+  perPage?: number;
+  formats?: readonly string[];
+}): Promise<AniListPageBatch> {
+  const page = Math.max(1, Math.trunc(options.page));
+  const perPage = Math.max(1, Math.min(Math.trunc(options.perPage ?? MAX_PAGE_SIZE), MAX_PAGE_SIZE));
+  const payload = await queryAniList(SEASON_QUERY, {
+    page,
+    perPage,
+    season: options.season,
+    seasonYear: options.year,
+    formats: [...(options.formats ?? ANILIST_DEFAULT_TV_FORMATS)],
+  });
+  return normalizePage(payload, page);
 }
 
 export async function fetchAniListSeason(options: {
@@ -197,32 +252,8 @@ export async function fetchAniListSeason(options: {
   limit?: number;
   formats?: readonly string[];
 }): Promise<AniListAnime[]> {
-  const query = `
-    query AnimeMemorySeason(
-      $page: Int!
-      $perPage: Int!
-      $season: MediaSeason!
-      $seasonYear: Int!
-      $formats: [MediaFormat!]
-    ) {
-      Page(page: $page, perPage: $perPage) {
-        pageInfo { currentPage hasNextPage }
-        media(
-          type: ANIME
-          season: $season
-          seasonYear: $seasonYear
-          format_in: $formats
-          isAdult: false
-          sort: [POPULARITY_DESC, SCORE_DESC]
-        ) {
-          ${MEDIA_FIELDS}
-        }
-      }
-    }
-  `;
-
   return collectPages(
-    query,
+    SEASON_QUERY,
     {
       season: options.season,
       seasonYear: options.year,
