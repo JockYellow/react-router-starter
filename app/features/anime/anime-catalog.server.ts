@@ -141,8 +141,7 @@ export async function cacheAnimeProviderRecord(
           year, season, format, episodes, cover_url, studio, genres_json,
           popularity, average_score, metadata_source, provider_updated_at,
           synced_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        RETURNING anime_id`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         record.malId,
@@ -167,13 +166,14 @@ export async function cacheAnimeProviderRecord(
         now,
         now,
       )
-      .first<{ anime_id: number }>();
+      .run();
 
-    if (!inserted?.anime_id) {
+    const insertedId = inserted.meta.last_row_id;
+    if (typeof insertedId === "number" && insertedId > 0) {
+      animeId = insertedId;
+    } else {
       animeId = await findAnimeId(db, record);
       if (!animeId) throw new Error(`Unable to cache ${record.provider} anime ${record.providerId}`);
-    } else {
-      animeId = inserted.anime_id;
     }
   }
 
