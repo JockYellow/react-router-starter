@@ -217,18 +217,23 @@ async function sortFrozenCandidates(db: D1Database, scopeKey: string) {
 
   const ids = (rows.results ?? []).map((row) => row.anime_id);
   if (!ids.length) return;
-  await db.prepare("DELETE FROM anime_scope_candidates WHERE scope_key = ?").bind(scopeKey).run();
-  const now = Date.now();
-  await db.batch(
-    ids.map((animeId, index) =>
+
+  // D1 batch is transactional. Move all existing positions out of the final range,
+  // then rewrite them in popularity order without deleting the candidate set.
+  await db.batch([
+    db
+      .prepare("UPDATE anime_scope_candidates SET position = position + 1000000 WHERE scope_key = ?")
+      .bind(scopeKey),
+    ...ids.map((animeId, index) =>
       db
         .prepare(
-          `INSERT INTO anime_scope_candidates (scope_key, anime_id, position, added_at)
-           VALUES (?, ?, ?, ?)`,
+          `UPDATE anime_scope_candidates
+           SET position = ?
+           WHERE scope_key = ? AND anime_id = ?`,
         )
-        .bind(scopeKey, animeId, index + 1, now),
+        .bind(index + 1, scopeKey, animeId),
     ),
-  );
+  ]);
 }
 
 export async function ensureSurveyInitialization(
