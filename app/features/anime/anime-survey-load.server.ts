@@ -1,7 +1,7 @@
 import { cacheAnimeProviderBatch } from "./anime-catalog.server";
 import { ensureAnimeSchema } from "./anime.schema.server";
-import { animeSurveyScopeKey, type AnimeSurveyScope } from "./anime.types";
-import { fetchJikanSeasonPage } from "./providers/jikan.server";
+import { animeSurveyScopeKey, type AnimeSeason, type AnimeSurveyScope } from "./anime.types";
+import { fetchBangumiSeasonBatch } from "./providers/bangumi.server";
 
 export const ANIME_SURVEY_LOAD_PHASES = [
   "FETCHING_PROVIDER",
@@ -14,7 +14,7 @@ export type AnimeSurveyLoadPhase = (typeof ANIME_SURVEY_LOAD_PHASES)[number];
 
 export type AnimeSurveyLoadState = {
   scopeKey: string;
-  provider: "JIKAN" | "ANILIST";
+  provider: "BANGUMI" | "ANILIST";
   phase: AnimeSurveyLoadPhase;
   targetCount: number;
   fetchedCount: number;
@@ -23,11 +23,14 @@ export type AnimeSurveyLoadState = {
   lockedUntil: number | null;
   lastError: string | null;
   updatedAt: number;
+  providerStep: number;
+  providerStepTotal: number;
+  providerLabel: string;
 };
 
 type LoadStateDbRow = {
   scope_key: string;
-  provider: "JIKAN" | "ANILIST";
+  provider: "BANGUMI" | "ANILIST";
   phase: AnimeSurveyLoadPhase;
   target_count: number;
   fetched_count: number;
@@ -45,8 +48,80 @@ type ProgressDbRow = {
 };
 
 const LOAD_LOCK_MS = 30_000;
+const BANGUMI_PAGE_SIZE = 100;
+const BANGUMI_STREAM_STRIDE = 100_000;
+const BANGUMI_STREAM_COUNT = 6;
+const SEASON_MONTHS: Record<AnimeSeason, readonly number[]> = {
+  WINTER: [1, 2, 3],
+  SPRING: [4, 5, 6],
+  SUMMER: [7, 8, 9],
+  FALL: [10, 11, 12],
+};
+
+function decodeBangumiPageKey(pageKey: number) {
+  const ordinal = Math.max(0, Math.trunc(pageKey) - 1);
+  const streamIndex = Math.floor(ordinal / BANGUMI_STREAM_STRIDE);
+  const pageIndex = ordinal % BANGUMI_STREAM_STRIDE;
+  if (streamIndex < 0 || streamIndex >= BANGUMI_STREAM_COUNT) return null;
+  return {
+    monthIndex: Math.floor(streamIndex / 2),
+    categoryIndex: streamIndex % 2,
+    offset: pageIndex * BANGUMI_PAGE_SIZE,
+    streamIndex,
+  };
+}
+
+function bangumiCursorFromPageKey(pageKey: number): string | null {
+  const decoded = decodeBangumiPageKey(pageKey);
+  if (!decoded) return null;
+  return JSON.stringify({
+    monthIndex: decoded.monthIndex,
+    categoryIndex: decoded.categoryIndex,
+    offset: decoded.offset,
+  });
+}
+
+function bangumiPageKeyFromCursor(cursor: string | null): number | null {
+  if (!cursor) return null;
+  const parsed = JSON.parse(cursor) as {
+    monthIndex?: number;
+    categoryIndex?: number;
+    offset?: number;
+  };
+  const monthIndex = Number(parsed.monthIndex);
+  const categoryIndex = Number(parsed.categoryIndex);
+  const offset = Number(parsed.offset);
+  if (
+    !Number.isInteger(monthIndex) || monthIndex < 0 || monthIndex > 2 ||
+    !Number.isInteger(categoryIndex) || categoryIndex < 0 || categoryIndex > 1 ||
+    !Number.isInteger(offset) || offset < 0 || offset % BANGUMI_PAGE_SIZE !== 0
+  ) {
+    throw new Error("Bangumi returned an invalid seasonal cursor");
+  }
+  const streamIndex = monthIndex * 2 + categoryIndex;
+  return streamIndex * BANGUMI_STREAM_STRIDE + offset / BANGUMI_PAGE_SIZE + 1;
+}
+
+function describeBangumiPageKey(pageKey: number, season: AnimeSeason) {
+  const decoded = decodeBangumiPageKey(pageKey);
+  if (!decoded) {
+    return { step: BANGUMI_STREAM_COUNT, stepTotal: BANGUMI_STREAM_COUNT, label: "季度資料完成" };
+  }
+  const month = SEASON_MONTHS[season][decoded.monthIndex];
+  const category = decoded.categoryIndex === 0 ? "TV" : "WEB";
+  const pageSuffix = decoded.offset > 0 ? ` · ${decoded.offset + 1} 起` : "";
+  return {
+    step: decoded.streamIndex + 1,
+    stepTotal: BANGUMI_STREAM_COUNT,
+    label: `${month} 月 · ${category}${pageSuffix}`,
+  };
+}
 
 function mapLoadState(row: LoadStateDbRow): AnimeSurveyLoadState {
+  const season = row.scope_key.split(":")[2] as AnimeSeason | undefined;
+  const providerInfo = season && (season === "WINTER" || season === "SPRING" || season === "SUMMER" || season === "FALL")
+    ? describeBangumiPageKey(row.next_page, season)
+    : { step: 0, stepTotal: BANGUMI_STREAM_COUNT, label: "季度資料" };
   return {
     scopeKey: row.scope_key,
     provider: row.provider,
@@ -58,6 +133,9 @@ function mapLoadState(row: LoadStateDbRow): AnimeSurveyLoadState {
     lockedUntil: row.locked_until,
     lastError: row.last_error,
     updatedAt: row.updated_at,
+    providerStep: row.phase === "READY" ? BANGUMI_STREAM_COUNT : providerInfo.step,
+    providerStepTotal: providerInfo.stepTotal,
+    providerLabel: row.phase === "READY" ? "季度資料完成" : providerInfo.label,
   };
 }
 
@@ -81,10 +159,40 @@ async function candidateCount(db: D1Database, scopeKey: string): Promise<number>
   return row?.count ?? 0;
 }
 
+async function sortFrozenCandidates(db: D1Database, scopeKey: string) {
+  const rows = await db
+    .prepare(
+      `SELECT c.anime_id
+       FROM anime_scope_candidates c
+       JOIN anime_items i ON i.anime_id = c.anime_id
+       WHERE c.scope_key = ?
+       ORDER BY COALESCE(i.popularity, 0) DESC,
+                COALESCE(i.average_score, 0) DESC,
+                c.position ASC`,
+    )
+    .bind(scopeKey)
+    .all<{ anime_id: number }>();
+
+  const ids = (rows.results ?? []).map((row) => row.anime_id);
+  if (!ids.length) return;
+  await db.prepare("DELETE FROM anime_scope_candidates WHERE scope_key = ?").bind(scopeKey).run();
+  const now = Date.now();
+  await db.batch(
+    ids.map((animeId, index) =>
+      db
+        .prepare(
+          `INSERT INTO anime_scope_candidates (scope_key, anime_id, position, added_at)
+           VALUES (?, ?, ?, ?)`,
+        )
+        .bind(scopeKey, animeId, index + 1, now),
+    ),
+  );
+}
+
 export async function ensureSurveyInitialization(
   db: D1Database,
   scope: AnimeSurveyScope,
-  options: { targetCount?: number } = {},
+  _options: { targetCount?: number } = {},
 ): Promise<{ ready: boolean; state: AnimeSurveyLoadState | null }> {
   await ensureAnimeSchema(db);
   const scopeKey = animeSurveyScopeKey(scope);
@@ -99,15 +207,14 @@ export async function ensureSurveyInitialization(
     candidateCount(db, scopeKey),
   ]);
 
-  // Preserve already-established candidate sets, including those migrated from
-  // the former AniList-keyed schema. D-019 says an established scope is frozen.
+  // Preserve any scope that was already established before the provider migration.
+  // Failed legacy load-state lives in the old table and does not control this path.
   if (!existingLoad && (candidates > 0 || existingProgress?.completed === 1)) {
     return { ready: true, state: null };
   }
 
   if (existingLoad) return { ready: false, state: mapLoadState(existingLoad) };
 
-  const targetCount = Math.max(1, Math.min(Math.trunc(options.targetCount ?? 100), 500));
   const now = Date.now();
   await db.batch([
     db
@@ -131,14 +238,13 @@ export async function ensureSurveyInitialization(
           scope_key, scope_type, year, season, provider, phase, resume_phase,
           target_count, fetched_count, next_page, retry_count,
           locked_until, last_error, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, 'JIKAN', 'FETCHING_PROVIDER', NULL, ?, 0, 1, 0, NULL, NULL, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, 'BANGUMI', 'FETCHING_PROVIDER', NULL, 0, 0, 1, 0, NULL, NULL, ?, ?)`,
       )
       .bind(
         scopeKey,
         scope.type,
         scope.year,
         scope.type === "TV_SEASON" ? scope.season : null,
-        targetCount,
         now,
         now,
       ),
@@ -197,6 +303,7 @@ export async function processSurveyLoadStep(
 
   try {
     if (stateRow.phase === "BUILDING_SCOPE") {
+      await sortFrozenCandidates(db, scopeKey);
       const count = await candidateCount(db, scopeKey);
       const finishedAt = Date.now();
       await db.batch([
@@ -225,12 +332,16 @@ export async function processSurveyLoadStep(
     if (scope.type !== "TV_SEASON") {
       throw new Error("Progressive loading currently supports TV seasons only");
     }
+    if (stateRow.provider !== "BANGUMI") {
+      throw new Error(`Unsupported seasonal provider ${stateRow.provider}`);
+    }
 
-    const page = stateRow.next_page;
-    const batch = await fetchJikanSeasonPage({
+    const cursor = bangumiCursorFromPageKey(stateRow.next_page);
+    if (!cursor) throw new Error("Bangumi seasonal cursor is exhausted unexpectedly");
+    const batch = await fetchBangumiSeasonBatch({
       year: scope.year,
       season: scope.season,
-      page,
+      cursor,
     });
     const cached = await cacheAnimeProviderBatch(db, batch.records);
 
@@ -247,12 +358,10 @@ export async function processSurveyLoadStep(
     }
 
     const currentCount = existing.size - uniqueNew.length;
-    const remaining = Math.max(0, stateRow.target_count - currentCount);
-    const accepted = uniqueNew.slice(0, remaining);
     const addedAt = Date.now();
-    if (accepted.length) {
+    if (uniqueNew.length) {
       await db.batch(
-        accepted.map((item, index) =>
+        uniqueNew.map((item, index) =>
           db
             .prepare(
               `INSERT OR IGNORE INTO anime_scope_candidates (
@@ -265,9 +374,9 @@ export async function processSurveyLoadStep(
     }
 
     const nextFetched = await candidateCount(db, scopeKey);
-    const providerDone = !batch.hasNextPage || nextFetched >= stateRow.target_count;
-    const nextPhase: AnimeSurveyLoadPhase = providerDone ? "BUILDING_SCOPE" : "FETCHING_PROVIDER";
-    const nextTarget = !batch.hasNextPage ? nextFetched : stateRow.target_count;
+    const nextPage = batch.done ? stateRow.next_page : bangumiPageKeyFromCursor(batch.nextCursor);
+    if (!batch.done && !nextPage) throw new Error("Bangumi seasonal cursor ended before provider completion");
+    const nextPhase: AnimeSurveyLoadPhase = batch.done ? "BUILDING_SCOPE" : "FETCHING_PROVIDER";
 
     await db
       .prepare(
@@ -277,11 +386,18 @@ export async function processSurveyLoadStep(
              locked_until = NULL, last_error = NULL, updated_at = ?
          WHERE scope_key = ?`,
       )
-      .bind(nextPhase, nextTarget, nextFetched, page + 1, Date.now(), scopeKey)
+      .bind(
+        nextPhase,
+        batch.done ? nextFetched : Math.max(stateRow.target_count, nextFetched),
+        nextFetched,
+        nextPage ?? stateRow.next_page,
+        Date.now(),
+        scopeKey,
+      )
       .run();
 
     const progress = await readLoadState(db, scopeKey);
-    if (!progress) throw new Error(`Survey load state ${scopeKey} disappeared after page ${page}`);
+    if (!progress) throw new Error(`Survey load state ${scopeKey} disappeared after ${batch.label}`);
     return { kind: "PROGRESS", state: mapLoadState(progress) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown survey load error";
