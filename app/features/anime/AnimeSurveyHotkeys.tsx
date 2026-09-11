@@ -13,7 +13,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 export function AnimeSurveyHotkeys(props: {
   year: number;
   season: AnimeSeason;
-  anilistId: number;
+  animeId: number;
   primaryEnabled: boolean;
   previousHref: string | null;
   disabled?: boolean;
@@ -47,7 +47,7 @@ export function AnimeSurveyHotkeys(props: {
       form.set("intent", "primary");
       form.set("year", String(props.year));
       form.set("season", props.season);
-      form.set("anilistId", String(props.anilistId));
+      form.set("animeId", String(props.animeId));
       form.set("status", status);
       void submit(form, { method: "post" });
     };
@@ -56,7 +56,7 @@ export function AnimeSurveyHotkeys(props: {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
     navigate,
-    props.anilistId,
+    props.animeId,
     props.disabled,
     props.previousHref,
     props.primaryEnabled,
