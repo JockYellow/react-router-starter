@@ -15,6 +15,8 @@ type LoaderActionData = SurveyLoadStepResult | {
   perPage: number;
 };
 
+const LOAD_ACTION = "/api/admin/anime/survey-load";
+
 const SEASON_LABELS: Record<AnimeSeason, string> = {
   WINTER: "冬季",
   SPRING: "春季",
@@ -65,7 +67,7 @@ export function AnimeSurveyInitializer({
               hasNextPage: batch.hasNextPage ? "1" : "0",
               recordsJson: JSON.stringify(batch.records),
             },
-            { method: "post" },
+            { method: "post", action: LOAD_ACTION },
           );
         } catch (error) {
           fetcher.submit(
@@ -76,7 +78,7 @@ export function AnimeSurveyInitializer({
               page: String(request.page),
               message: error instanceof Error ? error.message : "AniList browser request failed",
             },
-            { method: "post" },
+            { method: "post", action: LOAD_ACTION },
           );
         } finally {
           setBrowserFetching(false);
@@ -92,7 +94,7 @@ export function AnimeSurveyInitializer({
           year: String(year),
           season,
         },
-        { method: "post" },
+        { method: "post", action: LOAD_ACTION },
       );
     }, busyElsewhere ? 1_200 : 250);
 
@@ -155,7 +157,7 @@ export function AnimeSurveyInitializer({
           ) : null}
           <p className="mt-2 break-words text-xs leading-5 text-red-200/70">{state.lastError ?? "外部資料來源暫時無法完成這一步。"}</p>
           <p className="mt-2 text-xs text-neutral-500">系統內部的短暫錯誤已自動重試；這顆按鈕只重試失敗的這一步，不會清掉前面已取得的資料。</p>
-          <fetcher.Form method="post" className="mt-4 flex flex-wrap gap-2">
+          <fetcher.Form method="post" action={LOAD_ACTION} className="mt-4 flex flex-wrap gap-2">
             <input type="hidden" name="intent" value="retry-load" />
             <input type="hidden" name="year" value={year} />
             <input type="hidden" name="season" value={season} />
