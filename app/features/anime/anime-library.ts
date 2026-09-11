@@ -51,6 +51,16 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
+function boundedInteger(
+  value: number | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (value == null || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(value)));
+}
+
 /**
  * Normalizes untrusted URL/query inputs before they are used by the library query.
  */
@@ -69,8 +79,9 @@ export function normalizeAnimeLibraryQuery(
   );
   const years = unique(
     (input.years ?? [])
+      .filter(Number.isFinite)
       .map((value) => Math.trunc(value))
-      .filter((value) => Number.isInteger(value) && value >= 1901 && value <= 2100),
+      .filter((value) => value >= 1901 && value <= 2100),
   );
   const seasons = unique(
     (input.seasons ?? []).filter((value): value is AnimeSeason =>
@@ -80,8 +91,8 @@ export function normalizeAnimeLibraryQuery(
   const sort = ANIME_LIBRARY_SORTS.includes(input.sort as AnimeLibrarySort)
     ? input.sort as AnimeLibrarySort
     : "RECENT";
-  const limit = Math.min(100, Math.max(1, Math.trunc(input.limit ?? 48)));
-  const offset = Math.min(100_000, Math.max(0, Math.trunc(input.offset ?? 0)));
+  const limit = boundedInteger(input.limit, 48, 1, 100);
+  const offset = boundedInteger(input.offset, 0, 0, 100_000);
 
   return {
     search,
