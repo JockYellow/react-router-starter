@@ -11,15 +11,14 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 ### A0–A3. Foundation / providers / matching
 - [x] `app/features/anime/` domain structure and stable keys.
 - [x] Reuse existing `BLOG_DB`; isolate tables with `anime_*` names.
-- [x] Catalog / aliases / decisions / sources / evaluations / tags / survey progress / frozen candidates / seed queue tables.
-- [x] Idempotent runtime schema construction by design.
-- [x] AniList season, movie-year and title search provider.
-- [x] Bangumi Chinese-title fallback.
+- [x] Legacy catalog / aliases / decisions / sources / evaluations / tags / survey progress / seed queue tables.
+- [x] Provider-neutral `anime_id` catalog and user-record tables added in PR #14.
+- [x] Existing AniList-keyed data migrates idempotently into provider-neutral tables.
+- [x] Bangumi official browse provider for historical TV-season discovery.
+- [x] Bangumi Chinese title fallback through pinned OpenCC `cn -> tw`.
 - [x] Conservative exact-normalized matching; no broad substring auto-match.
+- [x] Exact alias + compatible-year + unique-result reconciliation for Bangumi vs legacy records.
 - [x] Freeze candidate membership/order per survey scope.
-- [x] Pin `opencc-js` 1.4.2.
-- [x] Bangumi `name_cn` -> OpenCC `cn -> tw` -> cached `title_zh_tw`.
-- [x] Lazy/best-effort Chinese enrichment for the current survey card.
 - [ ] Execute schema twice against real Cloudflare D1 and verify idempotency.
 
 ### A4. Private Netflix seed
@@ -47,7 +46,7 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 
 ## Batch B — Seasonal survey, progress & evaluation (#6)
 
-**State: code-complete in PR #12; deployed browser acceptance pending.**
+**State: PR #14 code-ready; merge/deploy acceptance pending.**
 
 ### B0–B4. Dashboard / seasonal survey / answering / evaluation
 - [x] Private/admin-authenticated `/anime` dashboard.
@@ -57,26 +56,38 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 - [x] Seen / Want / Not Seen primary flow.
 - [x] Seen completion + one overall evaluation + optional 15 tags + optional note.
 - [x] Incremental Seen autosave.
+- [x] Rating autosave carries viewing detail so rating-first interaction is safe.
 - [x] Position-addressable previous/edit mode.
 
-### B5. Persistence, loading visibility & recovery
+### B5. Provider-neutral seasonal discovery
+- [x] Remove AniList as a required runtime identity/provider dependency.
+- [x] Reject Jikan as primary provider after live repeated 504 probe failures.
+- [x] Verify Bangumi historical TV and WEB browse endpoints with live HTTP 200 responses.
+- [x] Scan all three months × TV/WEB for each TV season.
+- [x] Follow Bangumi offset pagination when a source segment exceeds 100 results.
+- [x] Remove former top-100 seasonal cutoff.
+- [x] Deduplicate discovered records by internal `anime_id`.
+- [x] Preserve external `mal_id` / `anilist_id` / `bangumi_id` when known.
+- [x] Reconcile legacy records only through external ID or unique exact alias + compatible year.
+- [x] Freeze completed seasonal order by collection popularity, then score.
+- [x] Reorder positions transactionally without deleting the candidate set.
+
+### B6. Loading visibility & recovery
 - [x] Primary answers persist immediately.
 - [x] Resume from D1 after reload/device switch.
-- [x] Prevent duplicate records with canonical IDs/upserts.
-- [x] Persist first-time seasonal load state in `anime_survey_load_state`.
-- [x] Fetch AniList in batches of at most 50 candidates.
-- [x] Show fetched / target progress and current load phase.
-- [x] Resume from the saved provider page after reload/failure.
+- [x] Version seasonal provider state as `anime_scope_load_state_v2` so old AniList 403 state is ignored.
+- [x] UI shows current candidate count and six-segment provider progress.
+- [x] Resume from the saved Bangumi month/category/offset after reload/failure.
 - [x] Add short per-scope D1 lock to suppress duplicate initialization.
 - [x] Retry timeout/network/408/425/429/5xx with bounded exponential backoff + jitter.
 - [x] Respect provider `Retry-After` within a capped wait.
 - [x] Non-retryable 4xx fails immediately.
-- [x] Exhausted failures show stopped count/error and a targeted retry action.
+- [x] Exhausted failures preserve discovered candidates and expose targeted retry.
 - [ ] Browser-level first-load progress acceptance against deployed Worker/D1.
 - [ ] Browser-level reload/resume acceptance.
 - [ ] Browser-level duplicate-tab/repeated-trigger acceptance.
 
-### B6. Desktop efficiency
+### B7. Desktop efficiency
 - [x] A / Left = Seen.
 - [x] W / Up = Want.
 - [x] D / Right = Not Seen.
@@ -84,17 +95,18 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 - [x] Disable shortcuts while typing.
 - [ ] Review shortcut behavior after real usage.
 
-### B7. Verification / polish
-- [x] Dashboard/survey CI verified.
-- [x] Previous-item/hotkey CI verified.
-- [x] Incremental Seen autosave CI verified.
-- [x] Provider retry policy unit tests.
-- [x] Load-state schema test.
-- [x] Reliability implementation passed Anime tests, repository typecheck, React Router build, and Wrangler dry-run before the final docs-only checkpoint.
+### B8. Verification / production acceptance
+- [x] Provider HTTP retry policy unit tests.
+- [x] Bangumi seasonal provider unit tests: query normalization, Simplified-to-Traditional title conversion, offset pagination and final segment completion.
+- [x] Provider-neutral code passes Anime tests, repository typecheck, React Router build, and Wrangler dry-run.
+- [x] Live Bangumi 2011/1 TV+WEB probe returned HTTP 200 and real data.
+- [ ] Merge/deploy PR #14.
+- [ ] Confirm a previously failed AniList season starts the new Bangumi flow rather than resurfacing the 403 state.
+- [ ] Confirm six-segment scan reaches READY and opens the first card.
 - [ ] Manual/browser season-switch test.
 - [ ] Manual/browser Seen persistence test.
 - [ ] Manual/browser Want/Not Seen one-click test.
-- [ ] Manual/browser first-time load/retry/duplicate-tab test.
+- [ ] Manual/browser reload/resume and duplicate-tab test.
 - [ ] Update/close #6 after deployed browser acceptance.
 
 ---
@@ -107,9 +119,9 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 - [ ] Filter by watch status, evaluation, year/season, tag and studio.
 
 ### C1. Detail page
-- [ ] Add canonical anime detail route.
+- [ ] Add canonical anime detail route using internal `anime_id`.
 - [ ] Show/edit personal viewing status, evaluation, tags and note.
-- [ ] Show core catalog metadata.
+- [ ] Show core catalog metadata and external provider IDs where useful.
 
 ### C2. Watchlist
 - [ ] Add `/anime/watchlist`.
@@ -133,7 +145,7 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 ### D1. Export
 - [ ] JSON export.
 - [ ] CSV export.
-- [ ] Include canonical IDs/title variants/status/detail/evaluation/tags/note/provenance where useful.
+- [ ] Include internal ID, external IDs, title variants, status/detail/evaluation/tags/note/provenance where useful.
 
 ### D2. Mobile UX
 - [ ] Responsive survey card and progress matrix.

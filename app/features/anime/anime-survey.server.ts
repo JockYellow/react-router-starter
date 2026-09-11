@@ -1,18 +1,13 @@
-import { cacheAniListAnimeBatch } from "./anime-catalog.server";
 import { ensureAnimeChineseTitle } from "./anime-chinese-title.server";
 import { ensureAnimeSchema } from "./anime.schema.server";
-import {
-  animeSurveyScopeKey,
-  type AnimeSurveyScope,
-} from "./anime.types";
-import {
-  fetchAniListMoviesByYear,
-  fetchAniListSeason,
-} from "./providers/anilist.server";
+import { animeSurveyScopeKey, type AnimeSurveyScope } from "./anime.types";
 
 export type SurveyCandidateRow = {
   position: number;
-  anilistId: number;
+  animeId: number;
+  malId: number | null;
+  anilistId: number | null;
+  bangumiId: number | null;
   titleZhTw: string | null;
   titleNative: string | null;
   titleRomaji: string | null;
@@ -57,7 +52,10 @@ type SurveyScopeDbRow = {
 
 type CandidateDbRow = {
   position: number;
-  anilist_id: number;
+  anime_id: number;
+  mal_id: number | null;
+  anilist_id: number | null;
+  bangumi_id: number | null;
   title_zh_tw: string | null;
   title_native: string | null;
   title_romaji: string | null;
@@ -77,7 +75,10 @@ type CandidateDbRow = {
 function mapCandidateRow(row: CandidateDbRow): SurveyCandidateRow {
   return {
     position: row.position,
+    animeId: row.anime_id,
+    malId: row.mal_id,
     anilistId: row.anilist_id,
+    bangumiId: row.bangumi_id,
     titleZhTw: row.title_zh_tw,
     titleNative: row.title_native,
     titleRomaji: row.title_romaji,
@@ -110,10 +111,7 @@ function mapScopeRow(row: SurveyScopeDbRow): SurveyScopeSummary {
   };
 }
 
-async function getExistingScope(
-  db: D1Database,
-  scopeKey: string,
-): Promise<SurveyScopeDbRow | null> {
+async function getExistingScope(db: D1Database, scopeKey: string): Promise<SurveyScopeDbRow | null> {
   return db
     .prepare(
       `SELECT
@@ -126,9 +124,9 @@ async function getExistingScope(
               ELSE 0
             END
           )
-          FROM anime_survey_candidates c
-          LEFT JOIN anime_decisions d ON d.anilist_id = c.anilist_id
-          LEFT JOIN anime_evaluations e ON e.anilist_id = c.anilist_id
+          FROM anime_scope_candidates c
+          LEFT JOIN anime_user_decisions d ON d.anime_id = c.anime_id
+          LEFT JOIN anime_user_evaluations e ON e.anime_id = c.anime_id
           WHERE c.scope_key = p.scope_key
         ), 0) AS processed_count
       FROM anime_survey_progress p
@@ -141,70 +139,43 @@ async function getExistingScope(
 export async function ensureSurveyScopeCandidates(
   db: D1Database,
   scope: AnimeSurveyScope,
-  options: { limit?: number } = {},
+  _options: { limit?: number } = {},
 ): Promise<SurveyScopeSummary> {
   await ensureAnimeSchema(db);
-
   const scopeKey = animeSurveyScopeKey(scope);
   const existing = await getExistingScope(db, scopeKey);
   if (existing) return mapScopeRow(existing);
 
-  const limit = Math.max(1, Math.min(Math.trunc(options.limit ?? 100), 500));
-  const providerRecords =
-    scope.type === "TV_SEASON"
-      ? await fetchAniListSeason({ year: scope.year, season: scope.season, limit })
-      : await fetchAniListMoviesByYear({ year: scope.year, limit });
-
-  await cacheAniListAnimeBatch(db, providerRecords);
-
-  const now = Date.now();
-  const statements = [
-    db
-      .prepare(
-        `INSERT OR IGNORE INTO anime_survey_progress (
-          scope_key,
-          scope_type,
-          year,
-          season,
-          candidate_count,
-          last_position,
-          completed,
-          started_at,
-          updated_at
-        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)`,
-      )
-      .bind(
-        scopeKey,
-        scope.type,
-        scope.year,
-        scope.type === "TV_SEASON" ? scope.season : null,
-        providerRecords.length,
-        providerRecords.length === 0 ? 1 : 0,
-        now,
-        now,
-      ),
-    ...providerRecords.map((anime, index) =>
-      db
-        .prepare(
-          `INSERT OR IGNORE INTO anime_survey_candidates (
-            scope_key,
-            anilist_id,
-            position,
-            added_at
-          ) VALUES (?, ?, ?, ?)`,
-        )
-        .bind(scopeKey, anime.id, index + 1, now),
-    ),
-  ];
-
-  await db.batch(statements);
-
-  const created = await getExistingScope(db, scopeKey);
-  if (!created) {
-    throw new Error(`Anime survey scope ${scopeKey} was not created`);
-  }
-  return mapScopeRow(created);
+  // Candidate creation is intentionally centralized in anime-survey-load.server.
+  // This prevents a hidden fallback from contacting a second provider or changing
+  // a frozen scope ordering without the visible initialization UI.
+  throw new Error(`Anime survey scope ${scopeKey} has not been initialized`);
 }
+
+const CANDIDATE_SELECT = `
+  SELECT
+    c.position,
+    a.anime_id,
+    a.mal_id,
+    a.anilist_id,
+    a.bangumi_id,
+    a.title_zh_tw,
+    a.title_native,
+    a.title_romaji,
+    a.title_english,
+    a.year,
+    a.season,
+    a.format,
+    a.episodes,
+    a.cover_url,
+    a.studio,
+    a.popularity,
+    a.average_score,
+    d.status AS decision_status,
+    d.detail_status
+  FROM anime_scope_candidates c
+  JOIN anime_items a ON a.anime_id = c.anime_id
+  LEFT JOIN anime_user_decisions d ON d.anime_id = c.anime_id`;
 
 export async function getSurveyCandidates(
   db: D1Database,
@@ -212,35 +183,10 @@ export async function getSurveyCandidates(
 ): Promise<SurveyCandidateRow[]> {
   await ensureAnimeSchema(db);
   const scopeKey = animeSurveyScopeKey(scope);
-
   const result = await db
-    .prepare(
-      `SELECT
-        c.position,
-        a.anilist_id,
-        a.title_zh_tw,
-        a.title_native,
-        a.title_romaji,
-        a.title_english,
-        a.year,
-        a.season,
-        a.format,
-        a.episodes,
-        a.cover_url,
-        a.studio,
-        a.popularity,
-        a.average_score,
-        d.status AS decision_status,
-        d.detail_status
-      FROM anime_survey_candidates c
-      JOIN anime_catalog a ON a.anilist_id = c.anilist_id
-      LEFT JOIN anime_decisions d ON d.anilist_id = c.anilist_id
-      WHERE c.scope_key = ?
-      ORDER BY c.position ASC`,
-    )
+    .prepare(`${CANDIDATE_SELECT} WHERE c.scope_key = ? ORDER BY c.position ASC`)
     .bind(scopeKey)
     .all<CandidateDbRow>();
-
   return (result.results ?? []).map(mapCandidateRow);
 }
 
@@ -253,37 +199,15 @@ export async function getNextUnresolvedSurveyCandidate(
 
   const row = await db
     .prepare(
-      `SELECT
-        c.position,
-        a.anilist_id,
-        a.title_zh_tw,
-        a.title_native,
-        a.title_romaji,
-        a.title_english,
-        a.year,
-        a.season,
-        a.format,
-        a.episodes,
-        a.cover_url,
-        a.studio,
-        a.popularity,
-        a.average_score,
-        d.status AS decision_status,
-        d.detail_status
-      FROM anime_survey_candidates c
-      JOIN anime_catalog a ON a.anilist_id = c.anilist_id
-      LEFT JOIN anime_decisions d ON d.anilist_id = c.anilist_id
-      LEFT JOIN anime_evaluations e ON e.anilist_id = c.anilist_id
-      WHERE c.scope_key = ?
-        AND (
-          d.anilist_id IS NULL
-          OR (
-            d.status = 'SEEN'
-            AND (d.detail_status IS NULL OR e.rating IS NULL)
-          )
-        )
-      ORDER BY c.position ASC
-      LIMIT 1`,
+      `${CANDIDATE_SELECT}
+       LEFT JOIN anime_user_evaluations e ON e.anime_id = c.anime_id
+       WHERE c.scope_key = ?
+         AND (
+           d.anime_id IS NULL
+           OR (d.status = 'SEEN' AND (d.detail_status IS NULL OR e.rating IS NULL))
+         )
+       ORDER BY c.position ASC
+       LIMIT 1`,
     )
     .bind(scopeKey)
     .first<CandidateDbRow>();
@@ -293,16 +217,11 @@ export async function getNextUnresolvedSurveyCandidate(
   if (candidate.titleZhTw) return candidate;
 
   try {
-    const enrichment = await ensureAnimeChineseTitle(db, candidate.anilistId);
-    if (enrichment.titleZhTw) {
-      return { ...candidate, titleZhTw: enrichment.titleZhTw };
-    }
+    const enrichment = await ensureAnimeChineseTitle(db, candidate.animeId);
+    return enrichment.titleZhTw ? { ...candidate, titleZhTw: enrichment.titleZhTw } : candidate;
   } catch {
-    // Chinese-title enrichment is best-effort. Provider trouble must never block
-    // the reconstruction flow; the UI can fall back to native/Romaji/English.
+    return candidate;
   }
-
-  return candidate;
 }
 
 export async function refreshSurveyProgress(
@@ -331,9 +250,9 @@ export async function refreshSurveyProgress(
             ELSE 0
           END
         ), 0) AS last_position
-      FROM anime_survey_candidates c
-      LEFT JOIN anime_decisions d ON d.anilist_id = c.anilist_id
-      LEFT JOIN anime_evaluations e ON e.anilist_id = c.anilist_id
+      FROM anime_scope_candidates c
+      LEFT JOIN anime_user_decisions d ON d.anime_id = c.anime_id
+      LEFT JOIN anime_user_evaluations e ON e.anime_id = c.anime_id
       WHERE c.scope_key = ?`,
     )
     .bind(scopeKey)
@@ -345,19 +264,10 @@ export async function refreshSurveyProgress(
   await db
     .prepare(
       `UPDATE anime_survey_progress
-      SET candidate_count = ?,
-          last_position = ?,
-          completed = ?,
-          updated_at = ?
-      WHERE scope_key = ?`,
+       SET candidate_count = ?, last_position = ?, completed = ?, updated_at = ?
+       WHERE scope_key = ?`,
     )
-    .bind(
-      stats.candidate_count,
-      stats.last_position,
-      completed ? 1 : 0,
-      now,
-      scopeKey,
-    )
+    .bind(stats.candidate_count, stats.last_position, completed ? 1 : 0, now, scopeKey)
     .run();
 
   const updated = await getExistingScope(db, scopeKey);

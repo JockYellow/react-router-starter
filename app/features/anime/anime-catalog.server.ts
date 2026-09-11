@@ -1,8 +1,9 @@
 import { distinctAnimeAliases, normalizeAnimeAlias } from "./anime-title";
 import { ensureAnimeSchema } from "./anime.schema.server";
 import type { AniListAnime } from "./providers/anilist.server";
+import type { AnimeProviderRecord } from "./providers/anime-provider.types";
 
-export type CacheAniListOptions = {
+export type CacheAnimeOptions = {
   titleZhTw?: string | null;
 };
 
@@ -13,8 +14,13 @@ type AliasInput = {
   isPrimary: boolean;
 };
 
-function buildAniListAliases(anime: AniListAnime, titleZhTw?: string | null): AliasInput[] {
+function effectiveZhTitle(record: AnimeProviderRecord, override?: string | null) {
+  return override?.trim() || record.titleZhTw?.trim() || null;
+}
+
+function buildProviderAliases(record: AnimeProviderRecord, titleZhTw?: string | null): AliasInput[] {
   const inputs: AliasInput[] = [];
+  const provider = record.provider.toLowerCase();
 
   const add = (
     value: string | null | undefined,
@@ -28,12 +34,10 @@ function buildAniListAliases(anime: AniListAnime, titleZhTw?: string | null): Al
   };
 
   add(titleZhTw, "resolved:zh-tw", "zh-TW", true);
-  add(anime.title.romaji, "anilist:title:romaji", "romaji", !titleZhTw);
-  add(anime.title.english, "anilist:title:english", "en");
-  add(anime.title.native, "anilist:title:native", "native");
-  for (const synonym of anime.synonyms) {
-    add(synonym, "anilist:synonym", null);
-  }
+  add(record.title.romaji, `${provider}:title:romaji`, "romaji", !titleZhTw);
+  add(record.title.english, `${provider}:title:english`, "en");
+  add(record.title.native, `${provider}:title:native`, "native");
+  for (const synonym of record.synonyms) add(synonym, `${provider}:synonym`, null);
 
   const distinct = distinctAnimeAliases(inputs.map((input) => input.alias));
   const accepted = new Set(distinct.map(normalizeAnimeAlias));
@@ -47,38 +51,258 @@ function buildAniListAliases(anime: AniListAnime, titleZhTw?: string | null): Al
   });
 }
 
+async function findByExternalId(db: D1Database, record: AnimeProviderRecord): Promise<number | null> {
+  if (record.malId) {
+    const byMal = await db
+      .prepare("SELECT anime_id FROM anime_items WHERE mal_id = ?")
+      .bind(record.malId)
+      .first<{ anime_id: number }>();
+    if (byMal) return byMal.anime_id;
+  }
+  if (record.anilistId) {
+    const byAniList = await db
+      .prepare("SELECT anime_id FROM anime_items WHERE anilist_id = ?")
+      .bind(record.anilistId)
+      .first<{ anime_id: number }>();
+    if (byAniList) return byAniList.anime_id;
+  }
+  if (record.bangumiId) {
+    const byBangumi = await db
+      .prepare("SELECT anime_id FROM anime_items WHERE bangumi_id = ?")
+      .bind(record.bangumiId)
+      .first<{ anime_id: number }>();
+    if (byBangumi) return byBangumi.anime_id;
+  }
+  return null;
+}
+
+async function findUniqueExactAliasMatch(
+  db: D1Database,
+  record: AnimeProviderRecord,
+  titleZhTw: string | null,
+): Promise<number | null> {
+  if (!record.seasonYear) return null;
+  const normalizedAliases = Array.from(
+    new Set(
+      buildProviderAliases(record, titleZhTw)
+        .map((entry) => normalizeAnimeAlias(entry.alias))
+        .filter(Boolean),
+    ),
+  );
+  if (!normalizedAliases.length) return null;
+
+  const matchingIds = new Set<number>();
+  for (const normalized of normalizedAliases) {
+    const rows = await db
+      .prepare(
+        `SELECT DISTINCT i.anime_id
+         FROM anime_item_aliases a
+         JOIN anime_items i ON i.anime_id = a.anime_id
+         WHERE a.normalized_alias = ?
+           AND (i.year = ? OR i.year IS NULL)
+         LIMIT 3`,
+      )
+      .bind(normalized, record.seasonYear)
+      .all<{ anime_id: number }>();
+    for (const row of rows.results ?? []) matchingIds.add(row.anime_id);
+    if (matchingIds.size > 1) return null;
+  }
+
+  return matchingIds.size === 1 ? [...matchingIds][0] : null;
+}
+
+async function findAnimeId(
+  db: D1Database,
+  record: AnimeProviderRecord,
+  titleZhTw: string | null,
+): Promise<number | null> {
+  return (await findByExternalId(db, record)) ?? findUniqueExactAliasMatch(db, record, titleZhTw);
+}
+
+export async function cacheAnimeProviderRecord(
+  db: D1Database,
+  record: AnimeProviderRecord,
+  options: CacheAnimeOptions = {},
+): Promise<number> {
+  await ensureAnimeSchema(db);
+  const now = Date.now();
+  const titleZhTw = effectiveZhTitle(record, options.titleZhTw);
+  let animeId = await findAnimeId(db, record, titleZhTw);
+
+  if (animeId) {
+    await db
+      .prepare(
+        `UPDATE anime_items SET
+          mal_id = COALESCE(mal_id, ?),
+          anilist_id = COALESCE(anilist_id, ?),
+          bangumi_id = COALESCE(bangumi_id, ?),
+          title_zh_tw = COALESCE(title_zh_tw, ?),
+          title_native = COALESCE(title_native, ?),
+          title_romaji = COALESCE(title_romaji, ?),
+          title_english = COALESCE(title_english, ?),
+          year = COALESCE(year, ?),
+          season = COALESCE(season, ?),
+          format = COALESCE(format, ?),
+          episodes = COALESCE(episodes, ?),
+          cover_url = COALESCE(cover_url, ?),
+          studio = COALESCE(studio, ?),
+          genres_json = CASE WHEN genres_json = '[]' THEN ? ELSE genres_json END,
+          popularity = COALESCE(popularity, ?),
+          average_score = COALESCE(average_score, ?),
+          provider_updated_at = COALESCE(provider_updated_at, ?),
+          synced_at = ?,
+          updated_at = ?
+        WHERE anime_id = ?`,
+      )
+      .bind(
+        record.malId,
+        record.anilistId,
+        record.bangumiId,
+        titleZhTw,
+        record.title.native,
+        record.title.romaji,
+        record.title.english,
+        record.seasonYear,
+        record.season,
+        record.format,
+        record.episodes,
+        record.coverUrl,
+        record.studio,
+        JSON.stringify(record.genres),
+        record.popularity,
+        record.averageScore,
+        record.providerUpdatedAt,
+        now,
+        now,
+        animeId,
+      )
+      .run();
+  } else {
+    const inserted = await db
+      .prepare(
+        `INSERT INTO anime_items (
+          mal_id, anilist_id, bangumi_id,
+          title_zh_tw, title_native, title_romaji, title_english,
+          year, season, format, episodes, cover_url, studio, genres_json,
+          popularity, average_score, metadata_source, provider_updated_at,
+          synced_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        record.malId,
+        record.anilistId,
+        record.bangumiId,
+        titleZhTw,
+        record.title.native,
+        record.title.romaji,
+        record.title.english,
+        record.seasonYear,
+        record.season,
+        record.format,
+        record.episodes,
+        record.coverUrl,
+        record.studio,
+        JSON.stringify(record.genres),
+        record.popularity,
+        record.averageScore,
+        record.provider,
+        record.providerUpdatedAt,
+        now,
+        now,
+        now,
+      )
+      .run();
+
+    const insertedId = inserted.meta.last_row_id;
+    if (typeof insertedId === "number" && insertedId > 0) {
+      animeId = insertedId;
+    } else {
+      animeId = await findByExternalId(db, record);
+      if (!animeId) throw new Error(`Unable to cache ${record.provider} anime ${record.providerId}`);
+    }
+  }
+
+  const aliases = buildProviderAliases(record, titleZhTw);
+  if (aliases.length) {
+    await db.batch(
+      aliases.map((input) =>
+        db
+          .prepare(
+            `INSERT INTO anime_item_aliases (
+              anime_id, alias, normalized_alias, source, language, is_primary, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(anime_id, normalized_alias, source) DO UPDATE SET
+              alias = excluded.alias,
+              language = COALESCE(excluded.language, anime_item_aliases.language),
+              is_primary = MAX(anime_item_aliases.is_primary, excluded.is_primary)`,
+          )
+          .bind(
+            animeId,
+            input.alias,
+            normalizeAnimeAlias(input.alias),
+            input.source,
+            input.language,
+            input.isPrimary ? 1 : 0,
+            now,
+          ),
+      ),
+    );
+  }
+
+  return animeId;
+}
+
+export async function cacheAnimeProviderBatch(
+  db: D1Database,
+  records: readonly AnimeProviderRecord[],
+): Promise<Array<{ animeId: number; record: AnimeProviderRecord }>> {
+  const cached: Array<{ animeId: number; record: AnimeProviderRecord }> = [];
+  for (const record of records) {
+    cached.push({ animeId: await cacheAnimeProviderRecord(db, record), record });
+  }
+  return cached;
+}
+
+function fromAniList(anime: AniListAnime): AnimeProviderRecord {
+  return {
+    provider: "ANILIST",
+    providerId: anime.id,
+    malId: anime.idMal,
+    anilistId: anime.id,
+    bangumiId: null,
+    titleZhTw: null,
+    title: anime.title,
+    synonyms: anime.synonyms,
+    season: anime.season,
+    seasonYear: anime.seasonYear,
+    format: anime.format,
+    episodes: anime.episodes,
+    coverUrl: anime.coverUrl,
+    genres: anime.genres,
+    popularity: anime.popularity,
+    averageScore: anime.averageScore,
+    providerUpdatedAt: anime.updatedAt,
+    studio: anime.studio,
+  };
+}
+
+// Compatibility path for the still-separate Netflix seed work. It keeps the old
+// AniList-keyed tables writable while also populating the provider-neutral catalog.
 export async function cacheAniListAnime(
   db: D1Database,
   anime: AniListAnime,
-  options: CacheAniListOptions = {},
+  options: CacheAnimeOptions = {},
 ): Promise<void> {
   await ensureAnimeSchema(db);
-
   const now = Date.now();
   const titleZhTw = options.titleZhTw?.trim() || null;
 
   await db
     .prepare(
       `INSERT INTO anime_catalog (
-        anilist_id,
-        mal_id,
-        title_zh_tw,
-        title_native,
-        title_romaji,
-        title_english,
-        year,
-        season,
-        format,
-        episodes,
-        cover_url,
-        studio,
-        genres_json,
-        popularity,
-        average_score,
-        provider_updated_at,
-        synced_at,
-        created_at,
-        updated_at
+        anilist_id, mal_id, title_zh_tw, title_native, title_romaji, title_english,
+        year, season, format, episodes, cover_url, studio, genres_json,
+        popularity, average_score, provider_updated_at, synced_at, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(anilist_id) DO UPDATE SET
         mal_id = COALESCE(excluded.mal_id, anime_catalog.mal_id),
@@ -122,45 +346,39 @@ export async function cacheAniListAnime(
     )
     .run();
 
-  const aliases = buildAniListAliases(anime, titleZhTw);
-  if (!aliases.length) return;
+  const legacyAliases = buildProviderAliases(fromAniList(anime), titleZhTw);
+  if (legacyAliases.length) {
+    await db.batch(
+      legacyAliases.map((input) =>
+        db
+          .prepare(
+            `INSERT INTO anime_aliases (
+              anilist_id, alias, normalized_alias, source, language, is_primary, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(anilist_id, normalized_alias, source) DO UPDATE SET
+              alias = excluded.alias,
+              language = COALESCE(excluded.language, anime_aliases.language),
+              is_primary = MAX(anime_aliases.is_primary, excluded.is_primary)`,
+          )
+          .bind(
+            anime.id,
+            input.alias,
+            normalizeAnimeAlias(input.alias),
+            input.source,
+            input.language,
+            input.isPrimary ? 1 : 0,
+            now,
+          ),
+      ),
+    );
+  }
 
-  await db.batch(
-    aliases.map((input) =>
-      db
-        .prepare(
-          `INSERT INTO anime_aliases (
-            anilist_id,
-            alias,
-            normalized_alias,
-            source,
-            language,
-            is_primary,
-            created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(anilist_id, normalized_alias, source) DO UPDATE SET
-            alias = excluded.alias,
-            language = COALESCE(excluded.language, anime_aliases.language),
-            is_primary = MAX(anime_aliases.is_primary, excluded.is_primary)`,
-        )
-        .bind(
-          anime.id,
-          input.alias,
-          normalizeAnimeAlias(input.alias),
-          input.source,
-          input.language,
-          input.isPrimary ? 1 : 0,
-          now,
-        ),
-    ),
-  );
+  await cacheAnimeProviderRecord(db, fromAniList(anime), options);
 }
 
 export async function cacheAniListAnimeBatch(
   db: D1Database,
   anime: readonly AniListAnime[],
 ): Promise<void> {
-  for (const record of anime) {
-    await cacheAniListAnime(db, record);
-  }
+  for (const record of anime) await cacheAniListAnime(db, record);
 }

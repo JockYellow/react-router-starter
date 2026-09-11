@@ -7,7 +7,7 @@ export function AnimeSeenAutosave(props: {
   formId: string;
   year: number;
   season: AnimeSeason;
-  anilistId: number;
+  animeId: number;
 }) {
   const fetcher = useFetcher();
 
@@ -20,7 +20,7 @@ export function AnimeSeenAutosave(props: {
       data.set("intent", intent);
       data.set("year", String(props.year));
       data.set("season", props.season);
-      data.set("anilistId", String(props.anilistId));
+      data.set("animeId", String(props.animeId));
       return data;
     };
 
@@ -36,7 +36,10 @@ export function AnimeSeenAutosave(props: {
       }
 
       if (target.name === "rating") {
+        const selectedDetail = form.querySelector<HTMLInputElement>('input[name="detailStatus"]:checked');
+        if (!selectedDetail) return;
         const data = baseData("seen-rating-autosave");
+        data.set("detailStatus", selectedDetail.value);
         data.set("rating", target.value);
         void fetcher.submit(data, { method: "post" });
         return;
@@ -63,7 +66,7 @@ export function AnimeSeenAutosave(props: {
       form.removeEventListener("change", onChange);
       form.removeEventListener("focusout", onFocusOut);
     };
-  }, [fetcher, props.anilistId, props.formId, props.season, props.year]);
+  }, [fetcher, props.animeId, props.formId, props.season, props.year]);
 
   return (
     <span className="text-[11px] font-semibold text-neutral-600" aria-live="polite">

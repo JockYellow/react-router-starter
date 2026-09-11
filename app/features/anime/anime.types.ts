@@ -59,8 +59,10 @@ export const ANIME_SURVEY_SCOPE_TYPES = ["TV_SEASON", "MOVIE_YEAR"] as const;
 export type AnimeSurveyScopeType = (typeof ANIME_SURVEY_SCOPE_TYPES)[number];
 
 export type AnimeCatalogRecord = {
-  anilistId: number;
+  animeId: number;
   malId: number | null;
+  anilistId: number | null;
+  bangumiId: number | null;
   titleZhTw: string | null;
   titleNative: string | null;
   titleRomaji: string | null;
@@ -74,12 +76,13 @@ export type AnimeCatalogRecord = {
   genres: string[];
   popularity: number | null;
   averageScore: number | null;
+  metadataSource: string;
   providerUpdatedAt: number | null;
   syncedAt: number;
 };
 
 export type AnimeDecision = {
-  anilistId: number;
+  animeId: number;
   status: AnimePrimaryStatus;
   detailStatus: AnimeWatchDetail | null;
   decidedAt: number;
@@ -87,7 +90,7 @@ export type AnimeDecision = {
 };
 
 export type AnimeEvaluation = {
-  anilistId: number;
+  animeId: number;
   rating: AnimeEvaluationKey | null;
   note: string | null;
   updatedAt: number;
@@ -105,9 +108,7 @@ export type AnimeSurveyScope =
     };
 
 export function animeSurveyScopeKey(scope: AnimeSurveyScope): string {
-  if (scope.type === "TV_SEASON") {
-    return `tv:${scope.year}:${scope.season}`;
-  }
+  if (scope.type === "TV_SEASON") return `tv:${scope.year}:${scope.season}`;
   return `movie:${scope.year}`;
 }
 

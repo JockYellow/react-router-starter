@@ -2,6 +2,8 @@ const schemaInitPromises = new WeakMap<object, Promise<void>>();
 
 async function createAnimeSchema(db: D1Database) {
   const statements = [
+    // Legacy AniList-keyed tables are intentionally kept during the transition.
+    // Existing production data can be copied into the provider-neutral tables below.
     `CREATE TABLE IF NOT EXISTS anime_catalog (
       anilist_id INTEGER PRIMARY KEY CHECK (anilist_id > 0),
       mal_id INTEGER,
@@ -40,11 +42,7 @@ async function createAnimeSchema(db: D1Database) {
       status TEXT NOT NULL CHECK (status IN ('SEEN', 'WANT', 'NOT_SEEN')),
       detail_status TEXT CHECK (
         detail_status IS NULL OR detail_status IN (
-          'COMPLETE',
-          'SEASON_COMPLETE',
-          'PARTIAL',
-          'DROPPED',
-          'MOVIE_ONLY'
+          'COMPLETE', 'SEASON_COMPLETE', 'PARTIAL', 'DROPPED', 'MOVIE_ONLY'
         )
       ),
       decided_at INTEGER NOT NULL,
@@ -72,12 +70,7 @@ async function createAnimeSchema(db: D1Database) {
       anilist_id INTEGER PRIMARY KEY,
       rating TEXT CHECK (
         rating IS NULL OR rating IN (
-          'FAVORITE',
-          'LOVE',
-          'RECOMMEND',
-          'NEUTRAL',
-          'DISLIKE',
-          'UNRATED'
+          'FAVORITE', 'LOVE', 'RECOMMEND', 'NEUTRAL', 'DISLIKE', 'UNRATED'
         )
       ),
       note TEXT,
@@ -143,32 +136,195 @@ async function createAnimeSchema(db: D1Database) {
       updated_at INTEGER NOT NULL,
       UNIQUE (source, source_ref)
     )`,
-    `CREATE INDEX IF NOT EXISTS idx_anime_catalog_year_season_format
-      ON anime_catalog (year, season, format)`,
-    `CREATE INDEX IF NOT EXISTS idx_anime_catalog_mal_id
-      ON anime_catalog (mal_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_anime_aliases_normalized_alias
-      ON anime_aliases (normalized_alias)`,
-    `CREATE INDEX IF NOT EXISTS idx_anime_aliases_anilist_id
-      ON anime_aliases (anilist_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_anime_decisions_status_detail
-      ON anime_decisions (status, detail_status)`,
-    `CREATE INDEX IF NOT EXISTS idx_anime_sources_source_match
-      ON anime_sources (source, match_status)`,
-    `CREATE INDEX IF NOT EXISTS idx_anime_sources_anilist_id
-      ON anime_sources (anilist_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_anime_evaluations_rating
-      ON anime_evaluations (rating)`,
-    `CREATE INDEX IF NOT EXISTS idx_anime_evaluation_tags_tag_key
-      ON anime_evaluation_tags (tag_key, anilist_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_anime_survey_progress_updated
-      ON anime_survey_progress (updated_at DESC)`,
-    `CREATE INDEX IF NOT EXISTS idx_anime_survey_candidates_scope_position
-      ON anime_survey_candidates (scope_key, position)`,
-    `CREATE INDEX IF NOT EXISTS idx_anime_survey_load_state_phase
-      ON anime_survey_load_state (phase, updated_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_anime_seed_queue_source_status
-      ON anime_seed_queue (source, queue_status, updated_at)`,
+
+    // Provider-neutral Anime Memory tables.
+    `CREATE TABLE IF NOT EXISTS anime_items (
+      anime_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mal_id INTEGER UNIQUE CHECK (mal_id IS NULL OR mal_id > 0),
+      anilist_id INTEGER UNIQUE CHECK (anilist_id IS NULL OR anilist_id > 0),
+      bangumi_id INTEGER UNIQUE CHECK (bangumi_id IS NULL OR bangumi_id > 0),
+      title_zh_tw TEXT,
+      title_native TEXT,
+      title_romaji TEXT,
+      title_english TEXT,
+      year INTEGER CHECK (year IS NULL OR year > 1900),
+      season TEXT CHECK (season IS NULL OR season IN ('WINTER', 'SPRING', 'SUMMER', 'FALL')),
+      format TEXT,
+      episodes INTEGER CHECK (episodes IS NULL OR episodes >= 0),
+      cover_url TEXT,
+      studio TEXT,
+      genres_json TEXT NOT NULL DEFAULT '[]',
+      popularity INTEGER CHECK (popularity IS NULL OR popularity >= 0),
+      average_score INTEGER CHECK (average_score IS NULL OR average_score BETWEEN 0 AND 100),
+      metadata_source TEXT NOT NULL DEFAULT 'LEGACY',
+      provider_updated_at INTEGER,
+      synced_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      CHECK (mal_id IS NOT NULL OR anilist_id IS NOT NULL OR bangumi_id IS NOT NULL)
+    )`,
+    `CREATE TABLE IF NOT EXISTS anime_item_aliases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      anime_id INTEGER NOT NULL,
+      alias TEXT NOT NULL,
+      normalized_alias TEXT NOT NULL CHECK (length(normalized_alias) > 0),
+      source TEXT NOT NULL,
+      language TEXT,
+      is_primary INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0, 1)),
+      created_at INTEGER NOT NULL,
+      UNIQUE (anime_id, normalized_alias, source),
+      FOREIGN KEY (anime_id) REFERENCES anime_items(anime_id) ON DELETE CASCADE
+    )`,
+    `CREATE TABLE IF NOT EXISTS anime_user_decisions (
+      anime_id INTEGER PRIMARY KEY,
+      status TEXT NOT NULL CHECK (status IN ('SEEN', 'WANT', 'NOT_SEEN')),
+      detail_status TEXT CHECK (
+        detail_status IS NULL OR detail_status IN (
+          'COMPLETE', 'SEASON_COMPLETE', 'PARTIAL', 'DROPPED', 'MOVIE_ONLY'
+        )
+      ),
+      decided_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (anime_id) REFERENCES anime_items(anime_id) ON DELETE CASCADE
+    )`,
+    `CREATE TABLE IF NOT EXISTS anime_item_sources (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      anime_id INTEGER,
+      source TEXT NOT NULL,
+      source_ref TEXT NOT NULL,
+      source_title TEXT,
+      source_status TEXT,
+      source_date TEXT,
+      match_status TEXT NOT NULL DEFAULT 'MATCHED' CHECK (
+        match_status IN ('MATCHED', 'AMBIGUOUS', 'UNMATCHED')
+      ),
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE (source, source_ref),
+      FOREIGN KEY (anime_id) REFERENCES anime_items(anime_id) ON DELETE SET NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS anime_user_evaluations (
+      anime_id INTEGER PRIMARY KEY,
+      rating TEXT CHECK (
+        rating IS NULL OR rating IN (
+          'FAVORITE', 'LOVE', 'RECOMMEND', 'NEUTRAL', 'DISLIKE', 'UNRATED'
+        )
+      ),
+      note TEXT,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (anime_id) REFERENCES anime_items(anime_id) ON DELETE CASCADE
+    )`,
+    `CREATE TABLE IF NOT EXISTS anime_user_evaluation_tags (
+      anime_id INTEGER NOT NULL,
+      tag_key TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (anime_id, tag_key),
+      FOREIGN KEY (anime_id) REFERENCES anime_items(anime_id) ON DELETE CASCADE
+    )`,
+    `CREATE TABLE IF NOT EXISTS anime_scope_candidates (
+      scope_key TEXT NOT NULL,
+      anime_id INTEGER NOT NULL,
+      position INTEGER NOT NULL CHECK (position > 0),
+      added_at INTEGER NOT NULL,
+      PRIMARY KEY (scope_key, anime_id),
+      UNIQUE (scope_key, position),
+      FOREIGN KEY (scope_key) REFERENCES anime_survey_progress(scope_key) ON DELETE CASCADE,
+      FOREIGN KEY (anime_id) REFERENCES anime_items(anime_id) ON DELETE CASCADE
+    )`,
+    `CREATE TABLE IF NOT EXISTS anime_scope_load_state (
+      scope_key TEXT PRIMARY KEY,
+      scope_type TEXT NOT NULL CHECK (scope_type IN ('TV_SEASON', 'MOVIE_YEAR')),
+      year INTEGER NOT NULL CHECK (year > 1900),
+      season TEXT CHECK (season IS NULL OR season IN ('WINTER', 'SPRING', 'SUMMER', 'FALL')),
+      provider TEXT NOT NULL CHECK (provider IN ('JIKAN', 'ANILIST')),
+      phase TEXT NOT NULL CHECK (phase IN ('FETCHING_PROVIDER', 'BUILDING_SCOPE', 'READY', 'ERROR')),
+      resume_phase TEXT CHECK (resume_phase IS NULL OR resume_phase IN ('FETCHING_PROVIDER', 'BUILDING_SCOPE')),
+      target_count INTEGER NOT NULL DEFAULT 100 CHECK (target_count >= 0),
+      fetched_count INTEGER NOT NULL DEFAULT 0 CHECK (fetched_count >= 0),
+      next_page INTEGER NOT NULL DEFAULT 1 CHECK (next_page > 0),
+      retry_count INTEGER NOT NULL DEFAULT 0 CHECK (retry_count >= 0),
+      locked_until INTEGER,
+      last_error TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (scope_key) REFERENCES anime_survey_progress(scope_key) ON DELETE CASCADE
+    )`,
+
+    `CREATE INDEX IF NOT EXISTS idx_anime_catalog_year_season_format ON anime_catalog (year, season, format)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_catalog_mal_id ON anime_catalog (mal_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_aliases_normalized_alias ON anime_aliases (normalized_alias)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_aliases_anilist_id ON anime_aliases (anilist_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_decisions_status_detail ON anime_decisions (status, detail_status)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_sources_source_match ON anime_sources (source, match_status)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_sources_anilist_id ON anime_sources (anilist_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_evaluations_rating ON anime_evaluations (rating)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_evaluation_tags_tag_key ON anime_evaluation_tags (tag_key, anilist_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_survey_progress_updated ON anime_survey_progress (updated_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_survey_candidates_scope_position ON anime_survey_candidates (scope_key, position)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_survey_load_state_phase ON anime_survey_load_state (phase, updated_at)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_seed_queue_source_status ON anime_seed_queue (source, queue_status, updated_at)`,
+
+    `CREATE INDEX IF NOT EXISTS idx_anime_items_year_season_format ON anime_items (year, season, format)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_items_mal_id ON anime_items (mal_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_items_anilist_id ON anime_items (anilist_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_item_aliases_normalized ON anime_item_aliases (normalized_alias)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_item_aliases_anime_id ON anime_item_aliases (anime_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_user_decisions_status_detail ON anime_user_decisions (status, detail_status)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_item_sources_source_match ON anime_item_sources (source, match_status)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_item_sources_anime_id ON anime_item_sources (anime_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_user_evaluations_rating ON anime_user_evaluations (rating)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_user_tags_tag_key ON anime_user_evaluation_tags (tag_key, anime_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_scope_candidates_scope_position ON anime_scope_candidates (scope_key, position)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_scope_load_state_phase ON anime_scope_load_state (phase, updated_at)`,
+
+    // Idempotent compatibility migration. Never overwrite newer provider-neutral rows.
+    `INSERT OR IGNORE INTO anime_items (
+      mal_id, anilist_id, bangumi_id,
+      title_zh_tw, title_native, title_romaji, title_english,
+      year, season, format, episodes, cover_url, studio, genres_json,
+      popularity, average_score, metadata_source, provider_updated_at,
+      synced_at, created_at, updated_at
+    )
+    SELECT
+      mal_id, anilist_id, NULL,
+      title_zh_tw, title_native, title_romaji, title_english,
+      year, season, format, episodes, cover_url, studio, genres_json,
+      popularity, average_score, 'ANILIST', provider_updated_at,
+      synced_at, created_at, updated_at
+    FROM anime_catalog`,
+    `INSERT OR IGNORE INTO anime_item_aliases (
+      anime_id, alias, normalized_alias, source, language, is_primary, created_at
+    )
+    SELECT i.anime_id, a.alias, a.normalized_alias, a.source, a.language, a.is_primary, a.created_at
+    FROM anime_aliases a
+    JOIN anime_items i ON i.anilist_id = a.anilist_id`,
+    `INSERT OR IGNORE INTO anime_user_decisions (
+      anime_id, status, detail_status, decided_at, updated_at
+    )
+    SELECT i.anime_id, d.status, d.detail_status, d.decided_at, d.updated_at
+    FROM anime_decisions d
+    JOIN anime_items i ON i.anilist_id = d.anilist_id`,
+    `INSERT OR IGNORE INTO anime_user_evaluations (anime_id, rating, note, updated_at)
+    SELECT i.anime_id, e.rating, e.note, e.updated_at
+    FROM anime_evaluations e
+    JOIN anime_items i ON i.anilist_id = e.anilist_id`,
+    `INSERT OR IGNORE INTO anime_user_evaluation_tags (anime_id, tag_key, created_at)
+    SELECT i.anime_id, t.tag_key, t.created_at
+    FROM anime_evaluation_tags t
+    JOIN anime_items i ON i.anilist_id = t.anilist_id`,
+    `INSERT OR IGNORE INTO anime_item_sources (
+      anime_id, source, source_ref, source_title, source_status, source_date,
+      match_status, metadata_json, created_at, updated_at
+    )
+    SELECT i.anime_id, s.source, s.source_ref, s.source_title, s.source_status, s.source_date,
+      s.match_status, s.metadata_json, s.created_at, s.updated_at
+    FROM anime_sources s
+    LEFT JOIN anime_items i ON i.anilist_id = s.anilist_id`,
+    `INSERT OR IGNORE INTO anime_scope_candidates (scope_key, anime_id, position, added_at)
+    SELECT c.scope_key, i.anime_id, c.position, c.added_at
+    FROM anime_survey_candidates c
+    JOIN anime_items i ON i.anilist_id = c.anilist_id`,
   ].map((sql) => db.prepare(sql));
 
   await db.batch(statements);

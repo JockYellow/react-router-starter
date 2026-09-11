@@ -20,7 +20,7 @@ export type AnimeSeasonProgressCell = {
 };
 
 export type AnimeRecentRecord = {
-  anilistId: number;
+  animeId: number;
   title: string;
   status: string;
   detailStatus: string | null;
@@ -60,11 +60,11 @@ export async function getAnimeDashboardData(
         `SELECT
           COALESCE(SUM(CASE WHEN status = 'SEEN' THEN 1 ELSE 0 END), 0) AS seen,
           COALESCE(SUM(CASE WHEN status = 'WANT' THEN 1 ELSE 0 END), 0) AS want
-        FROM anime_decisions`,
+        FROM anime_user_decisions`,
       )
       .first<{ seen: number; want: number }>(),
     db
-      .prepare("SELECT COUNT(*) AS count FROM anime_evaluations WHERE rating = 'FAVORITE'")
+      .prepare("SELECT COUNT(*) AS count FROM anime_user_evaluations WHERE rating = 'FAVORITE'")
       .first<{ count: number }>(),
     db
       .prepare(
@@ -82,9 +82,9 @@ export async function getAnimeDashboardData(
           p.completed,
           p.updated_at
         FROM anime_survey_progress p
-        LEFT JOIN anime_survey_candidates c ON c.scope_key = p.scope_key
-        LEFT JOIN anime_decisions d ON d.anilist_id = c.anilist_id
-        LEFT JOIN anime_evaluations e ON e.anilist_id = c.anilist_id
+        LEFT JOIN anime_scope_candidates c ON c.scope_key = p.scope_key
+        LEFT JOIN anime_user_decisions d ON d.anime_id = c.anime_id
+        LEFT JOIN anime_user_evaluations e ON e.anime_id = c.anime_id
         WHERE p.scope_type = 'TV_SEASON'
           AND p.year BETWEEN ? AND ?
         GROUP BY p.scope_key
@@ -95,21 +95,21 @@ export async function getAnimeDashboardData(
     db
       .prepare(
         `SELECT
-          a.anilist_id,
+          a.anime_id,
           COALESCE(a.title_zh_tw, a.title_native, a.title_romaji, a.title_english, '未命名作品') AS title,
           d.status,
           d.detail_status,
           e.rating,
           a.cover_url,
           MAX(d.updated_at, COALESCE(e.updated_at, 0)) AS updated_at
-        FROM anime_decisions d
-        JOIN anime_catalog a ON a.anilist_id = d.anilist_id
-        LEFT JOIN anime_evaluations e ON e.anilist_id = d.anilist_id
+        FROM anime_user_decisions d
+        JOIN anime_items a ON a.anime_id = d.anime_id
+        LEFT JOIN anime_user_evaluations e ON e.anime_id = d.anime_id
         ORDER BY updated_at DESC
         LIMIT 8`,
       )
       .all<{
-        anilist_id: number;
+        anime_id: number;
         title: string;
         status: string;
         detail_status: string | null;
@@ -120,9 +120,7 @@ export async function getAnimeDashboardData(
   ]);
 
   const scopeMap = new Map<string, ScopeRow>();
-  for (const row of scopeResult.results ?? []) {
-    scopeMap.set(`${row.year}:${row.season}`, row);
-  }
+  for (const row of scopeResult.results ?? []) scopeMap.set(`${row.year}:${row.season}`, row);
 
   const seasons: AnimeSeasonProgressCell[] = [];
   for (let year = endYear; year >= startYear; year -= 1) {
@@ -153,7 +151,7 @@ export async function getAnimeDashboardData(
     },
     seasons,
     recent: (recentResult.results ?? []).map((row) => ({
-      anilistId: row.anilist_id,
+      animeId: row.anime_id,
       title: row.title,
       status: row.status,
       detailStatus: row.detail_status,
