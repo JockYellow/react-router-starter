@@ -59,7 +59,7 @@ export default [
   route("api/food-mind/rooms/:roomId/state", "routes/api/food-mind/rooms/state.tsx"),
   route("api/food-mind/rooms/:roomId/answer", "routes/api/food-mind/rooms/answer.tsx"),
   route("api/food-mind/rooms/:roomId/next", "routes/api/food-mind/rooms/next.tsx"),
-  route("api/food-mind/rooms/:roomId/result", "routes/api/food-mind/result.tsx"),
+  route("api/food-mind/rooms/:roomId/result", "routes/api/food-mind/rooms/result.tsx"),
   route("api/food-mind/rooms/:roomId/share", "routes/api/food-mind/rooms/share.tsx"),
   route("api/init", "routes/api/spotify/init.tsx"),
   route("api/save", "routes/api/spotify/save.tsx"),
