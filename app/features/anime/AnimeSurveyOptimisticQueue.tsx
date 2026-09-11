@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  ANIME_BACKGROUND_SAVE_MAX_ATTEMPTS,
+  animeBackgroundSaveRetryDelayMs,
+  createSerialAsyncQueue,
+  isRetryableAnimeBackgroundSaveStatus,
+} from "./anime-background-save";
+import {
   advanceAnimeSurveyQueue,
   mergeAnimeSurveyQueue,
   type AnimeSurveyQueueItem,
@@ -10,6 +16,7 @@ import type { AnimePrimaryStatus, AnimeSeason } from "./anime.types";
 type FastPrimaryStatus = Extract<AnimePrimaryStatus, "WANT" | "NOT_SEEN">;
 
 type SaveJob = {
+  scopeKey: string;
   animeId: number;
   status: FastPrimaryStatus;
   state: "SAVING" | "FAILED";
@@ -20,6 +27,16 @@ type QueueResponse = {
   ok: true;
   items: AnimeSurveyQueueItem[];
 };
+
+class BackgroundSaveRequestError extends Error {
+  retryable: boolean;
+
+  constructor(message: string, retryable: boolean) {
+    super(message);
+    this.name = "BackgroundSaveRequestError";
+    this.retryable = retryable;
+  }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -36,14 +53,6 @@ function parseQueueResponse(value: unknown): QueueResponse | null {
   return { ok: true, items: value.items };
 }
 
-function parseSavedProcessedCount(value: unknown): number | null {
-  if (!isRecord(value) || value.ok !== true || !isRecord(value.summary)) return null;
-  const processedCount = value.summary.processedCount;
-  return typeof processedCount === "number" && Number.isFinite(processedCount)
-    ? processedCount
-    : null;
-}
-
 function initialSignature(items: readonly AnimeSurveyQueueItem[]): string {
   return items
     .map((item) => [
@@ -53,6 +62,14 @@ function initialSignature(items: readonly AnimeSurveyQueueItem[]): string {
       item.record.rating ?? "",
     ].join(":"))
     .join("|");
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function sameSaveJob(a: Pick<SaveJob, "scopeKey" | "animeId">, b: Pick<SaveJob, "scopeKey" | "animeId">) {
+  return a.scopeKey === b.scopeKey && a.animeId === b.animeId;
 }
 
 /**
@@ -71,15 +88,20 @@ export function useAnimeSurveyOptimisticQueue(props: {
 }) {
   const scopeKey = `${props.year}:${props.season}`;
   const incomingSignature = useMemo(() => initialSignature(props.initialItems), [props.initialItems]);
-  const [queue, setQueue] = useState<AnimeSurveyQueueItem[]>(() => props.initialItems.slice(0, 5));
+  const initialQueue = props.initialItems.slice(0, 5);
+  const [queue, setQueue] = useState<AnimeSurveyQueueItem[]>(() => initialQueue);
   const [handledIds, setHandledIds] = useState<Set<number>>(() => new Set());
   const [saveJobs, setSaveJobs] = useState<SaveJob[]>([]);
   const [displayProcessedCount, setDisplayProcessedCount] = useState(props.processedCount);
   const [refillLoading, setRefillLoading] = useState(false);
   const [refillError, setRefillError] = useState<string | null>(null);
   const handledIdsRef = useRef(handledIds);
+  const queueRef = useRef<AnimeSurveyQueueItem[]>(initialQueue);
+  const saveQueueRef = useRef<ReturnType<typeof createSerialAsyncQueue> | null>(null);
   const lastScopeRef = useRef(scopeKey);
   const lastRefillKeyRef = useRef("");
+
+  if (!saveQueueRef.current) saveQueueRef.current = createSerialAsyncQueue();
 
   useEffect(() => {
     handledIdsRef.current = handledIds;
@@ -89,10 +111,12 @@ export function useAnimeSurveyOptimisticQueue(props: {
     if (lastScopeRef.current === scopeKey) return;
     lastScopeRef.current = scopeKey;
     const nextHandled = new Set<number>();
+    const nextQueue = props.initialItems.slice(0, 5);
     handledIdsRef.current = nextHandled;
+    queueRef.current = nextQueue;
     setHandledIds(nextHandled);
     setSaveJobs([]);
-    setQueue(props.initialItems.slice(0, 5));
+    setQueue(nextQueue);
     setDisplayProcessedCount(props.processedCount);
     setRefillLoading(false);
     setRefillError(null);
@@ -102,7 +126,9 @@ export function useAnimeSurveyOptimisticQueue(props: {
   useEffect(() => {
     if (lastScopeRef.current !== scopeKey) return;
     setDisplayProcessedCount((current) => Math.max(current, props.processedCount));
-    setQueue(mergeAnimeSurveyQueue([], props.initialItems, handledIdsRef.current, 5));
+    const nextQueue = mergeAnimeSurveyQueue([], props.initialItems, handledIdsRef.current, 5);
+    queueRef.current = nextQueue;
+    setQueue(nextQueue);
     setRefillError(null);
     lastRefillKeyRef.current = "";
   }, [incomingSignature, props.initialItems, props.processedCount, scopeKey]);
@@ -117,50 +143,75 @@ export function useAnimeSurveyOptimisticQueue(props: {
     }
   }, [queue]);
 
-  const persistJob = useCallback(async (job: Pick<SaveJob, "animeId" | "status">) => {
-    try {
-      const formData = new FormData();
-      formData.set("intent", "primary-optimistic");
-      formData.set("year", String(props.year));
-      formData.set("season", props.season);
-      formData.set("animeId", String(job.animeId));
-      formData.set("status", job.status);
+  const persistJob = useCallback(async (job: Pick<SaveJob, "scopeKey" | "animeId" | "status">) => {
+    let finalError: Error | null = null;
 
-      const response = await fetch(`/anime/survey?year=${props.year}&season=${props.season}`, {
-        method: "POST",
-        body: formData,
-        credentials: "same-origin",
-        keepalive: true,
-        headers: { Accept: "application/json" },
-      });
-      const payload: unknown = await response.json().catch(() => null);
-      if (!response.ok || !isRecord(payload) || payload.ok !== true) {
-        throw new Error(`背景儲存失敗（HTTP ${response.status}）`);
-      }
+    for (let attempt = 0; attempt < ANIME_BACKGROUND_SAVE_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        const formData = new FormData();
+        formData.set("year", String(props.year));
+        formData.set("season", props.season);
+        formData.set("animeId", String(job.animeId));
+        formData.set("status", job.status);
 
-      const persistedProcessedCount = parseSavedProcessedCount(payload);
-      if (persistedProcessedCount != null) {
-        setDisplayProcessedCount((current) => Math.max(current, persistedProcessedCount));
+        const response = await fetch("/api/anime/survey-answer", {
+          method: "POST",
+          body: formData,
+          credentials: "same-origin",
+          keepalive: true,
+          headers: { Accept: "application/json" },
+        });
+        const payload: unknown = await response.json().catch(() => null);
+        const loginRedirect = response.redirected || response.url.includes("/admin/login");
+
+        if (!response.ok || !isRecord(payload) || payload.ok !== true) {
+          const message = loginRedirect
+            ? "背景儲存失敗：登入狀態可能已失效"
+            : `背景儲存失敗（HTTP ${response.status}）`;
+          throw new BackgroundSaveRequestError(
+            message,
+            !loginRedirect && isRetryableAnimeBackgroundSaveStatus(response.status),
+          );
+        }
+
+        setSaveJobs((current) => current.filter((item) => !sameSaveJob(item, job)));
+        return;
+      } catch (error) {
+        const normalized = error instanceof Error ? error : new Error("背景儲存失敗");
+        finalError = normalized;
+        const retryable = error instanceof BackgroundSaveRequestError
+          ? error.retryable
+          : error instanceof TypeError;
+        const canRetry = retryable && attempt + 1 < ANIME_BACKGROUND_SAVE_MAX_ATTEMPTS;
+        if (!canRetry) break;
+        await delay(animeBackgroundSaveRetryDelayMs(attempt));
       }
-      setSaveJobs((current) => current.filter((item) => item.animeId !== job.animeId));
-    } catch (error) {
-      setSaveJobs((current) => current.map((item) => item.animeId === job.animeId
-        ? {
-            ...item,
-            state: "FAILED",
-            error: error instanceof Error ? error.message : "背景儲存失敗",
-          }
-        : item));
     }
+
+    setSaveJobs((current) => current.map((item) => sameSaveJob(item, job)
+      ? {
+          ...item,
+          state: "FAILED",
+          error: finalError?.message ?? "背景儲存失敗",
+        }
+      : item));
   }, [props.season, props.year]);
+
+  const enqueuePersist = useCallback((job: Pick<SaveJob, "scopeKey" | "animeId" | "status">): void => {
+    const runner = saveQueueRef.current;
+    if (!runner) return;
+    void runner.enqueue(() => persistJob(job));
+  }, [persistJob]);
 
   const answerFast = useCallback((status: FastPrimaryStatus): boolean => {
     if (!props.enabled) return false;
-    const current = queue[0];
+    const current = queueRef.current[0];
     if (!current || current.record.status === "SEEN") return false;
 
     const animeId = current.candidate.animeId;
-    setQueue((items) => advanceAnimeSurveyQueue(items, animeId));
+    const nextQueue = advanceAnimeSurveyQueue(queueRef.current, animeId);
+    queueRef.current = nextQueue;
+    setQueue(nextQueue);
     setHandledIds((previous) => {
       const next = new Set(previous);
       next.add(animeId);
@@ -168,31 +219,34 @@ export function useAnimeSurveyOptimisticQueue(props: {
       return next;
     });
     setDisplayProcessedCount((count) => Math.min(props.candidateCount, count + 1));
+    const job: SaveJob = { scopeKey, animeId, status, state: "SAVING", error: null };
     setSaveJobs((jobs) => [
-      ...jobs.filter((item) => item.animeId !== animeId),
-      { animeId, status, state: "SAVING", error: null },
+      ...jobs.filter((item) => !sameSaveJob(item, job)),
+      job,
     ]);
-    void persistJob({ animeId, status });
+    enqueuePersist(job);
     return true;
-  }, [persistJob, props.candidateCount, props.enabled, queue]);
+  }, [enqueuePersist, props.candidateCount, props.enabled, scopeKey]);
 
   const retrySave = useCallback((animeId: number): void => {
-    const job = saveJobs.find((item) => item.animeId === animeId && item.state === "FAILED");
+    const job = saveJobs.find((item) => item.scopeKey === scopeKey
+      && item.animeId === animeId
+      && item.state === "FAILED");
     if (!job) return;
-    setSaveJobs((current) => current.map((item) => item.animeId === animeId
+    setSaveJobs((current) => current.map((item) => sameSaveJob(item, job)
       ? { ...item, state: "SAVING", error: null }
       : item));
-    void persistJob(job);
-  }, [persistJob, saveJobs]);
+    enqueuePersist(job);
+  }, [enqueuePersist, saveJobs, scopeKey]);
 
   const retryAllFailed = useCallback((): void => {
-    for (const job of saveJobs.filter((item) => item.state === "FAILED")) {
-      setSaveJobs((current) => current.map((item) => item.animeId === job.animeId
+    for (const job of saveJobs.filter((item) => item.scopeKey === scopeKey && item.state === "FAILED")) {
+      setSaveJobs((current) => current.map((item) => sameSaveJob(item, job)
         ? { ...item, state: "SAVING", error: null }
         : item));
-      void persistJob(job);
+      enqueuePersist(job);
     }
-  }, [persistJob, saveJobs]);
+  }, [enqueuePersist, saveJobs, scopeKey]);
 
   const refillQueue = useCallback(async (): Promise<void> => {
     if (!props.enabled || refillLoading) return;
@@ -217,12 +271,16 @@ export function useAnimeSurveyOptimisticQueue(props: {
         throw new Error(`下一批候選載入失敗（HTTP ${response.status}）`);
       }
 
-      setQueue((current) => mergeAnimeSurveyQueue(
-        current,
-        parsed.items,
-        handledIdsRef.current,
-        5,
-      ));
+      setQueue((current) => {
+        const next = mergeAnimeSurveyQueue(
+          current,
+          parsed.items,
+          handledIdsRef.current,
+          5,
+        );
+        queueRef.current = next;
+        return next;
+      });
     } catch (error) {
       setRefillError(error instanceof Error ? error.message : "下一批候選載入失敗");
     } finally {
@@ -266,12 +324,13 @@ export function useAnimeSurveyOptimisticQueue(props: {
     return () => window.removeEventListener("beforeunload", warn);
   }, [saveJobs.length]);
 
-  const failedJobs = saveJobs.filter((job) => job.state === "FAILED");
-  const savingCount = saveJobs.length - failedJobs.length;
+  const currentScopeJobs = saveJobs.filter((job) => job.scopeKey === scopeKey);
+  const failedJobs = currentScopeJobs.filter((job) => job.state === "FAILED");
+  const savingCount = currentScopeJobs.length - failedJobs.length;
   const currentItem = queue[0] ?? null;
   const isComplete = props.candidateCount > 0
     && displayProcessedCount >= props.candidateCount
-    && saveJobs.length === 0;
+    && currentScopeJobs.length === 0;
   const waitingForQueue = !currentItem
     && !isComplete
     && (refillLoading || displayProcessedCount < props.candidateCount);
