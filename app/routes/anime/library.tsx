@@ -87,6 +87,8 @@ export default function AnimeLibrary() {
     + (data.query.search ? 1 : 0);
   const currentStart = data.total === 0 ? 0 : data.query.offset + 1;
   const currentEnd = Math.min(data.total, data.query.offset + data.items.length);
+  const currentQuery = searchParams.toString();
+  const currentLibraryPath = currentQuery ? `/anime/library?${currentQuery}` : "/anime/library";
 
   const pageHref = (offset: number) => {
     const params = new URLSearchParams(searchParams);
@@ -94,6 +96,11 @@ export default function AnimeLibrary() {
     else params.delete("offset");
     const query = params.toString();
     return query ? `/anime/library?${query}` : "/anime/library";
+  };
+
+  const detailHref = (animeId: number) => {
+    const params = new URLSearchParams({ returnTo: currentLibraryPath });
+    return `/anime/library/${animeId}?${params.toString()}`;
   };
 
   return (
@@ -267,19 +274,23 @@ export default function AnimeLibrary() {
             <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
               {data.items.map((item) => (
                 <article key={item.animeId} className="min-w-0">
-                  <div className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-100 shadow-sm">
-                    {item.coverUrl ? (
-                      <img src={item.coverUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center px-3 text-center text-xs font-bold text-neutral-400">
-                        沒有海報
+                  <Link to={detailHref(item.animeId)} className="block">
+                    <div className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-100 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                      {item.coverUrl ? (
+                        <img src={item.coverUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center px-3 text-center text-xs font-bold text-neutral-400">
+                          沒有海報
+                        </div>
+                      )}
+                      <div className="absolute left-2 top-2">
+                        <StatusBadge status={item.status} />
                       </div>
-                    )}
-                    <div className="absolute left-2 top-2">
-                      <StatusBadge status={item.status} />
                     </div>
-                  </div>
-                  <h3 className="mt-2 line-clamp-2 text-sm font-black leading-5">{item.title}</h3>
+                  </Link>
+                  <h3 className="mt-2 line-clamp-2 text-sm font-black leading-5">
+                    <Link to={detailHref(item.animeId)} className="hover:underline">{item.title}</Link>
+                  </h3>
                   <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-semibold text-neutral-400">
                     {item.year ? <span>{item.year}</span> : null}
                     {item.season ? <span>{SEASON_LABELS[item.season]}</span> : null}
