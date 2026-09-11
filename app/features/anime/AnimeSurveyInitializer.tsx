@@ -10,6 +10,7 @@ type LoaderActionData = SurveyLoadStepResult | {
 };
 
 const LOAD_ACTION = "/api/admin/anime/survey-load";
+const JIKAN_PAGE_INTERVAL_MS = 1_100;
 
 const SEASON_LABELS: Record<AnimeSeason, string> = {
   WINTER: "冬季",
@@ -49,7 +50,7 @@ export function AnimeSurveyInitializer({
         },
         { method: "post", action: LOAD_ACTION },
       );
-    }, busyElsewhere ? 1_200 : 300);
+    }, busyElsewhere ? 1_500 : JIKAN_PAGE_INTERVAL_MS);
 
     return () => window.clearTimeout(timer);
   }, [busyElsewhere, fetcher, inFlight, revalidator, season, state.fetchedCount, state.nextPage, state.phase, year]);
@@ -121,7 +122,7 @@ export function AnimeSurveyInitializer({
         </div>
       ) : (
         <p className="mt-5 text-xs leading-5 text-neutral-500">
-          畫面進度仍在變化時不用重新整理或重複點擊。多分頁同時開啟時，D1 短鎖會避免同一季度重複抓取。
+          畫面進度仍在變化時不用重新整理或重複點擊。系統會刻意放慢分頁請求以避開 Jikan 的速率限制；多分頁同時開啟時，D1 短鎖會避免同一季度重複抓取。
         </p>
       )}
     </section>
