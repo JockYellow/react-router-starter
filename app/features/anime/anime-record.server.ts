@@ -10,7 +10,7 @@ import {
 } from "./anime.types";
 
 export type AnimePersonalRecord = {
-  anilistId: number;
+  animeId: number;
   status: AnimePrimaryStatus | null;
   detailStatus: AnimeWatchDetail | null;
   rating: AnimeEvaluationKey | null;
@@ -27,32 +27,28 @@ type RecordRow = {
 
 export async function getAnimePersonalRecord(
   db: D1Database,
-  anilistId: number,
+  animeId: number,
 ): Promise<AnimePersonalRecord> {
   await ensureAnimeSchema(db);
 
   const row = await db
     .prepare(
-      `SELECT
-        d.status,
-        d.detail_status,
-        e.rating,
-        e.note
-      FROM anime_catalog a
-      LEFT JOIN anime_decisions d ON d.anilist_id = a.anilist_id
-      LEFT JOIN anime_evaluations e ON e.anilist_id = a.anilist_id
-      WHERE a.anilist_id = ?`,
+      `SELECT d.status, d.detail_status, e.rating, e.note
+       FROM anime_items a
+       LEFT JOIN anime_user_decisions d ON d.anime_id = a.anime_id
+       LEFT JOIN anime_user_evaluations e ON e.anime_id = a.anime_id
+       WHERE a.anime_id = ?`,
     )
-    .bind(anilistId)
+    .bind(animeId)
     .first<RecordRow>();
 
   const tagResult = await db
-    .prepare("SELECT tag_key FROM anime_evaluation_tags WHERE anilist_id = ? ORDER BY created_at ASC")
-    .bind(anilistId)
+    .prepare("SELECT tag_key FROM anime_user_evaluation_tags WHERE anime_id = ? ORDER BY created_at ASC")
+    .bind(animeId)
     .all<{ tag_key: string }>();
 
   return {
-    anilistId,
+    animeId,
     status: row?.status ?? null,
     detailStatus: row?.detail_status ?? null,
     rating: row?.rating ?? null,
@@ -65,7 +61,7 @@ export async function getAnimePersonalRecord(
 
 export async function savePrimaryDecision(
   db: D1Database,
-  anilistId: number,
+  animeId: number,
   status: AnimePrimaryStatus,
 ): Promise<void> {
   await ensureAnimeSchema(db);
@@ -74,18 +70,18 @@ export async function savePrimaryDecision(
   if (status === "SEEN") {
     await db
       .prepare(
-        `INSERT INTO anime_decisions (
-          anilist_id, status, detail_status, decided_at, updated_at
+        `INSERT INTO anime_user_decisions (
+          anime_id, status, detail_status, decided_at, updated_at
         ) VALUES (?, 'SEEN', NULL, ?, ?)
-        ON CONFLICT(anilist_id) DO UPDATE SET
+        ON CONFLICT(anime_id) DO UPDATE SET
           status = 'SEEN',
           detail_status = CASE
-            WHEN anime_decisions.status = 'SEEN' THEN anime_decisions.detail_status
+            WHEN anime_user_decisions.status = 'SEEN' THEN anime_user_decisions.detail_status
             ELSE NULL
           END,
           updated_at = excluded.updated_at`,
       )
-      .bind(anilistId, now, now)
+      .bind(animeId, now, now)
       .run();
     return;
   }
@@ -93,78 +89,70 @@ export async function savePrimaryDecision(
   await db.batch([
     db
       .prepare(
-        `INSERT INTO anime_decisions (
-          anilist_id, status, detail_status, decided_at, updated_at
+        `INSERT INTO anime_user_decisions (
+          anime_id, status, detail_status, decided_at, updated_at
         ) VALUES (?, ?, NULL, ?, ?)
-        ON CONFLICT(anilist_id) DO UPDATE SET
+        ON CONFLICT(anime_id) DO UPDATE SET
           status = excluded.status,
           detail_status = NULL,
           updated_at = excluded.updated_at`,
       )
-      .bind(anilistId, status, now, now),
-    db.prepare("DELETE FROM anime_evaluation_tags WHERE anilist_id = ?").bind(anilistId),
-    db.prepare("DELETE FROM anime_evaluations WHERE anilist_id = ?").bind(anilistId),
+      .bind(animeId, status, now, now),
+    db.prepare("DELETE FROM anime_user_evaluation_tags WHERE anime_id = ?").bind(animeId),
+    db.prepare("DELETE FROM anime_user_evaluations WHERE anime_id = ?").bind(animeId),
   ]);
 }
 
 export async function saveSeenDetail(
   db: D1Database,
-  anilistId: number,
+  animeId: number,
   detailStatus: AnimeWatchDetail,
 ): Promise<void> {
-  if (!ANIME_WATCH_DETAILS.includes(detailStatus)) {
-    throw new Error("Invalid Anime watch detail");
-  }
-
+  if (!ANIME_WATCH_DETAILS.includes(detailStatus)) throw new Error("Invalid Anime watch detail");
   await ensureAnimeSchema(db);
   const now = Date.now();
   await db
     .prepare(
-      `INSERT INTO anime_decisions (
-        anilist_id, status, detail_status, decided_at, updated_at
+      `INSERT INTO anime_user_decisions (
+        anime_id, status, detail_status, decided_at, updated_at
       ) VALUES (?, 'SEEN', ?, ?, ?)
-      ON CONFLICT(anilist_id) DO UPDATE SET
-        status = 'SEEN',
-        detail_status = excluded.detail_status,
-        updated_at = excluded.updated_at`,
+      ON CONFLICT(anime_id) DO UPDATE SET
+        status = 'SEEN', detail_status = excluded.detail_status, updated_at = excluded.updated_at`,
     )
-    .bind(anilistId, detailStatus, now, now)
+    .bind(animeId, detailStatus, now, now)
     .run();
 }
 
 export async function toggleSeenTag(
   db: D1Database,
-  anilistId: number,
+  animeId: number,
   tag: string,
 ): Promise<void> {
   if (!isAnimeEvaluationTagKey(tag)) throw new Error("Invalid Anime evaluation tag");
   await ensureAnimeSchema(db);
 
   const existing = await db
-    .prepare("SELECT 1 AS found FROM anime_evaluation_tags WHERE anilist_id = ? AND tag_key = ?")
-    .bind(anilistId, tag)
+    .prepare("SELECT 1 AS found FROM anime_user_evaluation_tags WHERE anime_id = ? AND tag_key = ?")
+    .bind(animeId, tag)
     .first<{ found: number }>();
 
   if (existing) {
     await db
-      .prepare("DELETE FROM anime_evaluation_tags WHERE anilist_id = ? AND tag_key = ?")
-      .bind(anilistId, tag)
+      .prepare("DELETE FROM anime_user_evaluation_tags WHERE anime_id = ? AND tag_key = ?")
+      .bind(animeId, tag)
       .run();
     return;
   }
 
   await db
-    .prepare(
-      `INSERT INTO anime_evaluation_tags (anilist_id, tag_key, created_at)
-      VALUES (?, ?, ?)`,
-    )
-    .bind(anilistId, tag, Date.now())
+    .prepare("INSERT INTO anime_user_evaluation_tags (anime_id, tag_key, created_at) VALUES (?, ?, ?)")
+    .bind(animeId, tag, Date.now())
     .run();
 }
 
 export async function saveSeenNote(
   db: D1Database,
-  anilistId: number,
+  animeId: number,
   noteInput: string | null,
 ): Promise<void> {
   await ensureAnimeSchema(db);
@@ -173,27 +161,25 @@ export async function saveSeenNote(
 
   await db
     .prepare(
-      `INSERT INTO anime_evaluations (anilist_id, rating, note, updated_at)
-      VALUES (?, NULL, ?, ?)
-      ON CONFLICT(anilist_id) DO UPDATE SET
-        note = excluded.note,
-        updated_at = excluded.updated_at`,
+      `INSERT INTO anime_user_evaluations (anime_id, rating, note, updated_at)
+       VALUES (?, NULL, ?, ?)
+       ON CONFLICT(anime_id) DO UPDATE SET note = excluded.note, updated_at = excluded.updated_at`,
     )
-    .bind(anilistId, note, now)
+    .bind(animeId, note, now)
     .run();
 }
 
 export async function saveSeenRating(
   db: D1Database,
-  anilistId: number,
+  animeId: number,
   rating: AnimeEvaluationKey,
 ): Promise<void> {
   if (!ANIME_EVALUATION_KEYS.includes(rating)) throw new Error("Invalid Anime evaluation");
   await ensureAnimeSchema(db);
 
   const decision = await db
-    .prepare("SELECT status, detail_status FROM anime_decisions WHERE anilist_id = ?")
-    .bind(anilistId)
+    .prepare("SELECT status, detail_status FROM anime_user_decisions WHERE anime_id = ?")
+    .bind(animeId)
     .first<{ status: AnimePrimaryStatus; detail_status: AnimeWatchDetail | null }>();
 
   if (!decision || decision.status !== "SEEN" || !decision.detail_status) {
@@ -203,70 +189,55 @@ export async function saveSeenRating(
   const now = Date.now();
   await db
     .prepare(
-      `INSERT INTO anime_evaluations (anilist_id, rating, note, updated_at)
-      VALUES (?, ?, NULL, ?)
-      ON CONFLICT(anilist_id) DO UPDATE SET
-        rating = excluded.rating,
-        updated_at = excluded.updated_at`,
+      `INSERT INTO anime_user_evaluations (anime_id, rating, note, updated_at)
+       VALUES (?, ?, NULL, ?)
+       ON CONFLICT(anime_id) DO UPDATE SET rating = excluded.rating, updated_at = excluded.updated_at`,
     )
-    .bind(anilistId, rating, now)
+    .bind(animeId, rating, now)
     .run();
 }
 
 export async function saveSeenEvaluation(
   db: D1Database,
   input: {
-    anilistId: number;
+    animeId: number;
     detailStatus: AnimeWatchDetail;
     rating: AnimeEvaluationKey;
     tags?: readonly string[];
     note?: string | null;
   },
 ): Promise<void> {
-  if (!ANIME_WATCH_DETAILS.includes(input.detailStatus)) {
-    throw new Error("Invalid Anime watch detail");
-  }
-  if (!ANIME_EVALUATION_KEYS.includes(input.rating)) {
-    throw new Error("Invalid Anime evaluation");
-  }
+  if (!ANIME_WATCH_DETAILS.includes(input.detailStatus)) throw new Error("Invalid Anime watch detail");
+  if (!ANIME_EVALUATION_KEYS.includes(input.rating)) throw new Error("Invalid Anime evaluation");
 
   const tags = [...new Set(input.tags ?? [])].filter(isAnimeEvaluationTagKey);
   const note = input.note?.trim().slice(0, 4000) || null;
-
   await ensureAnimeSchema(db);
   const now = Date.now();
-  const statements = [
+
+  await db.batch([
     db
       .prepare(
-        `INSERT INTO anime_decisions (
-          anilist_id, status, detail_status, decided_at, updated_at
+        `INSERT INTO anime_user_decisions (
+          anime_id, status, detail_status, decided_at, updated_at
         ) VALUES (?, 'SEEN', ?, ?, ?)
-        ON CONFLICT(anilist_id) DO UPDATE SET
-          status = 'SEEN',
-          detail_status = excluded.detail_status,
-          updated_at = excluded.updated_at`,
+        ON CONFLICT(anime_id) DO UPDATE SET
+          status = 'SEEN', detail_status = excluded.detail_status, updated_at = excluded.updated_at`,
       )
-      .bind(input.anilistId, input.detailStatus, now, now),
+      .bind(input.animeId, input.detailStatus, now, now),
     db
       .prepare(
-        `INSERT INTO anime_evaluations (anilist_id, rating, note, updated_at)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(anilist_id) DO UPDATE SET
-          rating = excluded.rating,
-          note = excluded.note,
-          updated_at = excluded.updated_at`,
+        `INSERT INTO anime_user_evaluations (anime_id, rating, note, updated_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(anime_id) DO UPDATE SET
+           rating = excluded.rating, note = excluded.note, updated_at = excluded.updated_at`,
       )
-      .bind(input.anilistId, input.rating, note, now),
-    db.prepare("DELETE FROM anime_evaluation_tags WHERE anilist_id = ?").bind(input.anilistId),
+      .bind(input.animeId, input.rating, note, now),
+    db.prepare("DELETE FROM anime_user_evaluation_tags WHERE anime_id = ?").bind(input.animeId),
     ...tags.map((tag) =>
       db
-        .prepare(
-          `INSERT INTO anime_evaluation_tags (anilist_id, tag_key, created_at)
-          VALUES (?, ?, ?)`,
-        )
-        .bind(input.anilistId, tag, now),
+        .prepare("INSERT INTO anime_user_evaluation_tags (anime_id, tag_key, created_at) VALUES (?, ?, ?)")
+        .bind(input.animeId, tag, now),
     ),
-  ];
-
-  await db.batch(statements);
+  ]);
 }
