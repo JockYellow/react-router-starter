@@ -1,3 +1,4 @@
+import { animeCoverProxyPath } from "./anime-cover.server";
 import { ensureAnimeSchema } from "./anime.schema.server";
 import { ANIME_SEASONS, type AnimeSeason } from "./anime.types";
 
@@ -156,7 +157,7 @@ export async function getAnimeDashboardData(
       status: row.status,
       detailStatus: row.detail_status,
       rating: row.rating,
-      coverUrl: row.cover_url,
+      coverUrl: row.cover_url ? animeCoverProxyPath(row.anime_id) : null,
       updatedAt: row.updated_at,
     })),
     latestScope,
