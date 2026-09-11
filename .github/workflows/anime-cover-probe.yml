@@ -12,28 +12,42 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Probe Bangumi cover URL and delivery
+      - name: Probe production CSP and Bangumi cover embedding
         shell: bash
         run: |
           set -euo pipefail
-          api='https://api.bgm.tv/v0/subjects?type=2&cat=1&year=2025&month=1&sort=date&limit=10&offset=0'
-          curl --silent --show-error --location \
-            --header 'Accept: application/json' \
-            --header 'User-Agent: AnimeMemory/1.0 (https://github.com/JockYellow/react-router-starter)' \
-            --output /tmp/bgm.json "$api"
-          image=$(node -e 'const p=require("/tmp/bgm.json"); const x=p.data?.find(v=>v?.images?.large||v?.images?.common||v?.images?.medium); const u=x?.images?.large||x?.images?.common||x?.images?.medium; console.log(u||"")')
-          echo "IMAGE_URL=$image"
-          test -n "$image"
-          scheme=$(node -e 'console.log(new URL(process.argv[1]).protocol)' "$image")
-          host=$(node -e 'console.log(new URL(process.argv[1]).host)' "$image")
-          echo "SCHEME=$scheme HOST=$host"
-          code=$(curl --silent --show-error --location --output /tmp/cover.bin --write-out '%{http_code}' "$image")
+          site='https://react-router-starter.jockhuang77.workers.dev'
+          echo '=== PRODUCTION /anime HEADERS ==='
+          curl --silent --show-error --dump-header /tmp/site-headers.txt --output /dev/null "$site/anime"
+          tr -d '\r' < /tmp/site-headers.txt | grep -Ei '^(HTTP/|location:|content-security-policy:)' || true
+
+          echo '=== 2025 WINTER IMAGE HOSTS ==='
+          rm -f /tmp/urls.txt
+          for month in 1 2 3; do
+            for cat in 1 5; do
+              api="https://api.bgm.tv/v0/subjects?type=2&cat=$cat&year=2025&month=$month&sort=date&limit=100&offset=0"
+              curl --silent --show-error --location \
+                --header 'Accept: application/json' \
+                --header 'User-Agent: AnimeMemory/1.0 (https://github.com/JockYellow/react-router-starter)' \
+                --output /tmp/bgm.json "$api"
+              node -e 'const p=require("/tmp/bgm.json"); for(const x of p.data||[]){const u=x?.images?.large||x?.images?.common||x?.images?.medium||x?.images?.grid||x?.images?.small; if(u) console.log(u)}' >> /tmp/urls.txt
+            done
+          done
+          node -e 'const fs=require("fs"); const urls=fs.readFileSync("/tmp/urls.txt","utf8").trim().split(/\n+/).filter(Boolean); const counts={}; for(const u of urls){try{const x=new URL(u); const k=x.protocol+"//"+x.host; counts[k]=(counts[k]||0)+1}catch{counts.INVALID=(counts.INVALID||0)+1}} console.log({count:urls.length,origins:counts})'
+
+          image=$(head -n 1 /tmp/urls.txt)
+          echo "SAMPLE_IMAGE=$image"
+          echo '=== SAMPLE IMAGE RESPONSE HEADERS ==='
+          code=$(curl --silent --show-error --location \
+            --header "Referer: $site/anime/survey?year=2025&season=WINTER" \
+            --header 'Sec-Fetch-Dest: image' \
+            --header 'Sec-Fetch-Mode: no-cors' \
+            --header 'Sec-Fetch-Site: cross-site' \
+            --header 'User-Agent: Mozilla/5.0' \
+            --dump-header /tmp/image-headers.txt \
+            --output /tmp/cover.bin \
+            --write-out '%{http_code}' "$image")
+          tr -d '\r' < /tmp/image-headers.txt | grep -Ei '^(HTTP/|content-type:|cross-origin-resource-policy:|access-control-allow-origin:|cache-control:|location:)' || true
           type=$(file -b --mime-type /tmp/cover.bin || true)
           bytes=$(wc -c < /tmp/cover.bin)
-          echo "DIRECT_HTTP=$code MIME=$type BYTES=$bytes"
-          https_image=$(printf '%s' "$image" | sed 's#^http://#https://#')
-          code2=$(curl --silent --show-error --location --output /tmp/cover-https.bin --write-out '%{http_code}' "$https_image")
-          type2=$(file -b --mime-type /tmp/cover-https.bin || true)
-          bytes2=$(wc -c < /tmp/cover-https.bin)
-          echo "HTTPS_URL=$https_image"
-          echo "HTTPS_HTTP=$code2 MIME=$type2 BYTES=$bytes2"
+          echo "BROWSERISH_HTTP=$code MIME=$type BYTES=$bytes"
