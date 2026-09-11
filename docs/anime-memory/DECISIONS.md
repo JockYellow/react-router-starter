@@ -156,3 +156,18 @@ Tags are optional and may evolve after real usage.
 **Decision:** Batch B UI may begin once Anime tests, repository typecheck, build, and Wrangler dry-run are green. Batch A remains open until private seed staging/resolution is executed against the real Cloudflare D1 environment and schema idempotency is verified there.
 
 **Reason:** The remaining Batch A work requires Cloudflare account/runtime access rather than more application architecture. Blocking all user-visible development on unavailable remote execution would add delay without reducing implementation risk.
+
+## D-027 — First-time seasonal loading must be visible and resumable
+**Decision:** A new TV season is initialized in small persisted batches rather than one opaque server request. The UI must show how many candidates have been fetched, what phase is running, and where a failure stopped. Progress is stored in D1 so reloads resume from the saved page instead of starting over.
+
+**Reason:** A silent long-running fetch looks broken and encourages unnecessary refresh/retry actions. Visible durable progress makes the system understandable and protects external-provider/API usage.
+
+## D-028 — Transient provider failures use bounded automatic retry
+**Decision:** Provider HTTP requests automatically retry timeout/network failures plus HTTP 408/425/429/5xx up to two retries with bounded exponential backoff and jitter. `Retry-After` is respected when supplied, subject to a maximum wait cap. Non-retryable 4xx responses fail immediately.
+
+**Reason:** Short provider outages and rate limits should not require user intervention, but an application request must not wait indefinitely or retry permanently.
+
+## D-029 — Duplicate seasonal initialization is suppressed with a short D1 lock
+**Decision:** `anime_survey_load_state` stores a short `locked_until` lease for each scope. A second tab/request observes BUSY and waits/synchronizes rather than issuing the same provider page request concurrently. Expired locks are recoverable.
+
+**Reason:** Users may refresh or click repeatedly when a network request is slow. Duplicate initialization would waste provider quota and can create confusing partial progress even when candidate inserts are idempotent.
