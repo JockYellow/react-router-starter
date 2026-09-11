@@ -47,7 +47,7 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 
 ## Batch B — Seasonal survey, progress & evaluation (#6)
 
-**State: active. First usable vertical slice implemented and CI-verified.**
+**State: active. Core survey is implemented; first-load reliability is in PR #12 and browser acceptance remains.**
 
 ### B0. Dashboard shell
 - [x] Add private/admin-authenticated `/anime` route.
@@ -92,16 +92,25 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 - [x] Optional 15 concrete evaluation tags.
 - [x] Optional note remains visually secondary.
 - [x] Seen item only counts as processed when viewing detail + overall evaluation exist.
-- [x] Incremental autosave plumbing for detail/rating/tag/note choices.
+- [x] Incremental autosave for detail/rating/tag/note choices.
 
-### B5. Persistence & recovery
+### B5. Persistence, loading visibility & recovery
 - [x] Primary answers persist immediately.
-- [x] Seen flow stays on the same card after selecting Seen until required detail/evaluation exists.
+- [x] Seen flow stays on the same card until required detail/evaluation exists.
 - [x] Resume from next unresolved candidate after reload/device switch by D1 state.
 - [x] Previous-item navigation.
 - [x] Existing answer edit/upsert path.
 - [x] Prevent duplicate records with canonical IDs/upserts.
 - [x] Provider loading/error retry state.
+- [x] Persist first-time seasonal load state in D1.
+- [x] Fetch first-time AniList season data in batches of at most 50 candidates.
+- [x] Show fetched/target progress and current load phase to the user.
+- [x] Resume from the saved provider page after reload/failure.
+- [x] Add short per-scope D1 load lock to suppress duplicate initialization.
+- [x] Automatically retry timeout/network/408/425/429/5xx with bounded exponential backoff.
+- [x] Respect provider `Retry-After` when available.
+- [x] After automatic retries are exhausted, show the stopped count/error and a targeted retry action.
+- [ ] Browser-level first-load progress acceptance test against deployed Worker/D1.
 - [ ] Browser-level stop/reload/resume acceptance test.
 - [ ] Browser-level previous-item edit acceptance test.
 
@@ -114,14 +123,16 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 - [ ] Review shortcut behavior after real usage and simplify if any key feels error-prone.
 
 ### B7. Batch B verification / polish
-- [x] CI unit tests/typecheck/build/Wrangler dry-run for initial dashboard/survey slice.
+- [x] CI unit tests/typecheck/build/Wrangler dry-run for dashboard/survey slice.
 - [x] CI unit tests/typecheck/build/Wrangler dry-run for previous-item/hotkey slice.
-- [ ] CI verification for incremental Seen autosave slice.
+- [x] CI verification for incremental Seen autosave slice.
+- [x] Provider retry policy unit tests added.
+- [ ] Final CI on PR #12 head after reliability/docs changes.
 - [ ] Manual/browser season-switch test.
 - [ ] Manual/browser Seen persistence test.
 - [ ] Manual/browser Want/Not Seen one-click test.
-- [ ] Update #6 after autosave CI result.
-- [x] Update `STATUS.md` to Batch B active.
+- [ ] Manual/browser first-time load/retry/duplicate-tab test.
+- [ ] Update/close #6 after deployed browser acceptance.
 
 ---
 
@@ -180,8 +191,9 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 - [ ] Progress matrix remains usable on mobile.
 
 ### D3. Reliability / QA
-- [ ] Provider timeout/partial-data handling acceptance tests.
-- [ ] D1 failure handling.
+- [x] Base provider timeout + retry/backoff policy implemented in Batch B.
+- [ ] Provider partial-data handling acceptance tests.
+- [ ] D1 failure handling beyond first-load resumability.
 - [ ] Decision/evaluation persistence integration tests.
 - [ ] Final typecheck/build/Wrangler dry-run.
 - [ ] Existing major routes smoke-check.
@@ -190,7 +202,7 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 - [ ] Document first-run/runtime assumptions.
 - [ ] Confirm no new Cloudflare database provisioning is required.
 - [ ] Finalize `STATUS.md`.
-- [ ] Close completed issues and prepare PR for merge.
+- [ ] Close completed issues and prepare final PR for merge.
 
 ---
 
