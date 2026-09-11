@@ -34,6 +34,7 @@ export default [
   route("api/ai/chat", "routes/api/ai/chat.tsx"),
   route("api/admin/profile", "routes/api/admin/profile.tsx"),
   route("api/admin/anime/netflix-seed", "routes/api/admin/anime-netflix-seed.tsx"),
+  route("api/admin/anime/survey-load", "routes/api/admin/anime-survey-load.tsx"),
   route("api/admin", "routes/api/rng-prompt-admin.tsx"),
   route("api/data", "routes/api/rng-prompt-data.tsx"),
   route("api/output-configs", "routes/api/output-configs.tsx"),
