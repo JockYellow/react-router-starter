@@ -132,7 +132,11 @@ export async function getAnimeDashboardData(
         season,
         candidateCount: existing?.candidate_count ?? 0,
         processedCount: existing?.processed_count ?? 0,
-        completed: existing?.completed === 1,
+        completed: Boolean(
+          existing
+          && existing.candidate_count > 0
+          && existing.processed_count >= existing.candidate_count
+        ),
         started: Boolean(existing),
         updatedAt: existing?.updated_at ?? null,
       });

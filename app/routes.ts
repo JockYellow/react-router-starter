@@ -15,6 +15,7 @@ export default [
   route("anime/watchlist", "routes/anime/watchlist.tsx"),
   route("anime/survey", "routes/anime/survey.tsx"),
   route("api/anime/cover/:animeId", "routes/api/anime-cover.$animeId.tsx"),
+  route("api/anime/survey-answer", "routes/api/anime-survey-answer.tsx"),
   route("api/anime/survey-queue", "routes/api/anime-survey-queue.tsx"),
   route("admin/login", "routes/admin/login.tsx"),
   route("admin/blog-edit", "routes/admin/blog-edit.tsx"),
