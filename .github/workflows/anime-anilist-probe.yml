@@ -1,0 +1,29 @@
+name: Anime AniList Probe
+
+on:
+  push:
+    branches:
+      - probe/anilist-github-egress
+    paths:
+      - .github/workflows/anime-anilist-probe.yml
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe AniList GraphQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          body='{"query":"query { Media(id: 1, type: ANIME) { id title { romaji } } }"}'
+          http_code=$(curl --silent --show-error --output /tmp/anilist.json --write-out '%{http_code}' \
+            --request POST 'https://graphql.anilist.co' \
+            --header 'Accept: application/json' \
+            --header 'Content-Type: application/json' \
+            --data "$body")
+          echo "HTTP $http_code"
+          cat /tmp/anilist.json
+          echo
+          test "$http_code" = "200"
