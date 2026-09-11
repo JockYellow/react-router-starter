@@ -1,4 +1,4 @@
-name: Anime Jikan Probe
+name: Anime Provider Probe
 
 on:
   push:
@@ -12,23 +12,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Probe Jikan seasonal API with bounded retry
+      - name: Probe Bangumi TV and WEB browse endpoints
         shell: bash
         run: |
           set -euo pipefail
-          url='https://api.jikan.moe/v4/seasons/2011/winter?sfw=true&page=1'
-          success=0
-          for attempt in 1 2 3; do
+          base='https://api.bgm.tv/v0/subjects?type=2&year=2011&month=1&sort=date&limit=100&offset=0'
+          for cat in 1 5; do
+            url="$base&cat=$cat"
             code=$(curl --silent --show-error --location \
               --header 'Accept: application/json' \
-              --header 'User-Agent: AnimeMemory/1.0 (+https://github.com/JockYellow/react-router-starter)' \
-              --output /tmp/jikan.json --write-out '%{http_code}' "$url")
-            echo "attempt=$attempt HTTP $code"
-            node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync("/tmp/jikan.json","utf8")); console.log({status:p.status??null,type:p.type??null,message:p.message??null,items:Array.isArray(p.data)?p.data.length:null,page:p.pagination?.current_page??null,next:p.pagination?.has_next_page??null})'
-            if [ "$code" = "200" ] && node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync("/tmp/jikan.json","utf8")); process.exit(Array.isArray(p.data)&&p.data.length>0?0:1)'; then
-              success=1
-              break
-            fi
-            sleep $attempt
+              --header 'User-Agent: AnimeMemory/1.0 (https://github.com/JockYellow/react-router-starter)' \
+              --output "/tmp/bgm-$cat.json" --write-out '%{http_code}' "$url")
+            echo "cat=$cat HTTP $code"
+            node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); console.log({total:p.total??null,limit:p.limit??null,offset:p.offset??null,items:Array.isArray(p.data)?p.data.length:null,first:p.data?.[0]?.name??null}); if(!Array.isArray(p.data)) process.exit(2)' "/tmp/bgm-$cat.json"
+            test "$code" = "200"
           done
-          test "$success" = "1"
