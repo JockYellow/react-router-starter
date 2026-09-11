@@ -65,11 +65,16 @@ test("invalid status, detail, and rating are rejected", () => {
   );
 });
 
-test("library return path only accepts the library listing", () => {
+test("detail return path only accepts library or watchlist listings", () => {
   assert.equal(sanitizeAnimeLibraryReturnTo("/anime/library"), "/anime/library");
   assert.equal(
     sanitizeAnimeLibraryReturnTo("/anime/library?status=SEEN&offset=48"),
     "/anime/library?status=SEEN&offset=48",
+  );
+  assert.equal(sanitizeAnimeLibraryReturnTo("/anime/watchlist"), "/anime/watchlist");
+  assert.equal(
+    sanitizeAnimeLibraryReturnTo("/anime/watchlist?q=Frieren&sort=SCORE_DESC"),
+    "/anime/watchlist?q=Frieren&sort=SCORE_DESC",
   );
   assert.equal(sanitizeAnimeLibraryReturnTo("https://example.com"), "/anime/library");
   assert.equal(sanitizeAnimeLibraryReturnTo("/anime/library/123"), "/anime/library");
