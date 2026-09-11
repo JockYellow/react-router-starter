@@ -1,0 +1,39 @@
+name: Anime Cover Probe
+
+on:
+  push:
+    branches:
+      - debug/anime-cover-probe
+    paths:
+      - .github/workflows/anime-cover-probe.yml
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe Bangumi cover URL and delivery
+        shell: bash
+        run: |
+          set -euo pipefail
+          api='https://api.bgm.tv/v0/subjects?type=2&cat=1&year=2025&month=1&sort=date&limit=10&offset=0'
+          curl --silent --show-error --location \
+            --header 'Accept: application/json' \
+            --header 'User-Agent: AnimeMemory/1.0 (https://github.com/JockYellow/react-router-starter)' \
+            --output /tmp/bgm.json "$api"
+          image=$(node -e 'const p=require("/tmp/bgm.json"); const x=p.data?.find(v=>v?.images?.large||v?.images?.common||v?.images?.medium); const u=x?.images?.large||x?.images?.common||x?.images?.medium; console.log(u||"")')
+          echo "IMAGE_URL=$image"
+          test -n "$image"
+          scheme=$(node -e 'console.log(new URL(process.argv[1]).protocol)' "$image")
+          host=$(node -e 'console.log(new URL(process.argv[1]).host)' "$image")
+          echo "SCHEME=$scheme HOST=$host"
+          code=$(curl --silent --show-error --location --output /tmp/cover.bin --write-out '%{http_code}' "$image")
+          type=$(file -b --mime-type /tmp/cover.bin || true)
+          bytes=$(wc -c < /tmp/cover.bin)
+          echo "DIRECT_HTTP=$code MIME=$type BYTES=$bytes"
+          https_image=$(printf '%s' "$image" | sed 's#^http://#https://#')
+          code2=$(curl --silent --show-error --location --output /tmp/cover-https.bin --write-out '%{http_code}' "$https_image")
+          type2=$(file -b --mime-type /tmp/cover-https.bin || true)
+          bytes2=$(wc -c < /tmp/cover-https.bin)
+          echo "HTTPS_URL=$https_image"
+          echo "HTTPS_HTTP=$code2 MIME=$type2 BYTES=$bytes2"
