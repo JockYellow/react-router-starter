@@ -14,13 +14,13 @@ Last updated: 2026-09-11
 
 ## Current overall state
 
-**IN PROGRESS — Batch B core survey is implemented; first-time seasonal loading reliability is now implemented in PR #12 and awaiting final CI + deployed browser acceptance.**
+**Batch B is code-complete in PR #12. Remaining work is deployed browser acceptance.**
 
-`/anime` and `/anime/survey` already exist on `main`. PR #12 changes only the first-time season initialization/reliability path: visible progress, page-sized provider fetches, resumability, duplicate-load suppression, and bounded automatic retries.
+`/anime` and `/anime/survey` are already on `main`. PR #12 adds the missing reliability/UX layer for first-time seasonal data loading: visible progress, 50-item provider batches, durable resume state, duplicate-load suppression, bounded automatic retries, and targeted failure recovery.
 
 ## Verification snapshot
 
-The code commit before the latest docs/test-only follow-up passed the complete Anime Memory CI pipeline:
+The Batch B reliability implementation passed the complete Anime Memory CI pipeline before the final docs-only checkpoint:
 
 - [x] `npm ci`
 - [x] `npm run test:anime`
@@ -28,7 +28,7 @@ The code commit before the latest docs/test-only follow-up passed the complete A
 - [x] React Router build
 - [x] Wrangler deploy dry-run
 
-The PR head continues to run CI after every follow-up commit. Browser/runtime acceptance against deployed Cloudflare D1 is still required before #6 is closed.
+Provider retry unit tests and the load-state schema test are included. Browser/runtime acceptance against the deployed Cloudflare Worker/D1 is still required before #6 is closed.
 
 ## Batch A — foundation status
 
@@ -49,7 +49,7 @@ The PR head continues to run CI after every follow-up commit. Browser/runtime ac
 
 These remain tracked in #5 and do not block Batch B/C development.
 
-## Batch B — implemented
+## Batch B — completed in code
 
 ### Dashboard `/anime`
 - [x] Admin-authenticated route.
@@ -65,36 +65,38 @@ These remain tracked in #5 and do not block Batch B/C development.
 - [x] Chinese-first title + poster + recognition metadata.
 - [x] Seen / Want / Not Seen primary flow.
 - [x] Seen detail + one overall evaluation + optional tags/note.
-- [x] Incremental autosave for Seen details.
+- [x] Incremental autosave.
 - [x] Previous-item/review mode.
 - [x] Desktop hotkeys with typing protection.
 
 ### First-time season loading reliability — PR #12
 - [x] `anime_survey_load_state` persists loading state in D1.
-- [x] AniList TV season loading runs in batches of at most 50 records.
+- [x] AniList loading runs in batches of at most 50 records.
 - [x] UI shows fetched / target count and current phase.
-- [x] Page progress survives reloads; failed later pages do not restart page 1.
+- [x] Progress survives reloads; failed later pages do not restart page 1.
 - [x] 30-second per-scope D1 lease suppresses duplicate simultaneous initialization.
 - [x] Timeout/network/408/425/429/5xx use up to two bounded automatic retries.
 - [x] Retry uses exponential backoff + jitter and respects `Retry-After` within a wait cap.
 - [x] Exhausted errors show where loading stopped and expose a targeted retry button.
 - [x] Non-retryable 4xx fails immediately.
-- [x] Provider retry unit tests added.
-- [x] Schema test covers `anime_survey_load_state` creation.
+- [x] Provider retry unit tests.
+- [x] Load-state schema test.
 
 ## Active segment
 
 ### B7 — deployed browser acceptance
 
-After PR #12 CI is green:
+After PR #12 is merged/deployed:
 
-1. Merge/deploy PR #12.
-2. Open a not-yet-initialized season and confirm progress visibly advances (normally 0 → 50 → up to 100 → build scope → first card).
-3. Reload during loading and confirm it resumes rather than restarts.
-4. Test a second tab/rapid repeat action and confirm duplicate load suppression.
-5. Confirm Seen autosave, Want/Not Seen one-click, season switching and previous-item editing on the deployed Worker.
-6. Update/close #6 if those acceptance checks pass.
-7. Start Batch C: Library / detail / watchlist.
+1. Open a not-yet-initialized season and confirm progress visibly advances (normally 0 → 50 → up to 100 → build scope → first card).
+2. Reload during loading and confirm it resumes rather than restarts.
+3. Test a second tab/rapid repeat action and confirm duplicate load suppression.
+4. Confirm season switching.
+5. Confirm Seen autosave survives reload.
+6. Confirm Want/Not Seen remain reliable one-click actions.
+7. Confirm previous-item editing returns correctly to unresolved flow.
+8. Update/close #6 if those checks pass.
+9. Start Batch C: Library / detail / watchlist.
 
 ## Privacy rule
 
@@ -117,5 +119,5 @@ This repository is public. Never commit personal Anime Memory rows, Netflix rows
 1. Read this file, `TODO.md`, `DECISIONS.md`, and `PRIVATE_DATA.md`.
 2. Open #6, #5, and Draft PR #12.
 3. Continue on `feature/anime-batch-b-reliability` until #12 is merged.
-4. Check the latest Anime Memory CI before merging.
-5. Do not reopen solved Batch A architecture questions; only #5 remote/private runtime verification remains there.
+4. Do not reopen solved Batch A architecture questions; only #5 remote/private runtime verification remains there.
+5. After #12 merge/deploy, run the B7 browser acceptance checklist before starting Batch C.
