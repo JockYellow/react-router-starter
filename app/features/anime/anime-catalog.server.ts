@@ -14,6 +14,10 @@ type AliasInput = {
   isPrimary: boolean;
 };
 
+function effectiveZhTitle(record: AnimeProviderRecord, override?: string | null) {
+  return override?.trim() || record.titleZhTw?.trim() || null;
+}
+
 function buildProviderAliases(record: AnimeProviderRecord, titleZhTw?: string | null): AliasInput[] {
   const inputs: AliasInput[] = [];
   const provider = record.provider.toLowerCase();
@@ -47,7 +51,7 @@ function buildProviderAliases(record: AnimeProviderRecord, titleZhTw?: string | 
   });
 }
 
-async function findAnimeId(db: D1Database, record: AnimeProviderRecord): Promise<number | null> {
+async function findByExternalId(db: D1Database, record: AnimeProviderRecord): Promise<number | null> {
   if (record.malId) {
     const byMal = await db
       .prepare("SELECT anime_id FROM anime_items WHERE mal_id = ?")
@@ -72,6 +76,49 @@ async function findAnimeId(db: D1Database, record: AnimeProviderRecord): Promise
   return null;
 }
 
+async function findUniqueExactAliasMatch(
+  db: D1Database,
+  record: AnimeProviderRecord,
+  titleZhTw: string | null,
+): Promise<number | null> {
+  if (!record.seasonYear) return null;
+  const normalizedAliases = Array.from(
+    new Set(
+      buildProviderAliases(record, titleZhTw)
+        .map((entry) => normalizeAnimeAlias(entry.alias))
+        .filter(Boolean),
+    ),
+  );
+  if (!normalizedAliases.length) return null;
+
+  const matchingIds = new Set<number>();
+  for (const normalized of normalizedAliases) {
+    const rows = await db
+      .prepare(
+        `SELECT DISTINCT i.anime_id
+         FROM anime_item_aliases a
+         JOIN anime_items i ON i.anime_id = a.anime_id
+         WHERE a.normalized_alias = ?
+           AND (i.year = ? OR i.year IS NULL)
+         LIMIT 3`,
+      )
+      .bind(normalized, record.seasonYear)
+      .all<{ anime_id: number }>();
+    for (const row of rows.results ?? []) matchingIds.add(row.anime_id);
+    if (matchingIds.size > 1) return null;
+  }
+
+  return matchingIds.size === 1 ? [...matchingIds][0] : null;
+}
+
+async function findAnimeId(
+  db: D1Database,
+  record: AnimeProviderRecord,
+  titleZhTw: string | null,
+): Promise<number | null> {
+  return (await findByExternalId(db, record)) ?? findUniqueExactAliasMatch(db, record, titleZhTw);
+}
+
 export async function cacheAnimeProviderRecord(
   db: D1Database,
   record: AnimeProviderRecord,
@@ -79,8 +126,8 @@ export async function cacheAnimeProviderRecord(
 ): Promise<number> {
   await ensureAnimeSchema(db);
   const now = Date.now();
-  const titleZhTw = options.titleZhTw?.trim() || null;
-  let animeId = await findAnimeId(db, record);
+  const titleZhTw = effectiveZhTitle(record, options.titleZhTw);
+  let animeId = await findAnimeId(db, record, titleZhTw);
 
   if (animeId) {
     await db
@@ -89,21 +136,20 @@ export async function cacheAnimeProviderRecord(
           mal_id = COALESCE(mal_id, ?),
           anilist_id = COALESCE(anilist_id, ?),
           bangumi_id = COALESCE(bangumi_id, ?),
-          title_zh_tw = COALESCE(?, title_zh_tw),
-          title_native = COALESCE(?, title_native),
-          title_romaji = COALESCE(?, title_romaji),
-          title_english = COALESCE(?, title_english),
-          year = COALESCE(?, year),
-          season = COALESCE(?, season),
-          format = COALESCE(?, format),
-          episodes = COALESCE(?, episodes),
-          cover_url = COALESCE(?, cover_url),
-          studio = COALESCE(?, studio),
-          genres_json = ?,
-          popularity = COALESCE(?, popularity),
-          average_score = COALESCE(?, average_score),
-          metadata_source = ?,
-          provider_updated_at = COALESCE(?, provider_updated_at),
+          title_zh_tw = COALESCE(title_zh_tw, ?),
+          title_native = COALESCE(title_native, ?),
+          title_romaji = COALESCE(title_romaji, ?),
+          title_english = COALESCE(title_english, ?),
+          year = COALESCE(year, ?),
+          season = COALESCE(season, ?),
+          format = COALESCE(format, ?),
+          episodes = COALESCE(episodes, ?),
+          cover_url = COALESCE(cover_url, ?),
+          studio = COALESCE(studio, ?),
+          genres_json = CASE WHEN genres_json = '[]' THEN ? ELSE genres_json END,
+          popularity = COALESCE(popularity, ?),
+          average_score = COALESCE(average_score, ?),
+          provider_updated_at = COALESCE(provider_updated_at, ?),
           synced_at = ?,
           updated_at = ?
         WHERE anime_id = ?`,
@@ -125,7 +171,6 @@ export async function cacheAnimeProviderRecord(
         JSON.stringify(record.genres),
         record.popularity,
         record.averageScore,
-        record.provider,
         record.providerUpdatedAt,
         now,
         now,
@@ -172,7 +217,7 @@ export async function cacheAnimeProviderRecord(
     if (typeof insertedId === "number" && insertedId > 0) {
       animeId = insertedId;
     } else {
-      animeId = await findAnimeId(db, record);
+      animeId = await findByExternalId(db, record);
       if (!animeId) throw new Error(`Unable to cache ${record.provider} anime ${record.providerId}`);
     }
   }
@@ -225,6 +270,7 @@ function fromAniList(anime: AniListAnime): AnimeProviderRecord {
     malId: anime.idMal,
     anilistId: anime.id,
     bangumiId: null,
+    titleZhTw: null,
     title: anime.title,
     synonyms: anime.synonyms,
     season: anime.season,
