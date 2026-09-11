@@ -14,10 +14,8 @@ export async function getSurveyCandidateAtPosition(
   if (!candidate || candidate.titleZhTw) return candidate;
 
   try {
-    const enrichment = await ensureAnimeChineseTitle(db, candidate.anilistId);
-    return enrichment.titleZhTw
-      ? { ...candidate, titleZhTw: enrichment.titleZhTw }
-      : candidate;
+    const enrichment = await ensureAnimeChineseTitle(db, candidate.animeId);
+    return enrichment.titleZhTw ? { ...candidate, titleZhTw: enrichment.titleZhTw } : candidate;
   } catch {
     return candidate;
   }
