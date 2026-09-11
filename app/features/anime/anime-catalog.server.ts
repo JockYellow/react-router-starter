@@ -1,3 +1,4 @@
+import { upsertAnimeBangumiMetrics } from "./anime-bangumi-metrics.server";
 import { distinctAnimeAliases, normalizeAnimeAlias } from "./anime-title";
 import { ensureAnimeSchema } from "./anime.schema.server";
 import type { AniListAnime } from "./providers/anilist.server";
@@ -127,6 +128,7 @@ export async function cacheAnimeProviderRecord(
   await ensureAnimeSchema(db);
   const now = Date.now();
   const titleZhTw = effectiveZhTitle(record, options.titleZhTw);
+  const sharedPopularity = record.provider === "ANILIST" ? record.popularity : null;
   let animeId = await findAnimeId(db, record, titleZhTw);
 
   if (animeId) {
@@ -169,7 +171,7 @@ export async function cacheAnimeProviderRecord(
         record.coverUrl,
         record.studio,
         JSON.stringify(record.genres),
-        record.popularity,
+        sharedPopularity,
         record.averageScore,
         record.providerUpdatedAt,
         now,
@@ -203,7 +205,7 @@ export async function cacheAnimeProviderRecord(
         record.coverUrl,
         record.studio,
         JSON.stringify(record.genres),
-        record.popularity,
+        sharedPopularity,
         record.averageScore,
         record.provider,
         record.providerUpdatedAt,
@@ -249,6 +251,7 @@ export async function cacheAnimeProviderRecord(
     );
   }
 
+  await upsertAnimeBangumiMetrics(db, animeId, record);
   return animeId;
 }
 
