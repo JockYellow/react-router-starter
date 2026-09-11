@@ -10,7 +10,6 @@ type LoaderActionData = SurveyLoadStepResult | {
 };
 
 const LOAD_ACTION = "/api/admin/anime/survey-load";
-const JIKAN_PAGE_INTERVAL_MS = 1_100;
 
 const SEASON_LABELS: Record<AnimeSeason, string> = {
   WINTER: "冬季",
@@ -50,25 +49,37 @@ export function AnimeSurveyInitializer({
         },
         { method: "post", action: LOAD_ACTION },
       );
-    }, busyElsewhere ? 1_500 : JIKAN_PAGE_INTERVAL_MS);
+    }, busyElsewhere ? 1_500 : 900);
 
     return () => window.clearTimeout(timer);
-  }, [busyElsewhere, fetcher, inFlight, revalidator, season, state.fetchedCount, state.nextPage, state.phase, year]);
+  }, [
+    busyElsewhere,
+    fetcher,
+    inFlight,
+    revalidator,
+    season,
+    state.fetchedCount,
+    state.nextPage,
+    state.phase,
+    state.providerStep,
+    year,
+  ]);
 
-  const denominator = Math.max(1, state.targetCount);
   const percentage = state.phase === "READY"
     ? 100
-    : Math.min(100, Math.round((state.fetchedCount / denominator) * 100));
+    : state.providerStepTotal > 0
+      ? Math.min(99, Math.max(0, Math.round(((state.providerStep - 1) / state.providerStepTotal) * 100)))
+      : 0;
 
   const statusText = state.phase === "ERROR"
     ? "資料讀取中斷"
     : state.phase === "BUILDING_SCOPE"
-      ? "動畫資料已取得，正在完成這一季的固定候選順序…"
+      ? "季度資料已取得，正在依人氣與評分固定候選順序…"
       : busyElsewhere
         ? "另一個讀取程序正在處理這一季，正在同步進度…"
         : inFlight
-          ? `正在從 Jikan / MyAnimeList 取得第 ${state.nextPage} 頁…`
-          : "準備取得下一批動畫…";
+          ? `正在從 Bangumi 取得 ${state.providerLabel}…`
+          : `準備取得 ${state.providerLabel}…`;
 
   return (
     <section className="mt-8 rounded-3xl border border-neutral-800 bg-neutral-900 p-6 md:p-8">
@@ -77,12 +88,12 @@ export function AnimeSurveyInitializer({
           <div className="text-xs font-black uppercase tracking-[0.18em] text-neutral-500">建立季度資料</div>
           <h2 className="mt-2 text-2xl font-black">{year} · {SEASON_LABELS[season]}</h2>
           <p className="mt-2 text-sm text-neutral-400">
-            第一次開啟這一季時才需要執行。季度清單改由 Jikan / MyAnimeList 取得，再寫入本站 D1；完成後直接使用本地資料。
+            第一次開啟這一季時，會掃描該季三個月份的 TV 與 WEB 動畫。完成後資料固定存在 D1，不會每次重新抓。
           </p>
         </div>
         <div className="rounded-2xl bg-neutral-950 px-4 py-3 text-right">
-          <div className="text-2xl font-black">{state.fetchedCount} / {state.targetCount}</div>
-          <div className="mt-1 text-xs font-bold text-neutral-500">已建立候選</div>
+          <div className="text-2xl font-black">{state.fetchedCount} 部</div>
+          <div className="mt-1 text-xs font-bold text-neutral-500">目前已建立候選</div>
         </div>
       </div>
 
@@ -94,20 +105,25 @@ export function AnimeSurveyInitializer({
         <div className="mt-3 h-3 overflow-hidden rounded-full bg-neutral-800">
           <div className="h-full rounded-full bg-white transition-all duration-300" style={{ width: `${percentage}%` }} />
         </div>
+        {state.phase === "FETCHING_PROVIDER" ? (
+          <div className="mt-2 text-xs font-semibold text-neutral-600">
+            第 {state.providerStep} / {state.providerStepTotal} 段 · {state.providerLabel}
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-5 grid gap-2 text-xs text-neutral-500 sm:grid-cols-3">
-        <div className="rounded-xl border border-neutral-800 px-3 py-2">來源：Jikan / MyAnimeList</div>
+        <div className="rounded-xl border border-neutral-800 px-3 py-2">來源：Bangumi · TV + WEB 完整掃描</div>
         <div className="rounded-xl border border-neutral-800 px-3 py-2">429 / 5xx / timeout：自動退避重試</div>
         <div className="rounded-xl border border-neutral-800 px-3 py-2">D1：保存進度，重新整理可續接</div>
       </div>
 
       {state.phase === "ERROR" ? (
         <div className="mt-6 rounded-2xl border border-red-900/60 bg-red-950/30 p-4">
-          <div className="font-black text-red-200">停在 {state.fetchedCount} / {state.targetCount}</div>
+          <div className="font-black text-red-200">已保留 {state.fetchedCount} 部候選</div>
           <p className="mt-2 break-words text-xs leading-5 text-red-200/70">{state.lastError ?? "外部資料來源暫時無法完成這一步。"}</p>
           <p className="mt-2 text-xs text-neutral-500">
-            系統已先自動處理短暫錯誤。手動重試只會從目前頁數續接，不會清除前面已寫入的候選或你的作答。
+            系統已先自動處理短暫錯誤。手動重試只會從目前月份／分類續接，不會清除前面已寫入的候選或你的作答。
           </p>
           <fetcher.Form method="post" action={LOAD_ACTION} className="mt-4 flex flex-wrap gap-2">
             <input type="hidden" name="intent" value="retry-load" />
@@ -122,7 +138,7 @@ export function AnimeSurveyInitializer({
         </div>
       ) : (
         <p className="mt-5 text-xs leading-5 text-neutral-500">
-          畫面進度仍在變化時不用重新整理或重複點擊。系統會刻意放慢分頁請求以避開 Jikan 的速率限制；多分頁同時開啟時，D1 短鎖會避免同一季度重複抓取。
+          畫面進度仍在變化時不用重新整理或重複點擊。多分頁同時開啟時，D1 短鎖會避免同一季度重複抓取。
         </p>
       )}
     </section>
