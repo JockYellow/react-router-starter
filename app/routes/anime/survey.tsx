@@ -307,9 +307,10 @@ export default function AnimeSurvey() {
     ? surveyUrl(data.scope.year, data.scope.season, candidate.position + 1)
     : null;
   const seenFormId = candidate ? `anime-seen-${candidate.animeId}` : "anime-seen";
+  const isPrimaryChoice = Boolean(candidate && record?.status !== "SEEN");
 
   return (
-    <main className="min-h-screen bg-neutral-950 px-4 py-6 text-neutral-100 md:py-10">
+    <main className="min-h-screen bg-neutral-950 px-3 py-3 text-neutral-100 sm:px-4 sm:py-6 md:py-10">
       {candidate ? (
         <AnimeSurveyHotkeys
           year={data.scope.year}
@@ -323,24 +324,24 @@ export default function AnimeSurvey() {
       ) : null}
 
       <div className="mx-auto max-w-5xl">
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Link to="/anime" className="rounded-xl border border-neutral-700 px-3 py-2 text-sm font-bold text-neutral-300 hover:bg-neutral-900">
+        <header className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <Link to="/anime" className="shrink-0 rounded-xl border border-neutral-700 px-2.5 py-2 text-xs font-bold text-neutral-300 hover:bg-neutral-900 sm:px-3 sm:text-sm">
               ← 盤點總覽
             </Link>
-            <div>
-              <div className="text-xs font-bold text-neutral-500">季度盤點</div>
-              <h1 className="text-lg font-black">{data.scope.year} · {SEASON_LABELS[data.scope.season]}</h1>
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold text-neutral-500 sm:text-xs">季度盤點</div>
+              <h1 className="truncate text-base font-black sm:text-lg">{data.scope.year} · {SEASON_LABELS[data.scope.season]}</h1>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Link to={surveyUrl(previousSeason.year, previousSeason.season)} className="rounded-xl px-3 py-2 text-sm font-bold text-neutral-400 hover:bg-neutral-900">上一季</Link>
-            <Link to={surveyUrl(nextSeason.year, nextSeason.season)} className="rounded-xl px-3 py-2 text-sm font-bold text-neutral-400 hover:bg-neutral-900">下一季</Link>
+          <div className="ml-auto flex gap-1 sm:gap-2">
+            <Link to={surveyUrl(previousSeason.year, previousSeason.season)} className="rounded-xl px-2 py-2 text-xs font-bold text-neutral-400 hover:bg-neutral-900 sm:px-3 sm:text-sm">上一季</Link>
+            <Link to={surveyUrl(nextSeason.year, nextSeason.season)} className="rounded-xl px-2 py-2 text-xs font-bold text-neutral-400 hover:bg-neutral-900 sm:px-3 sm:text-sm">下一季</Link>
           </div>
         </header>
 
         {data.summary ? (
-          <div className="mt-5">
+          <div className="mt-3 sm:mt-5">
             <div className="flex items-center justify-between text-xs font-bold text-neutral-500">
               <span>{processedCount} / {data.summary.candidateCount}</span>
               <span>{Math.round(progress)}%</span>
@@ -378,17 +379,17 @@ export default function AnimeSurvey() {
         ) : null}
 
         {candidate ? (
-          <div className="mt-4 flex min-h-8 items-center justify-between gap-3 text-xs font-bold text-neutral-500">
+          <div className="mt-2 flex min-h-8 items-center justify-between gap-3 text-xs font-bold text-neutral-500 sm:mt-4">
             <div className="flex gap-2">
               {previousItemHref ? (
-                <Link to={previousItemHref} className="rounded-lg px-2.5 py-1.5 hover:bg-neutral-900 hover:text-neutral-300">Z · 上一題</Link>
+                <Link to={previousItemHref} className="rounded-lg px-2 py-1.5 hover:bg-neutral-900 hover:text-neutral-300 sm:px-2.5">Z · 上一題</Link>
               ) : null}
               {data.reviewMode ? (
-                <Link to={surveyUrl(data.scope.year, data.scope.season)} className="rounded-lg px-2.5 py-1.5 hover:bg-neutral-900 hover:text-neutral-300">回到待答</Link>
+                <Link to={surveyUrl(data.scope.year, data.scope.season)} className="rounded-lg px-2 py-1.5 hover:bg-neutral-900 hover:text-neutral-300 sm:px-2.5">回到待答</Link>
               ) : null}
             </div>
             {data.reviewMode && nextReviewHref ? (
-              <Link to={nextReviewHref} className="rounded-lg px-2.5 py-1.5 hover:bg-neutral-900 hover:text-neutral-300">下一題 →</Link>
+              <Link to={nextReviewHref} className="rounded-lg px-2 py-1.5 hover:bg-neutral-900 hover:text-neutral-300 sm:px-2.5">下一題 →</Link>
             ) : null}
           </div>
         ) : null}
@@ -416,26 +417,34 @@ export default function AnimeSurvey() {
             ) : null}
           </section>
         ) : candidate ? (
-          <section className="mt-3 overflow-hidden rounded-[2rem] border border-neutral-800 bg-neutral-900 shadow-2xl">
+          <section className="mt-2 overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl sm:mt-3 md:rounded-[2rem]">
             <div className="grid md:grid-cols-[minmax(260px,38%)_1fr]">
-              <div className="bg-neutral-800">
+              <div className={isPrimaryChoice ? "bg-neutral-950 md:bg-neutral-800" : "bg-neutral-800"}>
                 {candidate.coverUrl ? (
-                  <img src={candidate.coverUrl} alt="" className="h-full min-h-[360px] w-full object-cover" />
+                  <img
+                    src={candidate.coverUrl}
+                    alt=""
+                    className={isPrimaryChoice
+                      ? "h-[34vh] min-h-[220px] max-h-[320px] w-full object-contain md:h-full md:max-h-none md:min-h-[360px] md:object-cover"
+                      : "h-full min-h-[360px] w-full object-cover"}
+                  />
                 ) : (
-                  <div className="flex min-h-[360px] items-center justify-center text-sm text-neutral-600">沒有海報</div>
+                  <div className={isPrimaryChoice
+                    ? "flex min-h-[220px] items-center justify-center text-sm text-neutral-600 md:min-h-[360px]"
+                    : "flex min-h-[360px] items-center justify-center text-sm text-neutral-600"}>沒有海報</div>
                 )}
               </div>
 
-              <div className="p-5 md:p-8">
-                <div className="flex items-center justify-between gap-3 text-xs font-bold text-neutral-500">
+              <div className="p-4 sm:p-5 md:p-8">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs font-bold text-neutral-500">
                   <span>第 {candidate.position} 部{data.reviewMode ? " · 修改模式" : ""}</span>
                   <span>{[candidate.format, candidate.episodes ? `${candidate.episodes} 集` : null, candidate.studio].filter(Boolean).join(" · ")}</span>
                 </div>
-                <h2 className="mt-4 text-3xl font-black leading-tight md:text-4xl">
+                <h2 className="mt-3 text-2xl font-black leading-tight sm:mt-4 sm:text-3xl md:text-4xl">
                   {candidate.titleZhTw ?? candidate.titleNative ?? candidate.titleRomaji ?? candidate.titleEnglish ?? "未命名作品"}
                 </h2>
                 {alternateTitles(candidate).length ? (
-                  <div className="mt-3 space-y-1 text-sm text-neutral-500">
+                  <div className="mt-2 space-y-1 text-xs text-neutral-500 sm:mt-3 sm:text-sm">
                     {alternateTitles(candidate).slice(0, 3).map((title) => <div key={title}>{title}</div>)}
                   </div>
                 ) : null}
@@ -526,31 +535,31 @@ export default function AnimeSurvey() {
                     </Form>
                   </div>
                 ) : (
-                  <Form method="post" className="mt-8">
+                  <Form method="post" className="mt-5 sm:mt-8">
                     <input type="hidden" name="intent" value="primary" />
                     <input type="hidden" name="year" value={data.scope.year} />
                     <input type="hidden" name="season" value={data.scope.season} />
                     <input type="hidden" name="animeId" value={candidate.animeId} />
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <button disabled={submitting} name="status" value="SEEN" className="rounded-2xl bg-white px-5 py-4 font-black text-neutral-950 disabled:opacity-50">
-                        看過 <span className="ml-1 text-xs font-bold text-neutral-500">A / ←</span>
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                      <button disabled={submitting} name="status" value="SEEN" className="min-h-12 rounded-xl bg-white px-2 py-3.5 text-sm font-black text-neutral-950 disabled:opacity-50 sm:rounded-2xl sm:px-5 sm:py-4 sm:text-base">
+                        看過 <span className="ml-1 hidden text-xs font-bold text-neutral-500 sm:inline">A / ←</span>
                       </button>
                       {data.reviewMode ? (
-                        <button disabled={submitting} name="status" value="WANT" className="rounded-2xl border border-neutral-600 px-5 py-4 font-black text-neutral-100 hover:bg-neutral-800 disabled:opacity-50">
-                          想看 <span className="ml-1 text-xs font-bold text-neutral-500">W / ↑</span>
+                        <button disabled={submitting} name="status" value="WANT" className="min-h-12 rounded-xl border border-neutral-600 px-2 py-3.5 text-sm font-black text-neutral-100 hover:bg-neutral-800 disabled:opacity-50 sm:rounded-2xl sm:px-5 sm:py-4 sm:text-base">
+                          想看 <span className="ml-1 hidden text-xs font-bold text-neutral-500 sm:inline">W / ↑</span>
                         </button>
                       ) : (
-                        <button type="button" onClick={() => optimistic.answerFast("WANT")} className="rounded-2xl border border-neutral-600 px-5 py-4 font-black text-neutral-100 hover:bg-neutral-800">
-                          想看 <span className="ml-1 text-xs font-bold text-neutral-500">W / ↑</span>
+                        <button type="button" onClick={() => optimistic.answerFast("WANT")} className="min-h-12 rounded-xl border border-neutral-600 px-2 py-3.5 text-sm font-black text-neutral-100 hover:bg-neutral-800 sm:rounded-2xl sm:px-5 sm:py-4 sm:text-base">
+                          想看 <span className="ml-1 hidden text-xs font-bold text-neutral-500 sm:inline">W / ↑</span>
                         </button>
                       )}
                       {data.reviewMode ? (
-                        <button disabled={submitting} name="status" value="NOT_SEEN" className="rounded-2xl border border-neutral-800 px-5 py-4 font-black text-neutral-500 hover:bg-neutral-800 disabled:opacity-50">
-                          沒看 <span className="ml-1 text-xs font-bold text-neutral-600">D / →</span>
+                        <button disabled={submitting} name="status" value="NOT_SEEN" className="min-h-12 rounded-xl border border-neutral-800 px-2 py-3.5 text-sm font-black text-neutral-500 hover:bg-neutral-800 disabled:opacity-50 sm:rounded-2xl sm:px-5 sm:py-4 sm:text-base">
+                          沒看 <span className="ml-1 hidden text-xs font-bold text-neutral-600 sm:inline">D / →</span>
                         </button>
                       ) : (
-                        <button type="button" onClick={() => optimistic.answerFast("NOT_SEEN")} className="rounded-2xl border border-neutral-800 px-5 py-4 font-black text-neutral-500 hover:bg-neutral-800">
-                          沒看 <span className="ml-1 text-xs font-bold text-neutral-600">D / →</span>
+                        <button type="button" onClick={() => optimistic.answerFast("NOT_SEEN")} className="min-h-12 rounded-xl border border-neutral-800 px-2 py-3.5 text-sm font-black text-neutral-500 hover:bg-neutral-800 sm:rounded-2xl sm:px-5 sm:py-4 sm:text-base">
+                          沒看 <span className="ml-1 hidden text-xs font-bold text-neutral-600 sm:inline">D / →</span>
                         </button>
                       )}
                     </div>
