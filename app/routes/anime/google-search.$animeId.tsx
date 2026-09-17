@@ -40,7 +40,7 @@ export async function loader({ request, context, params }: LoaderFunctionArgs): 
   if (!title) throw new Response("Anime title not found", { status: 404 });
 
   const url = new URL("https://www.google.com/search");
-  url.searchParams.set("q", title);
+  url.searchParams.set("q", `${title} 動畫 製作背景`);
   return new Response(null, {
     status: 302,
     headers: {
