@@ -264,6 +264,8 @@ export async function fetchBangumiSeasonBatch(options: {
     step,
     stepTotal,
     label: `${month} 月 · ${category.label}${rangeLabel}`,
+    progressCurrent: rangeEnd,
+    progressTotal: total,
   };
 }
 
