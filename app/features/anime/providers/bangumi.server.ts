@@ -9,8 +9,28 @@ const BANGUMI_SEARCH_ENDPOINT = "https://api.bgm.tv/v0/search/subjects";
 const BANGUMI_BROWSE_ENDPOINT = "https://api.bgm.tv/v0/subjects";
 const DEFAULT_TIMEOUT_MS = 12_000;
 const USER_AGENT = "JockYellow/AnimeMemory (https://github.com/JockYellow/react-router-starter)";
-const BROWSE_LIMIT = 100;
+const BROWSE_LIMIT = 25;
 const toTaiwanTraditional = OpenCC.ConverterFactory(Locale.from.cn, Locale.to.tw);
+
+const EXCLUDED_SEASON_TAGS = new Set([
+  "国产",
+  "國產",
+  "中国",
+  "中國",
+  "中国动画",
+  "中國動畫",
+  "国漫",
+  "國漫",
+  "美国",
+  "美國",
+  "美国动画",
+  "美國動畫",
+  "欧美",
+  "歐美",
+  "欧美动画",
+  "歐美動畫",
+  "美漫",
+]);
 
 const SEASON_MONTHS: Record<AnimeSeason, readonly number[]> = {
   WINTER: [1, 2, 3],
@@ -113,6 +133,10 @@ function normalizeTags(tags: BangumiRawSubject["tags"]): string[] {
   return [...new Set(values)];
 }
 
+export function isExcludedBangumiSeasonTags(tags: readonly string[]): boolean {
+  return tags.some((tag) => EXCLUDED_SEASON_TAGS.has(tag.trim()));
+}
+
 function normalizeBrowseSubject(
   subject: BangumiRawSubject,
   input: { year: number; season: AnimeSeason; format: "TV" | "ONA" },
@@ -120,6 +144,9 @@ function normalizeBrowseSubject(
   const id = safePositiveInt(subject.id);
   const name = subject.name?.trim();
   if (!id || !name || subject.type !== 2) return null;
+
+  const tags = normalizeTags(subject.tags);
+  if (isExcludedBangumiSeasonTags(tags)) return null;
 
   const nameCn = subject.name_cn?.trim() || null;
   const titleZhTw = nameCn ? toTaiwanTraditional(nameCn).trim() || null : null;
@@ -152,7 +179,7 @@ function normalizeBrowseSubject(
       subject.images?.grid ??
       subject.images?.small ??
       null,
-    genres: normalizeTags(subject.tags),
+    genres: tags,
     popularity: Number.isInteger(subject.collection_total) && (subject.collection_total ?? 0) >= 0
       ? (subject.collection_total as number)
       : null,
@@ -201,8 +228,8 @@ export async function fetchBangumiSeasonBatch(options: {
     },
   );
 
-  const records = (payload.data ?? [])
-    .filter((subject): subject is BangumiRawSubject => Boolean(subject))
+  const sourceRows = (payload.data ?? []).filter((subject): subject is BangumiRawSubject => Boolean(subject));
+  const records = sourceRows
     .map((subject) => normalizeBrowseSubject(subject, {
       year: options.year,
       season: options.season,
@@ -216,7 +243,7 @@ export async function fetchBangumiSeasonBatch(options: {
     : BROWSE_LIMIT;
   const total = Number.isInteger(payload.total) && Number(payload.total) >= 0
     ? Number(payload.total)
-    : responseOffset + records.length;
+    : responseOffset + sourceRows.length;
   const nextOffset = responseOffset + responseLimit;
 
   let nextCursor: BangumiBrowseCursor | null;
@@ -226,13 +253,17 @@ export async function fetchBangumiSeasonBatch(options: {
     nextCursor = nextStreamCursor(cursor);
   }
 
+  const rangeStart = total > 0 ? responseOffset + 1 : 0;
+  const rangeEnd = total > 0 ? Math.min(total, responseOffset + responseLimit) : 0;
+  const rangeLabel = rangeStart > 0 ? ` · 第 ${rangeStart}–${rangeEnd} 筆` : "";
+
   return {
     records,
     nextCursor: nextCursor ? serializeCursor(nextCursor) : null,
     done: nextCursor == null,
     step,
     stepTotal,
-    label: `${month} 月 · ${category.label}`,
+    label: `${month} 月 · ${category.label}${rangeLabel}`,
   };
 }
 
