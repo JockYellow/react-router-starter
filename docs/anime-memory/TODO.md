@@ -4,50 +4,20 @@ Canonical project roadmap issue: #9
 
 Keep work split into independently verifiable segments. Personal Anime Memory rows never belong in this public repository.
 
-## Immediate next phase — survey efficiency (#6)
+Last reconciled with implementation: 2026-09-17.
 
-**State: approved by user; resume on `feature/anime-survey-efficiency`.**
+## Current checkpoint
 
-### B9. Correct recognition-first ordering
-- [ ] Stop mixing legacy AniList popularity and Bangumi `collection_total` in one ambiguous field for survey ranking.
-- [ ] Persist a provider-specific Bangumi popularity / collection count.
-- [ ] Rank TV-season candidates primarily by Bangumi collection count.
-- [ ] Use score only as a secondary tie-breaker.
-- [ ] Consider TV ahead of WEB/ONA as a small deterministic tie-break, not a hard filter.
-- [ ] Define behavior for already-created/frozen scopes before changing positions; do not silently invalidate answered positions.
-- [ ] Add migration/backfill path for existing Bangumi-matched records where needed.
-- [ ] Add tests proving AniList and Bangumi popularity scales cannot be mixed accidentally.
-
-### B10. Fast primary-answer flow
-- [ ] Add a small client-side queue of upcoming unresolved candidates (target ~3–5).
-- [ ] Preload upcoming `/api/anime/cover/:animeId` images.
-- [ ] Make `NOT_SEEN` advance immediately with optimistic UI.
-- [ ] Make `WANT` advance immediately with optimistic UI.
-- [ ] Save optimistic answers to D1 in the background.
-- [ ] Refill candidate queue without a full-page redirect/loader cycle per answer.
-- [ ] Update progress optimistically, then reconcile with D1.
-- [ ] Surface background-save failure and provide retry/recovery; never silently lose an answer.
-- [ ] Keep `SEEN` on the current card and reveal detail/evaluation instead of auto-advancing.
-- [ ] Preserve A/W/D/arrow/Z desktop shortcuts.
-- [ ] Add tests for queue order, answer persistence, error recovery, and Seen-vs-Not-Seen behavior.
-
-### B11. Remaining production acceptance
-- [x] Bangumi seasonal import works in production (2025 Winter confirmed).
-- [x] Same-origin cover proxy works in production; user confirmed posters display after PR #16.
-- [ ] Reload during a new season initialization and verify provider cursor resumes.
-- [ ] Second-tab/repeated initialization test verifies D1 load lock.
-- [ ] Seen detail/rating autosave survives reload.
-- [ ] Want/Not Seen persist after optimistic-flow refactor.
-- [ ] Previous-item edit mode returns to unresolved flow correctly.
-- [ ] Season switching smoke test.
-- [ ] Review keyboard shortcut behavior after real use.
-- [ ] Update/close #6 when accepted.
+- `main` already contains the core TV seasonal survey, provider-neutral identity, Bangumi discovery, same-origin covers, fast background saves, Library, detail editing, Watchlist, production credits, and the first mobile survey pass.
+- PR #21 is **code-complete and CI-green, but still Draft / unmerged pending user production testing**.
+- PR #21 adds: 20/10 survey queue buffering, credits prefetch + D1 cache, finer 25-row Bangumi load feedback, conservative CN/US-origin seasonal filtering, and direct Google search using `片名 動畫 製作背景`.
+- The next action is **production test PR #21**, not more feature work.
 
 ---
 
 ## Batch A — Data foundation & Netflix seed (#5)
 
-**State: code-complete; real Cloudflare D1/private seed execution pending.**
+**State: code-complete; real Cloudflare D1/private seed execution still pending.**
 
 ### A0–A3. Foundation / providers / matching
 - [x] Reuse existing `BLOG_DB` and `anime_*` tables.
@@ -70,58 +40,116 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 
 ## Batch B — Seasonal survey, progress & evaluation (#6)
 
-### Implemented
+**State: core implementation is mature and merged; latest loading/search optimizations are in PR #21 pending production acceptance.**
+
+### B0–B8. Core survey
 - [x] `/anime` dashboard and `/anime/survey`.
 - [x] Seen / Want / Not Seen.
 - [x] Seen completion state + overall rating + optional tags/note.
-- [x] Incremental autosave.
+- [x] Incremental Seen autosave.
 - [x] Previous/edit mode.
-- [x] A / Left, W / Up, D / Right, Z shortcuts.
+- [x] A / Left, W / Up, D / Right, Z shortcuts with typing protection.
 - [x] Bangumi full seasonal scan: 3 months × TV/WEB + offset pagination.
 - [x] No top-100 seasonal cutoff.
-- [x] resumable provider load state + D1 duplicate-load lock + retry/backoff.
-- [x] provider-neutral identity and legacy migration.
-- [x] same-origin cover proxy supporting Bangumi and legacy AniList sources.
+- [x] Resumable provider load state + D1 duplicate-load lock + retry/backoff.
+- [x] Provider-neutral identity and legacy migration.
+- [x] Same-origin cover proxy supporting Bangumi and legacy AniList sources.
 
-### Production-confirmed
-- [x] 2025 Winter initializes successfully.
-- [x] cover images render successfully after PR #16.
+### B9. Recognition-first ordering
+- [x] Stop relying on one mixed AniList/Bangumi popularity scale for seasonal ranking.
+- [x] Persist provider-specific Bangumi collection/score metadata.
+- [x] Rank new TV-season scopes primarily by Bangumi collection count.
+- [x] Use score / deterministic format rules only as secondary ordering signals.
+- [x] Preserve already-answered/frozen scope positions rather than silently moving them.
+- [x] Add focused ranking tests.
 
-### Remaining
-- [ ] Complete B9/B10/B11 above.
+### B10. Fast primary-answer flow
+- [x] Optimistic `WANT` / `NOT_SEEN` card advance.
+- [x] Dedicated lightweight background-save endpoint.
+- [x] Serialize background D1 saves to avoid concurrent write pileups.
+- [x] Bounded retry for transient save failures and visible recovery state.
+- [x] Refill candidates without a full-page loader cycle per fast answer.
+- [x] Update progress optimistically while retaining D1 as source of truth.
+- [x] Keep `SEEN` on-card for the detail/evaluation flow.
+- [x] Preserve desktop shortcuts.
+- [x] Preload upcoming covers.
+- [x] PR #21 expands the rolling candidate buffer to 20 and refills at 10.
+
+### B10b. Production information / discovery assistance
+- [x] Show Bangumi-derived studio/director when available.
+- [x] Provider failures remain non-blocking.
+- [x] Add D1-backed credits cache and batch prefetch in PR #21.
+- [x] Prepare the first 20 credits before entering a newly initialized survey in PR #21.
+- [x] Add direct Google search shortcut; query is `片名 動畫 製作背景` in PR #21.
+
+### B10c. First-load UX / candidate quality — PR #21
+- [x] Reduce Bangumi browse batch size to 25 for finer visible feedback.
+- [x] Show per-segment / row-range progress instead of only coarse six-step movement.
+- [x] Show credits preparation progress before survey entry.
+- [x] Conservatively exclude known CN/US-origin seasonal tags before catalog caching.
+- [x] CI #125: Anime tests, typecheck, build, and Wrangler dry-run all pass.
+- [ ] User production-tests PR #21.
+- [ ] Merge PR #21 after explicit user approval.
+
+### B11. Remaining production acceptance
+- [x] Bangumi seasonal import works in production (2025 Winter confirmed).
+- [x] Same-origin cover proxy works in production; posters render after PR #16.
+- [x] Fast answer persistence failure mode was fixed in PR #19.
+- [ ] Test a previously unseen season using the PR #21 fine-grained initializer.
+- [ ] Verify reload during initialization resumes provider cursor instead of restarting.
+- [ ] Verify second-tab/repeated initialization is suppressed by the D1 load lock.
+- [ ] Confirm first 20 credits finish preparing and the first card opens automatically.
+- [ ] Stress-test very rapid Want/Not Seen input against the 20/10 buffer.
+- [ ] Confirm Google search opens separately on desktop and mobile.
+- [ ] Confirm Seen detail/rating autosave survives reload.
+- [ ] Confirm previous-item edit returns correctly to unresolved flow.
+- [ ] Season-switching smoke test.
+- [ ] Update/close #6 after production acceptance.
 
 ---
 
 ## Batch C — Library, detail page & watchlist (#7)
 
+**State: C1/C2/C3 implementation merged in PR #18; roadmap issue #7 is stale and still needs production acceptance/update.**
+
 ### C0. Library
-- [ ] Add `/anime/library` poster wall.
-- [ ] Search title/alias.
-- [ ] Filter by watch status, evaluation, year/season, tag and studio.
+- [x] `/anime/library` poster wall.
+- [x] Title/alias search.
+- [x] Filters for personal status/evaluation/year/season/tags.
+- [x] Deterministic sorting and pagination.
+- [x] Same-origin cover output.
 
 ### C1. Detail page
-- [ ] Add canonical anime detail route using internal `anime_id`.
-- [ ] Show/edit personal viewing status, evaluation, tags and note.
-- [ ] Show core catalog metadata and external provider IDs where useful.
+- [x] Canonical detail route using internal `anime_id`.
+- [x] Show/edit personal viewing status, completion state, evaluation, tags and note.
+- [x] Separate personal record from external catalog metadata.
+- [x] Changing away from Seen safely clears Seen-only evaluation fields where appropriate.
 
 ### C2. Watchlist
-- [ ] Add `/anime/watchlist`.
-- [ ] Show/sort Want records.
-- [ ] Want -> Seen transition reuses standard evaluation flow.
-- [ ] Allow safe removal/status change.
+- [x] `/anime/watchlist` dedicated WANT backlog.
+- [x] Search and useful sorting.
+- [x] Want -> Seen reuses the normal detail/evaluation flow.
+- [x] Safe removal/status transition without deleting the personal record.
+- [x] Guard stale actions from overwriting a newer status change.
 
 ### C3. Verification
-- [ ] Survey records appear correctly in Library/Watchlist.
-- [ ] Search/filter combinations work.
-- [ ] Detail edits persist.
-- [ ] Update #7 / STATUS.
+- [x] Focused unit tests for Library query normalization, detail editing and Watchlist behavior.
+- [x] CI passed before PR #18 merge.
+- [ ] Production UI acceptance for Library / detail / Watchlist.
+- [ ] Verify representative search/filter combinations against real accumulated data.
+- [ ] Verify edits and Watchlist transitions after reload.
+- [ ] Update/close #7 after acceptance.
 
 ---
 
-## Batch D — Movies, export, mobile UX & QA (#8)
+## Batch D — Movies, export, mobile UX & final QA (#8)
+
+**State: partially started through survey/mobile reliability work, but the two largest product gaps — movie survey and durable export — remain.**
 
 ### D0. Movie survey
-- [ ] Track movies by year separately and reuse the standard answer/evaluation flow.
+- [ ] Track movies by year separately from TV seasons.
+- [ ] Reuse Seen / Want / Not Seen + evaluation flow.
+- [ ] Reuse the fast queue/background-save architecture where appropriate.
 
 ### D0b. Missing original-scope coverage
 - [ ] Add a separate catch-up flow for OVA / OAD / Special / other non-TV non-movie works.
@@ -129,43 +157,49 @@ Keep work split into independently verifiable segments. Personal Anime Memory ro
 - [ ] Do not force all OVA/Special works into normal seasonal TV scans.
 - [ ] Do not force exhaustive year-by-year historical scanning before 2011.
 
-### D1. Export
-- [ ] JSON export.
-- [ ] CSV export.
+### D1. Export / backup
+- [ ] Add full JSON export as the durable backup format.
+- [ ] Add CSV export for human-readable analysis.
 - [ ] Include internal ID, external IDs, title variants, status/detail/evaluation/tags/note/provenance where useful.
-- [ ] Verify exported data is readable/restorable as a durable personal backup.
+- [ ] Verify exported JSON can be read/restored or otherwise validated independently of D1.
 
 ### D2. Mobile UX
-- [ ] Responsive survey card and progress matrix.
-- [ ] Comfortable tap targets / accidental-action protection.
-- [ ] Responsive Library grid.
+- [x] First responsive survey-choice pass merged in PR #20.
+- [x] Large touch-friendly primary choice buttons on small screens.
+- [x] Compact mobile poster/header spacing for the fast survey path.
+- [ ] Production acceptance of the mobile survey after PR #21.
+- [ ] Review mobile Seen evaluation form for longer sessions.
+- [ ] Responsive Library/Watchlist polish and real-device acceptance.
 
 ### D3. Reliability / QA
 - [x] Base provider timeout + retry/backoff policy.
+- [x] Background primary-answer retry/recovery behavior.
 - [ ] Provider partial-data acceptance tests.
-- [ ] D1 failure handling beyond first-load resumability.
+- [ ] Broader D1 failure handling beyond first-load and primary-answer paths.
 - [ ] Decision/evaluation persistence integration tests.
-- [ ] Final typecheck/build/Wrangler dry-run and major-route smoke check.
+- [ ] Major-route desktop/mobile smoke test.
+- [ ] Final typecheck/build/Wrangler dry-run after all Batch D work.
 
 ### D4. Handoff / deploy
 - [ ] Document first-run/runtime assumptions.
 - [ ] Confirm no new Cloudflare database provisioning is required.
-- [ ] Finalize `STATUS.md` and close completed issues.
+- [ ] Finalize `STATUS.md`, `TODO.md`, roadmap issues, and close completed batches.
 
 ---
 
-## Recommended execution order
+## Recommended execution order from this checkpoint
 
-1. B9 popularity semantics / ordering.
-2. B10 optimistic queue + cover preloading.
-3. B11 Batch B browser acceptance and close #6.
-4. Finish Batch A private Netflix seed production execution.
-5. Batch C Library / detail / watchlist.
-6. Batch D movies.
-7. OVA/Special + pre-2011 catch-up.
-8. Export / mobile / final QA.
+1. **Production-test PR #21** on a new/unseen season, including fast input and mobile Google search.
+2. Merge PR #21 only after explicit user approval; then close/update the remaining Batch B acceptance items.
+3. Run the pending private Netflix seed against real D1 and finish Batch A acceptance.
+4. Production-accept Library / detail / Watchlist and close/update Batch C.
+5. Implement **JSON + CSV export** so accumulated personal data is no longer dependent on D1 as the only durable copy.
+6. Implement the **movie-by-year survey**.
+7. Finish mobile Library/Watchlist polish and broader persistence/provider QA.
+8. Add OVA/Special + pre-2011 catch-up flows.
+9. Final documentation / deployment verification / roadmap cleanup.
 
-## Explicitly out of scope
+## Explicitly out of scope unless the product direction changes
 
 - Automated taste-model ranking / smart gap filling.
 - Staff/studio affinity scoring.

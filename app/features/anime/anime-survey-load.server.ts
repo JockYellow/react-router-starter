@@ -58,7 +58,7 @@ type CandidateRankDbRow = {
 };
 
 const LOAD_LOCK_MS = 30_000;
-const BANGUMI_PAGE_SIZE = 100;
+const BANGUMI_PAGE_SIZE = 25;
 const BANGUMI_STREAM_STRIDE = 100_000;
 const BANGUMI_STREAM_COUNT = 6;
 const LOAD_STATE_TABLE = "anime_scope_load_state_v2";
@@ -225,8 +225,6 @@ async function sortFrozenCandidates(db: D1Database, scopeKey: string): Promise<v
     .bind(scopeKey)
     .first<{ found: number }>();
 
-  // A scope with any user answer is already established. Never silently move its
-  // positions; corrected recognition ordering applies to newly-built scopes.
   if (answered) return;
 
   const rows = await db
@@ -257,8 +255,6 @@ async function sortFrozenCandidates(db: D1Database, scopeKey: string): Promise<v
 
   if (!ranked.length) return;
 
-  // D1 batch is transactional. Move all existing positions out of the final range,
-  // then rewrite them without deleting the candidate set or user-linked rows.
   await db.batch([
     db
       .prepare("UPDATE anime_scope_candidates SET position = position + 1000000 WHERE scope_key = ?")
@@ -294,8 +290,6 @@ export async function ensureSurveyInitialization(
     candidateCount(db, scopeKey),
   ]);
 
-  // Preserve any scope that was already established before the provider migration.
-  // Failed legacy load-state lives in older tables and does not control this path.
   if (!existingLoad && (candidates > 0 || existingProgress?.completed === 1)) {
     return { ready: true, state: null };
   }

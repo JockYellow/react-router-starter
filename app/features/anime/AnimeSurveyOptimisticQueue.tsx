@@ -6,12 +6,17 @@ import {
   createSerialAsyncQueue,
   isRetryableAnimeBackgroundSaveStatus,
 } from "./anime-background-save";
+import { prefetchAnimeCredits } from "./anime-credits.client";
 import {
   advanceAnimeSurveyQueue,
   mergeAnimeSurveyQueue,
   type AnimeSurveyQueueItem,
 } from "./anime-survey-queue";
 import type { AnimePrimaryStatus, AnimeSeason } from "./anime.types";
+
+const SURVEY_QUEUE_SIZE = 20;
+const SURVEY_REFILL_THRESHOLD = 10;
+const COVER_PREFETCH_COUNT = 5;
 
 type FastPrimaryStatus = Extract<AnimePrimaryStatus, "WANT" | "NOT_SEEN">;
 
@@ -73,7 +78,7 @@ function sameSaveJob(a: Pick<SaveJob, "scopeKey" | "animeId">, b: Pick<SaveJob, 
 }
 
 /**
- * Keeps a small unresolved queue in the browser and persists Want/Not Seen in
+ * Keeps a rolling unresolved queue in the browser and persists Want/Not Seen in
  * the background while the visible card advances immediately.
  *
  * @param props - Scope, server queue snapshot and progress counters.
@@ -88,7 +93,7 @@ export function useAnimeSurveyOptimisticQueue(props: {
 }) {
   const scopeKey = `${props.year}:${props.season}`;
   const incomingSignature = useMemo(() => initialSignature(props.initialItems), [props.initialItems]);
-  const initialQueue = props.initialItems.slice(0, 5);
+  const initialQueue = props.initialItems.slice(0, SURVEY_QUEUE_SIZE);
   const [queue, setQueue] = useState<AnimeSurveyQueueItem[]>(() => initialQueue);
   const [handledIds, setHandledIds] = useState<Set<number>>(() => new Set());
   const [saveJobs, setSaveJobs] = useState<SaveJob[]>([]);
@@ -111,7 +116,7 @@ export function useAnimeSurveyOptimisticQueue(props: {
     if (lastScopeRef.current === scopeKey) return;
     lastScopeRef.current = scopeKey;
     const nextHandled = new Set<number>();
-    const nextQueue = props.initialItems.slice(0, 5);
+    const nextQueue = props.initialItems.slice(0, SURVEY_QUEUE_SIZE);
     handledIdsRef.current = nextHandled;
     queueRef.current = nextQueue;
     setHandledIds(nextHandled);
@@ -126,7 +131,7 @@ export function useAnimeSurveyOptimisticQueue(props: {
   useEffect(() => {
     if (lastScopeRef.current !== scopeKey) return;
     setDisplayProcessedCount((current) => Math.max(current, props.processedCount));
-    const nextQueue = mergeAnimeSurveyQueue([], props.initialItems, handledIdsRef.current, 5);
+    const nextQueue = mergeAnimeSurveyQueue([], props.initialItems, handledIdsRef.current, SURVEY_QUEUE_SIZE);
     queueRef.current = nextQueue;
     setQueue(nextQueue);
     setRefillError(null);
@@ -135,13 +140,18 @@ export function useAnimeSurveyOptimisticQueue(props: {
 
   useEffect(() => {
     if (typeof Image === "undefined") return;
-    for (const item of queue.slice(1, 5)) {
+    for (const item of queue.slice(1, COVER_PREFETCH_COUNT + 1)) {
       if (!item.candidate.coverUrl) continue;
       const image = new Image();
       image.decoding = "async";
       image.src = item.candidate.coverUrl;
     }
   }, [queue]);
+
+  useEffect(() => {
+    if (!props.enabled || !queue.length) return;
+    void prefetchAnimeCredits(queue.map((item) => item.candidate.animeId));
+  }, [props.enabled, queue]);
 
   const persistJob = useCallback(async (job: Pick<SaveJob, "scopeKey" | "animeId" | "status">) => {
     let finalError: Error | null = null;
@@ -256,7 +266,7 @@ export function useAnimeSurveyOptimisticQueue(props: {
       const params = new URLSearchParams({
         year: String(props.year),
         season: props.season,
-        limit: "5",
+        limit: String(SURVEY_QUEUE_SIZE),
       });
       const excluded = [...handledIdsRef.current];
       if (excluded.length) params.set("exclude", excluded.join(","));
@@ -276,7 +286,7 @@ export function useAnimeSurveyOptimisticQueue(props: {
           current,
           parsed.items,
           handledIdsRef.current,
-          5,
+          SURVEY_QUEUE_SIZE,
         );
         queueRef.current = next;
         return next;
@@ -290,7 +300,7 @@ export function useAnimeSurveyOptimisticQueue(props: {
 
   useEffect(() => {
     if (!props.enabled || refillLoading || refillError) return;
-    if (queue.length > 2 || displayProcessedCount >= props.candidateCount) return;
+    if (queue.length > SURVEY_REFILL_THRESHOLD || displayProcessedCount >= props.candidateCount) return;
 
     const refillKey = `${queue.map((item) => item.candidate.animeId).join(",")}|${handledIds.size}|${displayProcessedCount}`;
     if (lastRefillKeyRef.current === refillKey) return;

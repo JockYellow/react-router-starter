@@ -34,4 +34,6 @@ export type AnimeProviderBatch = {
   step: number;
   stepTotal: number;
   label: string;
+  progressCurrent?: number;
+  progressTotal?: number;
 };

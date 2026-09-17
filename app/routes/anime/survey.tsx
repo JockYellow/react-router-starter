@@ -130,7 +130,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
       };
     }
 
-    const candidates = await getNextUnresolvedSurveyCandidates(db, scope, { limit: 5 });
+    const candidates = await getNextUnresolvedSurveyCandidates(db, scope, { limit: 20 });
     const initialItems = await Promise.all(
       candidates.map(async (candidate) => ({
         candidate,

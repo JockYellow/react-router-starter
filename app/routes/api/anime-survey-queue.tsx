@@ -20,24 +20,22 @@ function parsePositiveIds(value: string | null): number[] {
   )).slice(0, 200);
 }
 
-/**
- * Returns the next small unresolved Anime survey queue for optimistic refill.
- */
+/** Returns the next rolling unresolved Anime survey queue for optimistic refill. */
 export async function loader({ request, context }: LoaderFunctionArgs): Promise<Response> {
   await requireAdmin(request, context);
   const db = requireBlogDb(context);
   const url = new URL(request.url);
   const year = Number(url.searchParams.get("year"));
   const season = url.searchParams.get("season");
-  const requestedLimit = Number(url.searchParams.get("limit") ?? 5);
+  const requestedLimit = Number(url.searchParams.get("limit") ?? 20);
 
   if (!Number.isInteger(year) || year < 1901 || year > 2100 || !isSeason(season)) {
     return Response.json({ error: "Invalid survey scope" }, { status: 400 });
   }
 
   const limit = Number.isInteger(requestedLimit)
-    ? Math.max(1, Math.min(requestedLimit, 5))
-    : 5;
+    ? Math.max(1, Math.min(requestedLimit, 20))
+    : 20;
   const excludeAnimeIds = parsePositiveIds(url.searchParams.get("exclude"));
   const scope = { type: "TV_SEASON" as const, year, season };
   const candidates = await getNextUnresolvedSurveyCandidates(db, scope, {
