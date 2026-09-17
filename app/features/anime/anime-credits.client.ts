@@ -15,6 +15,12 @@ function parseCredits(value: unknown): AnimeSurveyCredits | null {
   return { studio, directors };
 }
 
+function normalizeAnimeIds(animeIds: readonly number[]): number[] {
+  return Array.from(new Set(
+    animeIds.filter((animeId) => Number.isInteger(animeId) && animeId > 0),
+  )).slice(0, 20);
+}
+
 async function startBatch(ids: number[]): Promise<void> {
   const params = new URLSearchParams({ ids: ids.join(",") });
   const response = await fetch(`/api/anime/credits?${params.toString()}`, {
@@ -42,9 +48,7 @@ export function peekAnimeCredits(animeId: number): AnimeSurveyCredits | null {
 }
 
 export async function prefetchAnimeCredits(animeIds: readonly number[]): Promise<void> {
-  const ids = Array.from(new Set(
-    animeIds.filter((animeId) => Number.isInteger(animeId) && animeId > 0),
-  )).slice(0, 20);
+  const ids = normalizeAnimeIds(animeIds);
   const missing = ids.filter((animeId) => !creditsCache.has(animeId) && !pendingCredits.has(animeId));
 
   if (missing.length) {
@@ -58,6 +62,24 @@ export async function prefetchAnimeCredits(animeIds: readonly number[]): Promise
   }
 
   await Promise.all(ids.map((animeId) => pendingCredits.get(animeId) ?? Promise.resolve(creditsCache.get(animeId) ?? null)));
+}
+
+export async function prefetchAnimeCreditsWithProgress(
+  animeIds: readonly number[],
+  onProgress: (completed: number, total: number) => void,
+  batchSize = 4,
+): Promise<void> {
+  const ids = normalizeAnimeIds(animeIds);
+  const size = Math.max(1, Math.min(Math.trunc(batchSize), 10));
+  let completed = 0;
+  onProgress(completed, ids.length);
+
+  for (let index = 0; index < ids.length; index += size) {
+    const batch = ids.slice(index, index + size);
+    await prefetchAnimeCredits(batch);
+    completed += batch.length;
+    onProgress(completed, ids.length);
+  }
 }
 
 export async function loadAnimeCredits(animeId: number): Promise<AnimeSurveyCredits | null> {
