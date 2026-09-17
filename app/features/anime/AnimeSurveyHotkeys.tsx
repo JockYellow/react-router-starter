@@ -1,12 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSubmit } from "react-router";
 
+import { loadAnimeCredits, peekAnimeCredits } from "./anime-credits.client";
+import type { AnimeSurveyCredits } from "./anime-credits";
 import type { AnimeSeason } from "./anime.types";
-
-type Credits = {
-  studio: string | null;
-  directors: string[];
-};
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -23,6 +20,10 @@ function ShortcutKey({ children }: { children: string }) {
   );
 }
 
+function visibleCredits(value: AnimeSurveyCredits | null): AnimeSurveyCredits | null {
+  return value && (value.studio || value.directors.length) ? value : null;
+}
+
 export function AnimeSurveyHotkeys(props: {
   year: number;
   season: AnimeSeason;
@@ -34,32 +35,16 @@ export function AnimeSurveyHotkeys(props: {
 }) {
   const submit = useSubmit();
   const navigate = useNavigate();
-  const [credits, setCredits] = useState<Credits | null>(null);
+  const [credits, setCredits] = useState<AnimeSurveyCredits | null>(() => visibleCredits(peekAnimeCredits(props.animeId)));
   const googleSearchHref = `/anime/google-search/${props.animeId}`;
 
   useEffect(() => {
     let cancelled = false;
-    setCredits(null);
+    setCredits(visibleCredits(peekAnimeCredits(props.animeId)));
 
-    void fetch(`/api/anime/credits/${props.animeId}`, {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-    })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        const payload: unknown = await response.json().catch(() => null);
-        if (!payload || typeof payload !== "object") return null;
-        const record = payload as Record<string, unknown>;
-        const studio = typeof record.studio === "string" && record.studio.trim()
-          ? record.studio.trim()
-          : null;
-        const directors = Array.isArray(record.directors)
-          ? record.directors.filter((value): value is string => typeof value === "string" && Boolean(value.trim()))
-          : [];
-        return { studio, directors } satisfies Credits;
-      })
+    void loadAnimeCredits(props.animeId)
       .then((value) => {
-        if (!cancelled && value && (value.studio || value.directors.length)) setCredits(value);
+        if (!cancelled) setCredits(visibleCredits(value));
       })
       .catch(() => undefined);
 
