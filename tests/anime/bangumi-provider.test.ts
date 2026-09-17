@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { fetchBangumiSeasonBatch } from "../../app/features/anime/providers/bangumi.server";
+import { fetchBangumiSeasonBatch, isExcludedBangumiSeasonTags } from "../../app/features/anime/providers/bangumi.server";
 
 test("Bangumi seasonal provider normalizes TV data and converts Chinese titles to Traditional", async () => {
   const originalFetch = globalThis.fetch;
@@ -11,7 +11,7 @@ test("Bangumi seasonal provider normalizes TV data and converts Chinese titles t
     requestedUrl = String(input);
     return new Response(JSON.stringify({
       total: 1,
-      limit: 100,
+      limit: 25,
       offset: 0,
       data: [{
         id: 123,
@@ -37,13 +37,15 @@ test("Bangumi seasonal provider normalizes TV data and converts Chinese titles t
     assert.match(requestedUrl, /cat=1/);
     assert.match(requestedUrl, /year=2011/);
     assert.match(requestedUrl, /month=1/);
-    assert.match(requestedUrl, /limit=100/);
+    assert.match(requestedUrl, /limit=25/);
     assert.match(requestedUrl, /offset=0/);
 
     assert.equal(batch.done, false);
     assert.equal(batch.step, 1);
     assert.equal(batch.stepTotal, 6);
-    assert.equal(batch.label, "1 月 · TV");
+    assert.equal(batch.label, "1 月 · TV · 第 1–1 筆");
+    assert.equal(batch.progressCurrent, 1);
+    assert.equal(batch.progressTotal, 1);
     assert.equal(batch.records.length, 1);
 
     const anime = batch.records[0];
@@ -73,11 +75,11 @@ test("Bangumi seasonal provider normalizes TV data and converts Chinese titles t
   }
 });
 
-test("Bangumi seasonal provider resumes with offset pagination before advancing streams", async () => {
+test("Bangumi seasonal provider resumes with 25-item pagination before advancing streams", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () => new Response(JSON.stringify({
     total: 130,
-    limit: 100,
+    limit: 25,
     offset: 0,
     data: [],
   }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
@@ -88,8 +90,10 @@ test("Bangumi seasonal provider resumes with offset pagination before advancing 
     assert.deepEqual(JSON.parse(batch.nextCursor ?? "null"), {
       monthIndex: 0,
       categoryIndex: 0,
-      offset: 100,
+      offset: 25,
     });
+    assert.equal(batch.progressCurrent, 25);
+    assert.equal(batch.progressTotal, 130);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -99,7 +103,7 @@ test("Bangumi seasonal provider completes after the third month WEB stream", asy
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () => new Response(JSON.stringify({
     total: 0,
-    limit: 100,
+    limit: 25,
     offset: 0,
     data: [],
   }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
@@ -117,4 +121,10 @@ test("Bangumi seasonal provider completes after the third month WEB stream", asy
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("Bangumi seasonal exclusion tags reject Chinese and US animation labels", () => {
+  assert.equal(isExcludedBangumiSeasonTags(["科幻", "国产"]), true);
+  assert.equal(isExcludedBangumiSeasonTags(["美國動畫"]), true);
+  assert.equal(isExcludedBangumiSeasonTags(["日本", "校園"]), false);
 });
