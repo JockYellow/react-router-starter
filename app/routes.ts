@@ -14,6 +14,7 @@ export default [
   route("anime/library/:animeId", "routes/anime/library.$animeId.tsx"),
   route("anime/watchlist", "routes/anime/watchlist.tsx"),
   route("anime/survey", "routes/anime/survey.tsx"),
+  route("anime/google-search/:animeId", "routes/anime/google-search.$animeId.tsx"),
   route("api/anime/cover/:animeId", "routes/api/anime-cover.$animeId.tsx"),
   route("api/anime/credits/:animeId", "routes/api/anime-credits.$animeId.tsx"),
   route("api/anime/survey-answer", "routes/api/anime-survey-answer.tsx"),
