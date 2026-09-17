@@ -30,9 +30,13 @@ async function startBatch(ids: number[]): Promise<void> {
   if (!response.ok) throw new Error(`Credits prefetch failed (${response.status})`);
 
   const payload: unknown = await response.json().catch(() => null);
-  if (!payload || typeof payload !== "object") return;
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Credits prefetch returned an invalid response");
+  }
   const items = (payload as Record<string, unknown>).items;
-  if (!Array.isArray(items)) return;
+  if (!Array.isArray(items)) {
+    throw new Error("Credits prefetch returned no items");
+  }
 
   for (const item of items) {
     if (!item || typeof item !== "object") continue;
@@ -71,12 +75,13 @@ export async function prefetchAnimeCreditsWithProgress(
 ): Promise<void> {
   const ids = normalizeAnimeIds(animeIds);
   const size = Math.max(1, Math.min(Math.trunc(batchSize), 10));
-  let completed = 0;
+  const missing = ids.filter((animeId) => !creditsCache.has(animeId));
+  let completed = ids.length - missing.length;
   onProgress(completed, ids.length);
 
-  for (let index = 0; index < ids.length; index += size) {
-    const batch = ids.slice(index, index + size);
-    await prefetchAnimeCredits(batch);
+  for (let index = 0; index < missing.length; index += size) {
+    const batch = missing.slice(index, index + size);
+    await startBatch(batch);
     completed += batch.length;
     onProgress(completed, ids.length);
   }
