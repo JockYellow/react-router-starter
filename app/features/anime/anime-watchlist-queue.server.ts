@@ -169,7 +169,12 @@ function oldLaneCompactionStatement(
     .prepare(
       `UPDATE anime_watchlist_queue
        SET position = position - 1
-       WHERE lane = ? AND unavailable = 0 AND position > ?`,
+       WHERE lane = ?
+         AND unavailable = 0
+         AND position > ?
+         AND anime_id IN (
+           SELECT anime_id FROM anime_user_decisions WHERE status = 'WANT'
+         )`,
     )
     .bind(state.lane, state.position);
 }
@@ -186,7 +191,10 @@ export async function assignAnimeWatchlistLane(
 
   const maxRow = await db
     .prepare(
-      "SELECT COALESCE(MAX(position), 0) AS max_position FROM anime_watchlist_queue WHERE lane = ? AND unavailable = 0",
+      `SELECT COALESCE(MAX(q.position), 0) AS max_position
+       FROM anime_watchlist_queue q
+       JOIN anime_user_decisions d ON d.anime_id = q.anime_id
+       WHERE q.lane = ? AND q.unavailable = 0 AND d.status = 'WANT'`,
     )
     .bind(lane)
     .first<{ max_position: number }>();
@@ -288,7 +296,12 @@ export async function moveAnimeWatchlistQueueItem(
         .prepare(
           `UPDATE anime_watchlist_queue
            SET position = position + 1
-           WHERE lane = ? AND unavailable = 0 AND position < ?`,
+           WHERE lane = ?
+             AND unavailable = 0
+             AND position < ?
+             AND anime_id IN (
+               SELECT anime_id FROM anime_user_decisions WHERE status = 'WANT'
+             )`,
         )
         .bind(state.lane, state.position),
       db
@@ -304,10 +317,14 @@ export async function moveAnimeWatchlistQueueItem(
   const order = direction === "UP" ? "DESC" : "ASC";
   const neighbor = await db
     .prepare(
-      `SELECT anime_id, position
-       FROM anime_watchlist_queue
-       WHERE lane = ? AND unavailable = 0 AND position ${operator} ?
-       ORDER BY position ${order}, anime_id ${order}
+      `SELECT q.anime_id, q.position
+       FROM anime_watchlist_queue q
+       JOIN anime_user_decisions d ON d.anime_id = q.anime_id
+       WHERE q.lane = ?
+         AND q.unavailable = 0
+         AND q.position ${operator} ?
+         AND d.status = 'WANT'
+       ORDER BY q.position ${order}, q.anime_id ${order}
        LIMIT 1`,
     )
     .bind(state.lane, state.position)
