@@ -28,6 +28,7 @@ export async function saveAnimeRecordEdit(
       .bind(animeId, input.detailStatus, now, now),
     db.prepare("DELETE FROM anime_user_evaluation_tags WHERE anime_id = ?").bind(animeId),
     db.prepare("DELETE FROM anime_user_evaluations WHERE anime_id = ?").bind(animeId),
+    db.prepare("DELETE FROM anime_watchlist_queue WHERE anime_id = ?").bind(animeId),
   ];
 
   if (input.rating || input.note) {
