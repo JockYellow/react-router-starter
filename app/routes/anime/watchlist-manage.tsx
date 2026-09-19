@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   Form,
   Link,
@@ -86,7 +87,7 @@ function QueueAction({
   animeId: number;
   intent: string;
   lane?: AnimeWatchlistLane;
-  children: React.ReactNode;
+  children: ReactNode;
   primary?: boolean;
 }) {
   return (
