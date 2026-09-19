@@ -43,7 +43,11 @@ function parseAnimeId(value: FormDataEntryValue | null): number {
 
 export async function loader({ request, context }: LoaderFunctionArgs) {
   await requireAdmin(request, context);
-  return getAnimeWatchlistQueueBoard(requireBlogDb(context));
+  const board = await getAnimeWatchlistQueueBoard(requireBlogDb(context));
+  return {
+    ...board,
+    stale: new URL(request.url).searchParams.get("stale") === "1",
+  };
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
@@ -289,6 +293,12 @@ export default function AnimeWatchlistManageRoute() {
             </Link>
           </div>
         </header>
+
+        {data.stale ? (
+          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
+            這部作品已經不是「想看」狀態，因此沒有改動排序；清單已重新整理。
+          </div>
+        ) : null}
 
         <div className="mt-6 grid grid-cols-2 gap-2 text-center text-xs font-black sm:grid-cols-5">
           <div className="rounded-2xl border border-neutral-200 bg-white px-3 py-3">全部 {total}</div>
