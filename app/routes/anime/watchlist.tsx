@@ -126,6 +126,9 @@ export default function AnimeWatchlistRoute() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link to="/anime/watchlist/manage" className="rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-black text-white hover:bg-neutral-700">
+              整理排序
+            </Link>
             <Link to="/anime/library" className="rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm font-bold hover:border-neutral-300">
               Library
             </Link>
