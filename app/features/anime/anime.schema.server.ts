@@ -187,6 +187,25 @@ async function createAnimeSchema(db: D1Database) {
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (anime_id) REFERENCES anime_items(anime_id) ON DELETE CASCADE
     )`,
+    `CREATE TABLE IF NOT EXISTS anime_watchlist_queue (
+      anime_id INTEGER PRIMARY KEY,
+      lane TEXT CHECK (lane IS NULL OR lane IN ('MEAL', 'FOCUS')),
+      position INTEGER CHECK (position IS NULL OR position > 0),
+      unavailable INTEGER NOT NULL DEFAULT 0 CHECK (unavailable IN (0, 1)),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      CHECK (
+        (unavailable = 1 AND lane IS NULL AND position IS NULL)
+        OR (
+          unavailable = 0
+          AND (
+            (lane IS NULL AND position IS NULL)
+            OR (lane IS NOT NULL AND position IS NOT NULL)
+          )
+        )
+      ),
+      FOREIGN KEY (anime_id) REFERENCES anime_items(anime_id) ON DELETE CASCADE
+    )`,
     `CREATE TABLE IF NOT EXISTS anime_item_sources (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       anime_id INTEGER,
@@ -271,6 +290,7 @@ async function createAnimeSchema(db: D1Database) {
     `CREATE INDEX IF NOT EXISTS idx_anime_item_aliases_normalized ON anime_item_aliases (normalized_alias)`,
     `CREATE INDEX IF NOT EXISTS idx_anime_item_aliases_anime_id ON anime_item_aliases (anime_id)`,
     `CREATE INDEX IF NOT EXISTS idx_anime_user_decisions_status_detail ON anime_user_decisions (status, detail_status)`,
+    `CREATE INDEX IF NOT EXISTS idx_anime_watchlist_queue_lane_position ON anime_watchlist_queue (lane, unavailable, position)`,
     `CREATE INDEX IF NOT EXISTS idx_anime_item_sources_source_match ON anime_item_sources (source, match_status)`,
     `CREATE INDEX IF NOT EXISTS idx_anime_item_sources_anime_id ON anime_item_sources (anime_id)`,
     `CREATE INDEX IF NOT EXISTS idx_anime_user_evaluations_rating ON anime_user_evaluations (rating)`,

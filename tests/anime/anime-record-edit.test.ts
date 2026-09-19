@@ -76,6 +76,10 @@ test("detail return path only accepts library or watchlist listings", () => {
     sanitizeAnimeLibraryReturnTo("/anime/watchlist?q=Frieren&sort=SCORE_DESC"),
     "/anime/watchlist?q=Frieren&sort=SCORE_DESC",
   );
+  assert.equal(
+    sanitizeAnimeLibraryReturnTo("/anime/watchlist/manage"),
+    "/anime/watchlist/manage",
+  );
   assert.equal(sanitizeAnimeLibraryReturnTo("https://example.com"), "/anime/library");
   assert.equal(sanitizeAnimeLibraryReturnTo("/anime/library/123"), "/anime/library");
 });

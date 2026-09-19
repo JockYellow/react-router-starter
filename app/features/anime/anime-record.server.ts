@@ -68,25 +68,27 @@ export async function savePrimaryDecision(
   const now = Date.now();
 
   if (status === "SEEN") {
-    await db
-      .prepare(
-        `INSERT INTO anime_user_decisions (
-          anime_id, status, detail_status, decided_at, updated_at
-        ) VALUES (?, 'SEEN', NULL, ?, ?)
-        ON CONFLICT(anime_id) DO UPDATE SET
-          status = 'SEEN',
-          detail_status = CASE
-            WHEN anime_user_decisions.status = 'SEEN' THEN anime_user_decisions.detail_status
-            ELSE NULL
-          END,
-          updated_at = excluded.updated_at`,
-      )
-      .bind(animeId, now, now)
-      .run();
+    await db.batch([
+      db
+        .prepare(
+          `INSERT INTO anime_user_decisions (
+            anime_id, status, detail_status, decided_at, updated_at
+          ) VALUES (?, 'SEEN', NULL, ?, ?)
+          ON CONFLICT(anime_id) DO UPDATE SET
+            status = 'SEEN',
+            detail_status = CASE
+              WHEN anime_user_decisions.status = 'SEEN' THEN anime_user_decisions.detail_status
+              ELSE NULL
+            END,
+            updated_at = excluded.updated_at`,
+        )
+        .bind(animeId, now, now),
+      db.prepare("DELETE FROM anime_watchlist_queue WHERE anime_id = ?").bind(animeId),
+    ]);
     return;
   }
 
-  await db.batch([
+  const statements = [
     db
       .prepare(
         `INSERT INTO anime_user_decisions (
@@ -100,7 +102,13 @@ export async function savePrimaryDecision(
       .bind(animeId, status, now, now),
     db.prepare("DELETE FROM anime_user_evaluation_tags WHERE anime_id = ?").bind(animeId),
     db.prepare("DELETE FROM anime_user_evaluations WHERE anime_id = ?").bind(animeId),
-  ]);
+  ];
+  if (status !== "WANT") {
+    statements.push(
+      db.prepare("DELETE FROM anime_watchlist_queue WHERE anime_id = ?").bind(animeId),
+    );
+  }
+  await db.batch(statements);
 }
 
 export async function saveSeenDetail(
@@ -111,16 +119,18 @@ export async function saveSeenDetail(
   if (!ANIME_WATCH_DETAILS.includes(detailStatus)) throw new Error("Invalid Anime watch detail");
   await ensureAnimeSchema(db);
   const now = Date.now();
-  await db
-    .prepare(
-      `INSERT INTO anime_user_decisions (
-        anime_id, status, detail_status, decided_at, updated_at
-      ) VALUES (?, 'SEEN', ?, ?, ?)
-      ON CONFLICT(anime_id) DO UPDATE SET
-        status = 'SEEN', detail_status = excluded.detail_status, updated_at = excluded.updated_at`,
-    )
-    .bind(animeId, detailStatus, now, now)
-    .run();
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO anime_user_decisions (
+          anime_id, status, detail_status, decided_at, updated_at
+        ) VALUES (?, 'SEEN', ?, ?, ?)
+        ON CONFLICT(anime_id) DO UPDATE SET
+          status = 'SEEN', detail_status = excluded.detail_status, updated_at = excluded.updated_at`,
+      )
+      .bind(animeId, detailStatus, now, now),
+    db.prepare("DELETE FROM anime_watchlist_queue WHERE anime_id = ?").bind(animeId),
+  ]);
 }
 
 export async function toggleSeenTag(
@@ -234,6 +244,7 @@ export async function saveSeenEvaluation(
       )
       .bind(input.animeId, input.rating, note, now),
     db.prepare("DELETE FROM anime_user_evaluation_tags WHERE anime_id = ?").bind(input.animeId),
+    db.prepare("DELETE FROM anime_watchlist_queue WHERE anime_id = ?").bind(input.animeId),
     ...tags.map((tag) =>
       db
         .prepare("INSERT INTO anime_user_evaluation_tags (anime_id, tag_key, created_at) VALUES (?, ?, ?)")

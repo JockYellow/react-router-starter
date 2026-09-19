@@ -73,6 +73,8 @@ export function sanitizeAnimeLibraryReturnTo(value: string | null | undefined): 
     || candidate.startsWith("/anime/library?")
     || candidate === "/anime/watchlist"
     || candidate.startsWith("/anime/watchlist?")
+    || candidate === "/anime/watchlist/manage"
+    || candidate.startsWith("/anime/watchlist/manage?")
   ) {
     return candidate;
   }

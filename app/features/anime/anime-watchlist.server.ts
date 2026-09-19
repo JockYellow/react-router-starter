@@ -148,6 +148,7 @@ export async function transitionWantDecision(
   await db.batch([
     db.prepare("DELETE FROM anime_user_evaluation_tags WHERE anime_id = ?").bind(animeId),
     db.prepare("DELETE FROM anime_user_evaluations WHERE anime_id = ?").bind(animeId),
+    db.prepare("DELETE FROM anime_watchlist_queue WHERE anime_id = ?").bind(animeId),
   ]);
   return true;
 }
