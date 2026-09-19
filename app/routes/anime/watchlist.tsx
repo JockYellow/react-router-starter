@@ -9,6 +9,9 @@ import {
 } from "react-router";
 
 import { requireAdmin } from "../../features/admin/admin-auth.server";
+import { AnimeWatchlistBoardView } from "../../features/anime/AnimeWatchlistBoardView";
+import { getAnimeWatchlistQueueBoard } from "../../features/anime/anime-watchlist-queue.server";
+import { resolveAnimeWatchlistView } from "../../features/anime/anime-watchlist-view";
 import {
   getAnimeWatchlistPage,
   transitionWantDecision,
@@ -55,19 +58,24 @@ function staleHref(returnTo: string): string {
 export async function loader({ request, context }: LoaderFunctionArgs) {
   await requireAdmin(request, context);
   const url = new URL(request.url);
+  const returnTo = watchlistHref(url);
+  const stale = url.searchParams.get("stale") === "1";
+  const db = requireBlogDb(context);
+
+  if (resolveAnimeWatchlistView(url.searchParams) === "QUEUE") {
+    const board = await getAnimeWatchlistQueueBoard(db);
+    return { view: "QUEUE" as const, board, returnTo, stale };
+  }
+
   const offset = Math.max(0, Number.parseInt(url.searchParams.get("offset") ?? "0", 10) || 0);
-  const page = await getAnimeWatchlistPage(requireBlogDb(context), {
+  const page = await getAnimeWatchlistPage(db, {
     search: url.searchParams.get("q"),
     sort: url.searchParams.get("sort"),
     limit: PAGE_SIZE,
     offset,
   });
 
-  return {
-    ...page,
-    returnTo: watchlistHref(url),
-    stale: url.searchParams.get("stale") === "1",
-  };
+  return { view: "ALL" as const, ...page, returnTo, stale };
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
@@ -97,6 +105,11 @@ export async function action({ request, context }: ActionFunctionArgs) {
 export default function AnimeWatchlistRoute() {
   const data = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
+
+  if (data.view === "QUEUE") {
+    return <AnimeWatchlistBoardView board={data.board} returnTo={data.returnTo} stale={data.stale} />;
+  }
+
   const currentStart = data.total === 0 ? 0 : data.query.offset + 1;
   const currentEnd = Math.min(data.total, data.query.offset + data.items.length);
 
@@ -122,11 +135,14 @@ export default function AnimeWatchlistRoute() {
             <div className="text-xs font-black uppercase tracking-[0.2em] text-neutral-400">Personal backlog</div>
             <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Anime Watchlist</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
-              專門整理「想看」作品。依加入時間、年份或外部評分排序；Bangumi 收藏數只顯示，不與其他 provider 的 popularity 混排。
+              全部檢視提供搜尋、年份及外部評分排序；日常選片請回到「看已排好的佇列」。
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link to="/anime/watchlist/manage" className="rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-black text-white hover:bg-neutral-700">
+            <Link to="/anime/watchlist" className="rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-black text-white hover:bg-neutral-700">
+              看已排好的佇列
+            </Link>
+            <Link to="/anime/watchlist/manage" className="rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm font-bold hover:border-neutral-300">
               整理排序
             </Link>
             <Link to="/anime/library" className="rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm font-bold hover:border-neutral-300">
