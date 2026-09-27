@@ -42,6 +42,7 @@ test("already readable Latin studio keeps raw provider name", () => {
 
 test("studio display leaves raw provider name when no useful alias exists", () => {
   const result = resolveBangumiPersonDisplayName("スタジオ例", [
+    { key: "官方网站", value: "https://example-studio.jp" },
     { key: "生日", value: "2000-01-01" },
   ]);
 
