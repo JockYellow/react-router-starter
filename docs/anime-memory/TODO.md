@@ -32,13 +32,13 @@ identity/metadata foundation and are now split into independently verifiable pha
 - [x] Open Draft PR #24 and pass Anime CI/typecheck/build/Wrangler dry-run (run #130).
 
 ### Phase C — versioned seasonal ordering migration
-- [ ] Add explicit ordering version/state for established TV-season scopes.
-- [ ] Re-rank old candidate positions once using Bangumi collection count first.
-- [ ] Preserve candidate membership.
-- [ ] Preserve all user decisions/evaluations/tags/notes.
-- [ ] Recompute survey progress after migration.
-- [ ] Verify next unresolved candidate follows the migrated order.
-- [ ] Add tests for partially answered scopes and idempotent re-entry.
+- [x] Add explicit ordering version/state for established TV-season scopes.
+- [x] Re-rank old candidate positions once using Bangumi collection count first.
+- [x] Preserve candidate membership.
+- [x] Preserve all user decisions/evaluations/tags/notes.
+- [x] Recompute survey progress after non-empty migration while preserving empty-scope completion semantics.
+- [x] Verify next unresolved candidate follows the migrated order.
+- [x] Add tests for partially answered scopes, missing metrics, membership preservation and idempotent re-entry; CI #140 passed.
 
 ### Phase D — survey production-information presentation
 - [ ] Consume canonical metadata boundary in survey presentation.
