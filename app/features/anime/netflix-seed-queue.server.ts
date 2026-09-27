@@ -146,8 +146,10 @@ function outcomeToQueueStatus(
 
 export async function upgradeLegacyReviewedNetflixSeedQueue(
   db: D1Database,
+  options: { limit?: number } = {},
 ): Promise<number> {
   await ensureAnimeSchema(db);
+  const limit = Math.max(1, Math.min(Math.trunc(options.limit ?? 10), 10));
   const rows = await db
     .prepare(
       `SELECT id, source_ref, payload_json
@@ -168,9 +170,10 @@ export async function upgradeLegacyReviewedNetflixSeedQueue(
              ) AS INTEGER
            ) <> ?
          )
-       ORDER BY id ASC`,
+       ORDER BY id ASC
+       LIMIT ?`,
     )
-    .bind(NETFLIX_SEED_RESOLVER_VERSION)
+    .bind(NETFLIX_SEED_RESOLVER_VERSION, limit)
     .all<QueueRow>();
 
   let upgraded = 0;
@@ -231,9 +234,8 @@ export async function processReviewedNetflixSeedQueue(
   options: { limit?: number } = {},
 ): Promise<NetflixSeedProcessResult> {
   await ensureAnimeSchema(db);
-  const upgraded = await upgradeLegacyReviewedNetflixSeedQueue(db);
-
   const limit = Math.max(1, Math.min(Math.trunc(options.limit ?? 5), 10));
+  const upgraded = await upgradeLegacyReviewedNetflixSeedQueue(db, { limit });
   const pending = await db
     .prepare(
       `SELECT id, source_ref, payload_json
