@@ -27,6 +27,8 @@ function item(animeId: number, position: number): AnimeSurveyQueueItem {
       studio: null,
       popularity: null,
       averageScore: null,
+      bangumiCollectionTotal: null,
+      bangumiAverageScore: null,
       decisionStatus: null,
       detailStatus: null,
     },
