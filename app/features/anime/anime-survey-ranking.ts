@@ -15,7 +15,7 @@ function formatPriority(format: string | null): number {
 }
 
 /**
- * Orders a newly-created TV-season scope by Bangumi recognition/popularity.
+ * Orders a TV-season scope by Bangumi recognition/popularity.
  *
  * Collection count is the primary signal, Bangumi score is the secondary
  * tie-breaker, TV receives a final small deterministic preference over WEB/ONA,
