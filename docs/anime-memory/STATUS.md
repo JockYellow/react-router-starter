@@ -86,13 +86,20 @@ No seasonal positions, personal decisions, Netflix rows or production D1 data we
 
 ### Phase C — versioned seasonal ordering migration
 
-Next implementation phase.
+**Implemented on Draft PR #24; Anime CI run #140 passed tests, typecheck, build and Wrangler dry-run.**
 
-- add an ordering version for established TV-season scopes;
-- migrate old positions once using current Bangumi recognition ranking;
-- preserve membership and every user decision/evaluation;
-- recompute progress after position rewrite;
-- verify next-unresolved behavior after migration.
+- Ordering version v2 is tracked per TV-season scope.
+- Established scopes without v2 migrate lazily the next time they are opened.
+- Migration rewrites only `anime_scope_candidates.position`.
+- Candidate membership and personal decisions/evaluations/tags/notes are untouched.
+- Non-empty migrated scopes refresh derived progress after position changes.
+- Empty completed legacy scopes keep their existing completion semantics.
+- New scopes are marked v2 after their initial recognition ranking.
+- A short D1 lock prevents simultaneous position rewrites.
+- Missing Bangumi collection metrics do not fall back to the legacy mixed popularity field.
+- Tests cover ranking, missing metrics, membership preservation, idempotent re-ordering and resume after a previously answered item.
+
+No production/private D1 data has been migrated by this branch yet.
 
 ### Phase D — survey information presentation
 
