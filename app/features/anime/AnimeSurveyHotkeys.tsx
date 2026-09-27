@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate, useSubmit } from "react-router";
 
-import { loadAnimeCredits, peekAnimeCredits } from "./anime-credits.client";
-import type { AnimeSurveyCredits } from "./anime-credits";
 import type { AnimeSeason } from "./anime.types";
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -20,10 +18,6 @@ function ShortcutKey({ children }: { children: string }) {
   );
 }
 
-function visibleCredits(value: AnimeSurveyCredits | null): AnimeSurveyCredits | null {
-  return value && (value.studio || value.directors.length) ? value : null;
-}
-
 export function AnimeSurveyHotkeys(props: {
   year: number;
   season: AnimeSeason;
@@ -35,23 +29,7 @@ export function AnimeSurveyHotkeys(props: {
 }) {
   const submit = useSubmit();
   const navigate = useNavigate();
-  const [credits, setCredits] = useState<AnimeSurveyCredits | null>(() => visibleCredits(peekAnimeCredits(props.animeId)));
   const googleSearchHref = `/anime/google-search/${props.animeId}`;
-
-  useEffect(() => {
-    let cancelled = false;
-    setCredits(visibleCredits(peekAnimeCredits(props.animeId)));
-
-    void loadAnimeCredits(props.animeId)
-      .then((value) => {
-        if (!cancelled) setCredits(visibleCredits(value));
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [props.animeId]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -124,16 +102,6 @@ export function AnimeSurveyHotkeys(props: {
         >
           Google 搜尋 ↗
         </a>
-
-        {credits ? (
-          <aside
-            aria-label="作品製作資訊"
-            className="flex max-w-[min(90vw,760px)] flex-wrap items-center justify-center gap-x-4 gap-y-1 rounded-xl border border-neutral-800 bg-neutral-950/90 px-4 py-2 text-xs font-bold text-neutral-400 shadow-xl backdrop-blur"
-          >
-            {credits.studio ? <span><span className="text-neutral-600">製作</span> {credits.studio}</span> : null}
-            {credits.directors.length ? <span><span className="text-neutral-600">導演</span> {credits.directors.join("、")}</span> : null}
-          </aside>
-        ) : null}
 
         <aside
           aria-label="快捷鍵說明"
