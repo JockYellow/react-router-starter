@@ -9,9 +9,21 @@ import {
 import {
   getCsrfToken,
 } from "../../features/admin/admin-auth.server";
-import { getAnimeAcceptanceSnapshot } from "../../features/anime/anime-acceptance.server";
-import { getReviewedNetflixSeedQueueSummary } from "../../features/anime/netflix-seed-queue.server";
+import {
+  getAnimeAcceptanceSnapshot,
+  type AnimeAcceptanceSnapshot,
+} from "../../features/anime/anime-acceptance.server";
+import {
+  getReviewedNetflixSeedQueueSummary,
+  type NetflixSeedQueueSummary,
+} from "../../features/anime/netflix-seed-queue.server";
 import { requireBlogDb } from "../../lib/d1.server";
+
+type AcceptanceLoaderData = {
+  csrfToken: string;
+  summary: NetflixSeedQueueSummary;
+  acceptance: AnimeAcceptanceSnapshot;
+};
 
 export async function loader({ request, context }: LoaderFunctionArgs) {
   const csrf = await getCsrfToken(request, context);
@@ -37,7 +49,7 @@ function Stat(props: { label: string; value: number | string; note?: string }) {
 }
 
 export default function AnimeAcceptancePage() {
-  const data = useLoaderData<typeof loader>();
+  const data = useLoaderData() as AcceptanceLoaderData;
   const revalidator = useRevalidator();
   const [running, setRunning] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
