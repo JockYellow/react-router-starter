@@ -5,10 +5,40 @@ import { getAnimeAcceptanceSnapshot } from "../../app/features/anime/anime-accep
 
 function fakeAcceptanceDb(counts: Record<string, number>) {
   function lookup(sql: string): number {
-    const entries = Object.entries(counts).sort((a, b) => b[0].length - a[0].length);
-    for (const [needle, value] of entries) {
-      if (sql.includes(needle)) return value;
+    const normalized = sql.replace(/\s+/g, " ").trim();
+    if (normalized.includes("json_extract(payload_json")) return counts.queueResolverCurrent ?? 0;
+    if (normalized.includes("FROM anime_seed_queue WHERE source = 'netflix'")) return counts.queueTotal ?? 0;
+
+    if (normalized.includes("FROM anime_item_sources s LEFT JOIN anime_user_decisions")) {
+      return counts.matchedWithoutDecision ?? 0;
     }
+    if (normalized.includes("FROM anime_item_sources s JOIN anime_user_decisions")) {
+      return counts.matchedWithDecision ?? 0;
+    }
+    if (
+      normalized.includes("FROM anime_item_sources")
+      && normalized.includes("match_status = 'MATCHED'")
+      && normalized.includes("anime_id IS NULL")
+    ) return counts.matchedWithoutAnimeId ?? 0;
+    if (normalized.includes("FROM anime_item_sources") && normalized.includes("match_status = 'MATCHED'")) {
+      return counts.canonicalMatched ?? 0;
+    }
+    if (normalized.includes("FROM anime_item_sources") && normalized.includes("match_status = 'AMBIGUOUS'")) {
+      return counts.canonicalAmbiguous ?? 0;
+    }
+    if (normalized.includes("FROM anime_item_sources") && normalized.includes("match_status = 'UNMATCHED'")) {
+      return counts.canonicalUnmatched ?? 0;
+    }
+    if (normalized.includes("FROM anime_item_sources WHERE source = 'netflix'")) {
+      return counts.canonicalSourcesTotal ?? 0;
+    }
+
+    if (normalized.includes("FROM anime_survey_progress p") && !normalized.includes("anime_scope_ordering_state")) {
+      return counts.tvScopesWithCandidates ?? 0;
+    }
+    if (normalized.includes("ordering_version < ?")) return counts.scopesWithMigrationError ?? 0;
+    if (normalized.includes("missing_metric_count > 0")) return counts.scopesWithMissingMetrics ?? 0;
+    if (normalized.includes("ordering_version >= ?")) return counts.scopesCurrent ?? 0;
     return 0;
   }
 
@@ -46,19 +76,19 @@ function fakeAcceptanceDb(counts: Record<string, number>) {
 
 test("acceptance snapshot exposes counts only and derives pending/legacy totals", async () => {
   const db = fakeAcceptanceDb({
-    "FROM anime_seed_queue WHERE source = 'netflix'": 12,
-    "json_extract(payload_json, '$.resolverVersion')": 9,
-    "FROM anime_item_sources WHERE source = 'netflix'": 8,
-    "match_status = 'MATCHED'": 5,
-    "match_status = 'AMBIGUOUS'": 2,
-    "match_status = 'UNMATCHED'": 1,
-    "match_status = 'MATCHED'\n         AND anime_id IS NULL": 0,
-    "LEFT JOIN anime_user_decisions": 1,
-    "JOIN anime_user_decisions": 4,
-    "FROM anime_survey_progress p": 7,
-    "ordering_version >= ?": 4,
-    "ordering_version < ?": 1,
-    "missing_metric_count > 0": 2,
+    queueTotal: 12,
+    queueResolverCurrent: 9,
+    canonicalSourcesTotal: 8,
+    canonicalMatched: 5,
+    canonicalAmbiguous: 2,
+    canonicalUnmatched: 1,
+    matchedWithoutAnimeId: 0,
+    matchedWithoutDecision: 1,
+    matchedWithDecision: 4,
+    tvScopesWithCandidates: 7,
+    scopesCurrent: 4,
+    scopesWithMigrationError: 1,
+    scopesWithMissingMetrics: 2,
   });
 
   const snapshot = await getAnimeAcceptanceSnapshot(db);
