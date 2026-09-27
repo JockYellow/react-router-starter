@@ -6,7 +6,7 @@ import { getAnimeAcceptanceSnapshot } from "../../app/features/anime/anime-accep
 function fakeAcceptanceDb(counts: Record<string, number>) {
   function lookup(sql: string): number {
     const normalized = sql.replace(/\s+/g, " ").trim();
-    if (normalized.includes("json_extract(payload_json")) return counts.queueResolverCurrent ?? 0;
+    if (normalized.includes("$.resolverVersion")) return counts.queueResolverCurrent ?? 0;
     if (normalized.includes("FROM anime_seed_queue WHERE source = 'netflix'")) return counts.queueTotal ?? 0;
 
     if (normalized.includes("FROM anime_item_sources s LEFT JOIN anime_user_decisions")) {
