@@ -69,6 +69,7 @@ export async function getAnimeAcceptanceSnapshot(
       `SELECT COUNT(*) AS count
        FROM anime_seed_queue
        WHERE source = 'netflix'
+         AND json_valid(payload_json) = 1
          AND CAST(json_extract(payload_json, '$.resolverVersion') AS INTEGER) = ?`,
       NETFLIX_SEED_RESOLVER_VERSION,
     ),
@@ -124,24 +125,39 @@ export async function getAnimeAcceptanceSnapshot(
     count(
       db,
       `SELECT COUNT(*) AS count
-       FROM anime_scope_ordering_state
-       WHERE ordering_version >= ?`,
+       FROM anime_scope_ordering_state s
+       JOIN anime_survey_progress p ON p.scope_key = s.scope_key
+       WHERE p.scope_type = 'TV_SEASON'
+         AND s.ordering_version >= ?
+         AND EXISTS (
+           SELECT 1 FROM anime_scope_candidates c WHERE c.scope_key = s.scope_key
+         )`,
       ANIME_SURVEY_ORDERING_VERSION,
     ),
     count(
       db,
       `SELECT COUNT(*) AS count
-       FROM anime_scope_ordering_state
-       WHERE ordering_version < ?
-         AND last_error IS NOT NULL`,
+       FROM anime_scope_ordering_state s
+       JOIN anime_survey_progress p ON p.scope_key = s.scope_key
+       WHERE p.scope_type = 'TV_SEASON'
+         AND s.ordering_version < ?
+         AND s.last_error IS NOT NULL
+         AND EXISTS (
+           SELECT 1 FROM anime_scope_candidates c WHERE c.scope_key = s.scope_key
+         )`,
       ANIME_SURVEY_ORDERING_VERSION,
     ),
     count(
       db,
       `SELECT COUNT(*) AS count
-       FROM anime_scope_ordering_state
-       WHERE ordering_version >= ?
-         AND missing_metric_count > 0`,
+       FROM anime_scope_ordering_state s
+       JOIN anime_survey_progress p ON p.scope_key = s.scope_key
+       WHERE p.scope_type = 'TV_SEASON'
+         AND s.ordering_version >= ?
+         AND s.missing_metric_count > 0
+         AND EXISTS (
+           SELECT 1 FROM anime_scope_candidates c WHERE c.scope_key = s.scope_key
+         )`,
       ANIME_SURVEY_ORDERING_VERSION,
     ),
   ]);
