@@ -27,7 +27,7 @@ New product behavior reads and writes through these tables:
 
 Provider popularity scales are not interchangeable.
 
-- `anime_items.popularity` is legacy/shared compatibility data and currently only receives AniList popularity from the provider cache.
+- `anime_items.popularity` is a legacy/shared compatibility field. Historical rows may contain values from different provider eras; current provider-cache writes only add AniList popularity there. New ranking logic must not use this field.
 - Bangumi `collection_total` belongs in `anime_bangumi_metrics.collection_total`.
 - Seasonal recognition ordering must use the Bangumi-specific metric directly.
 - UI may display provider-specific metrics, but must label them by meaning/source instead of presenting them as one universal popularity score.
@@ -57,7 +57,7 @@ It exposes:
 - season/year/format/episodes;
 - raw studio/director credits;
 - provider-specific Bangumi collection/score metadata;
-- legacy AniList popularity explicitly separated from Bangumi metrics.
+- legacy shared popularity explicitly separated from Bangumi metrics.
 
 Chinese-title and credit enrichment are best-effort. Provider failure must not make
 already-cached canonical metadata unreadable.
