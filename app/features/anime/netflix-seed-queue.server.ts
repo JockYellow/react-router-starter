@@ -153,8 +153,14 @@ export async function upgradeLegacyReviewedNetflixSeedQueue(
       `SELECT id, source_ref, payload_json
        FROM anime_seed_queue
        WHERE source = 'netflix'
+         AND (
+           json_valid(payload_json) = 0
+           OR CAST(json_extract(payload_json, '$.resolverVersion') AS INTEGER) IS NULL
+           OR CAST(json_extract(payload_json, '$.resolverVersion') AS INTEGER) <> ?
+         )
        ORDER BY id ASC`,
     )
+    .bind(NETFLIX_SEED_RESOLVER_VERSION)
     .all<QueueRow>();
 
   let upgraded = 0;
