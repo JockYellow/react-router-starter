@@ -29,7 +29,7 @@ identity/metadata foundation and are now split into independently verifiable pha
 - [x] Add canonical metadata read/enrichment boundary.
 - [x] Expose Bangumi collection metrics separately from legacy AniList popularity.
 - [x] Add focused matcher/display-title tests.
-- [ ] Open Draft PR and pass Anime CI/typecheck/build/Wrangler dry-run.
+- [x] Open Draft PR #24 and pass Anime CI/typecheck/build/Wrangler dry-run (run #130).
 
 ### Phase C — versioned seasonal ordering migration
 - [ ] Add explicit ordering version/state for established TV-season scopes.
