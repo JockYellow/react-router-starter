@@ -137,12 +137,14 @@ test("legacy staged Netflix rows are upgraded to v2 and reset to pending before 
     prepare(sql: string) {
       return statement(sql);
     },
-    async batch() {
+    async batch(statements: Array<ReturnType<typeof statement>>) {
+      for (const prepared of statements) await prepared.run();
       return [];
     },
   } as unknown as D1Database;
 
   await ensureAnimeSchema(db);
+  updates.length = 0;
   const upgraded = await upgradeLegacyReviewedNetflixSeedQueue(db);
 
   assert.equal(upgraded, 1);
