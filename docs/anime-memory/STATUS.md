@@ -116,12 +116,19 @@ No production/private D1 data has been migrated by this branch yet.
 
 ### Phase E — Netflix ingestion v2
 
-- resolve against canonical local identity first;
-- use Bangumi rather than AniList as the external fallback when needed;
-- write `anime_item_sources` and `anime_user_decisions` directly;
-- preserve MATCHED / AMBIGUOUS / UNMATCHED handling;
-- never overwrite newer manual/survey decisions;
-- allow existing staged queue rows to be re-resolved idempotently.
+**Implemented on Draft PR #24; Anime CI run #164 passed tests, typecheck, build and Wrangler dry-run.**
+
+- AniList is no longer a required Netflix resolver.
+- Existing canonical Netflix source mappings are reused when present.
+- Otherwise Bangumi search accepts only a unique exact native/Chinese/cn->tw alias; ambiguous and non-exact results remain unresolved.
+- Matched Bangumi subjects are fetched by id and enter the normal canonical provider cache.
+- Netflix provenance writes directly to `anime_item_sources`.
+- Missing viewing decisions write directly to `anime_user_decisions` with `INSERT OR IGNORE`, preserving later/manual answers.
+- Netflix title is retained as a canonical alias; Chinese-looking Netflix titles may fill a missing `title_zh_tw` without overwriting existing titles.
+- Queue payloads use resolverVersion 2. Existing v1/unversioned staged rows auto-upgrade and reset to PENDING once before processing.
+- Synthetic tests cover exact/ambiguous resolution, canonical writes, decision preservation, queue upgrade, and Bangumi detail normalization.
+
+No production/private Netflix rows have been processed on this branch.
 
 ### Phase F — production/private migration and end-to-end acceptance
 
