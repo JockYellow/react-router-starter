@@ -6,7 +6,10 @@ import {
   importReviewedNetflixRow,
   NETFLIX_SEED_RESOLVER_VERSION,
 } from "../../app/features/anime/netflix-seed.server";
-import { serializeReviewedNetflixSeedQueueRow } from "../../app/features/anime/netflix-seed-queue.server";
+import {
+  serializeReviewedNetflixSeedQueueRow,
+  upgradeLegacyReviewedNetflixSeedQueue,
+} from "../../app/features/anime/netflix-seed-queue.server";
 
 function fakeCanonicalNetflixDb(existingAnimeId = 321) {
   const sql: string[] = [];
@@ -94,6 +97,58 @@ test("Netflix queue payload carries resolver version so old staged rows reset on
   })) as Record<string, unknown>;
 
   assert.equal(NETFLIX_SEED_RESOLVER_VERSION, 2);
+  assert.equal(payload.resolverVersion, 2);
+  assert.equal(payload.title, "Example");
+});
+
+
+test("legacy staged Netflix rows are upgraded to v2 and reset to pending before processing", async () => {
+  const updates: Array<{ sql: string; values: unknown[] }> = [];
+  const oldPayload = JSON.stringify({ title: "Example", reviewStatus: "看完" });
+
+  function statement(sql: string, values: unknown[] = []) {
+    return {
+      bind(...next: unknown[]) {
+        return statement(sql, next);
+      },
+      async first<T>() {
+        return null as T | null;
+      },
+      async all<T>() {
+        if (sql.includes("FROM anime_seed_queue") && sql.includes("ORDER BY id ASC")) {
+          return {
+            results: [{
+              id: 1,
+              source_ref: "Example",
+              payload_json: oldPayload,
+            }] as T[],
+          };
+        }
+        return { results: [] as T[] };
+      },
+      async run() {
+        if (sql.includes("UPDATE anime_seed_queue")) updates.push({ sql, values });
+        return { meta: { changes: 1 } };
+      },
+    };
+  }
+
+  const db = {
+    prepare(sql: string) {
+      return statement(sql);
+    },
+    async batch() {
+      return [];
+    },
+  } as unknown as D1Database;
+
+  await ensureAnimeSchema(db);
+  const upgraded = await upgradeLegacyReviewedNetflixSeedQueue(db);
+
+  assert.equal(upgraded, 1);
+  assert.equal(updates.length, 1);
+  assert.match(updates[0].sql, /queue_status = 'PENDING'/);
+  const payload = JSON.parse(String(updates[0].values[0])) as Record<string, unknown>;
   assert.equal(payload.resolverVersion, 2);
   assert.equal(payload.title, "Example");
 });
