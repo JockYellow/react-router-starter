@@ -7,6 +7,7 @@ import { fetchJsonWithTimeout } from "./provider-http.server";
 
 const BANGUMI_SEARCH_ENDPOINT = "https://api.bgm.tv/v0/search/subjects";
 const BANGUMI_BROWSE_ENDPOINT = "https://api.bgm.tv/v0/subjects";
+const BANGUMI_SUBJECT_ENDPOINT = "https://api.bgm.tv/v0/subjects";
 const DEFAULT_TIMEOUT_MS = 12_000;
 const USER_AGENT = "JockYellow/AnimeMemory (https://github.com/JockYellow/react-router-starter)";
 const BROWSE_LIMIT = 25;
@@ -62,6 +63,19 @@ type BangumiRawSubject = {
   eps?: number | null;
   score?: number | null;
   collection_total?: number | null;
+  collection?: {
+    wish?: number | null;
+    collect?: number | null;
+    doing?: number | null;
+    on_hold?: number | null;
+    dropped?: number | null;
+  } | null;
+  rating?: {
+    score?: number | null;
+    total?: number | null;
+  } | null;
+  total_episodes?: number | null;
+  meta_tags?: string[] | null;
   rank?: number | null;
   images?: {
     large?: string | null;
@@ -187,6 +201,126 @@ function normalizeBrowseSubject(
     providerUpdatedAt: null,
     studio: null,
   };
+}
+
+
+function seasonFromDate(date: string | null | undefined): AnimeSeason | null {
+  const month = Number(date?.slice(5, 7));
+  if (!Number.isInteger(month) || month < 1 || month > 12) return null;
+  if (month <= 3) return "WINTER";
+  if (month <= 6) return "SPRING";
+  if (month <= 9) return "SUMMER";
+  return "FALL";
+}
+
+function normalizeBangumiPlatform(platform: string | null | undefined): {
+  format: string | null;
+  seasonal: boolean;
+} {
+  const value = platform?.trim() || "";
+  if (/^TV$/i.test(value)) return { format: "TV", seasonal: true };
+  if (/^(WEB|Web|ONA)$/i.test(value)) return { format: "ONA", seasonal: true };
+  if (/(剧场|劇場|Movie|MOVIE|映画)/i.test(value)) return { format: "MOVIE", seasonal: false };
+  return { format: value || null, seasonal: false };
+}
+
+function detailedCollectionTotal(subject: BangumiRawSubject): number | null {
+  if (Number.isInteger(subject.collection_total) && (subject.collection_total ?? 0) >= 0) {
+    return subject.collection_total as number;
+  }
+  const collection = subject.collection;
+  if (!collection) return null;
+  const values = [
+    collection.wish,
+    collection.collect,
+    collection.doing,
+    collection.on_hold,
+    collection.dropped,
+  ].filter((value): value is number => Number.isInteger(value) && (value ?? 0) >= 0);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
+}
+
+function normalizeBangumiSubjectDetail(subject: BangumiRawSubject): AnimeProviderRecord | null {
+  const id = safePositiveInt(subject.id);
+  const name = subject.name?.trim();
+  if (!id || !name || subject.type !== 2) return null;
+
+  const nameCn = subject.name_cn?.trim() || null;
+  const titleZhTw = nameCn ? toTaiwanTraditional(nameCn).trim() || null : null;
+  const dateYear = Number(subject.date?.slice(0, 4));
+  const platform = normalizeBangumiPlatform(subject.platform);
+  const rawScore = typeof subject.rating?.score === "number"
+    ? subject.rating.score
+    : subject.score;
+  const score = typeof rawScore === "number" && Number.isFinite(rawScore)
+    ? Math.max(0, Math.min(100, Math.round(rawScore * 10)))
+    : null;
+  const tags = [...new Set([
+    ...normalizeTags(subject.tags),
+    ...(subject.meta_tags ?? []).map((tag) => tag.trim()).filter(Boolean),
+  ])];
+
+  return {
+    provider: "BANGUMI",
+    providerId: id,
+    malId: null,
+    anilistId: null,
+    bangumiId: id,
+    titleZhTw,
+    title: {
+      romaji: null,
+      english: null,
+      native: name,
+    },
+    synonyms: nameCn && nameCn !== name ? [nameCn] : [],
+    season: platform.seasonal ? seasonFromDate(subject.date) : null,
+    seasonYear: Number.isInteger(dateYear) && dateYear > 1900 ? dateYear : null,
+    format: platform.format,
+    episodes: Number.isInteger(subject.eps) && (subject.eps ?? 0) >= 0
+      ? subject.eps as number
+      : Number.isInteger(subject.total_episodes) && (subject.total_episodes ?? 0) >= 0
+        ? subject.total_episodes as number
+        : null,
+    coverUrl:
+      subject.images?.large ??
+      subject.images?.common ??
+      subject.images?.medium ??
+      subject.images?.grid ??
+      subject.images?.small ??
+      null,
+    genres: tags,
+    popularity: detailedCollectionTotal(subject),
+    averageScore: score,
+    providerUpdatedAt: null,
+    studio: null,
+  };
+}
+
+export async function fetchBangumiAnimeById(subjectId: number): Promise<AnimeProviderRecord> {
+  if (!Number.isInteger(subjectId) || subjectId <= 0) throw new Error("Invalid Bangumi subject id");
+
+  const subject = await fetchJsonWithTimeout<BangumiRawSubject>(
+    "Bangumi",
+    `${BANGUMI_SUBJECT_ENDPOINT}/${subjectId}`,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "User-Agent": USER_AGENT,
+      },
+    },
+    DEFAULT_TIMEOUT_MS,
+    {
+      maxRetries: 2,
+      baseDelayMs: 800,
+      maxDelayMs: 10_000,
+      jitterMs: 300,
+    },
+  );
+
+  const record = normalizeBangumiSubjectDetail(subject);
+  if (!record) throw new Error(`Bangumi subject ${subjectId} is not a usable Anime record`);
+  return record;
 }
 
 export async function fetchBangumiSeasonBatch(options: {
