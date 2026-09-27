@@ -41,12 +41,12 @@ identity/metadata foundation and are now split into independently verifiable pha
 - [x] Add tests for partially answered scopes, missing metrics, membership preservation and idempotent re-entry; CI #140 passed.
 
 ### Phase D — survey production-information presentation
-- [ ] Consume canonical metadata boundary in survey presentation.
-- [ ] Show Bangumi collection count for visible ordering verification.
-- [ ] Define studio/director display-alias/localization strategy.
-- [ ] Preserve raw provider names separately.
-- [ ] Remove duplicated studio/credits presentation.
-- [ ] Verify desktop and mobile survey layout.
+- [x] Expose canonical/provider-specific metadata needed by survey presentation.
+- [x] Show Bangumi collection count for visible ordering verification.
+- [x] Define studio display alias strategy from Bangumi PersonDetail; directors remain best-effort raw provider names.
+- [x] Preserve raw provider names separately.
+- [x] Remove duplicated studio/credits presentation; card is the single metadata surface.
+- [x] Keep one responsive card metadata block for desktop/mobile; CI #154 tests/typecheck/build/dry-run passed.
 
 ### Phase E — Netflix ingestion v2
 - [ ] Stop using AniList as the required Netflix resolver.
