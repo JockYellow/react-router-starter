@@ -160,33 +160,20 @@ Do not depend on English title recognition for the primary survey experience.
 
 ## Data model
 
-Initial tables:
+The runtime model is provider-neutral and keyed by internal `anime_id`.
 
-### `anime_catalog`
-Canonical anime metadata keyed primarily by AniList ID.
+Primary tables:
 
-Expected fields include IDs, title variants, year, season, format, episodes, cover, studio, genres, popularity/score metadata, and sync timestamp.
+- `anime_items` — canonical work identity and shared catalog metadata.
+- `anime_item_aliases` — title aliases used for conservative matching/search.
+- `anime_user_decisions` — Seen / Want / Not Seen and viewing detail.
+- `anime_user_evaluations` / `anime_user_evaluation_tags` — personal evaluation.
+- `anime_item_sources` — provenance such as Netflix history.
+- `anime_scope_candidates` / `anime_survey_progress` — frozen survey membership/order and progress.
+- `anime_bangumi_metrics` — Bangumi-specific collection/score metrics used by recognition-first ordering.
+- `anime_scope_ordering_state` — versioned migration state for established TV-season ordering.
 
-### `anime_aliases`
-Aliases used for search, Chinese naming, source-title mapping, and deduplication.
-
-### `anime_decisions`
-Viewing fact/status:
-
-- Primary status: `SEEN | WANT | NOT_SEEN`
-- Optional detailed status for seen titles.
-
-### `anime_sources`
-Evidence/provenance that linked a personal record to the catalog, e.g. Netflix or manual survey.
-
-### `anime_evaluations`
-Single overall personal evaluation plus optional note.
-
-### `anime_evaluation_tags`
-Many-to-many relationship between an anime record and concrete personal evaluation tags.
-
-### `anime_survey_progress`
-Durable progress state keyed by survey scope (TV: year + season; movie: year).
+Legacy AniList-keyed tables remain only for compatibility/migration and are not the write boundary for new product features.
 
 ## Netflix seed rules
 
@@ -208,12 +195,12 @@ Netflix titles should be resolved to canonical anime IDs as safely as possible. 
 
 The application should use server-side provider code rather than browser-direct cross-origin calls.
 
-Planned providers:
+Current provider strategy:
 
-- AniList: canonical discovery/metadata source and ID.
-- Bangumi: Chinese title fallback where useful.
+- Bangumi: seasonal discovery, collection/score signals, canonical fallback for Netflix resolution, and studio/director metadata.
+- AniList: legacy compatibility data only; new Netflix ingestion does not depend on AniList.
 
-Provider results should be cached into D1 rather than repeatedly fetched on every card display.
+Provider results are cached into D1 rather than repeatedly fetched on every card display. Provider-specific popularity scales remain separate and must not be mixed into one shared ranking field.
 
 ## Scope exclusions
 
