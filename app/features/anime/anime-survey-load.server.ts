@@ -1,4 +1,3 @@
-import { ensureAnimeBangumiMetricsSchema } from "./anime-bangumi-metrics.server";
 import { cacheAnimeProviderBatch } from "./anime-catalog.server";
 import {
   applyAnimeSurveyRecognitionOrdering,
