@@ -138,7 +138,8 @@ No production/private Netflix rows have been processed on this branch.
 - Added resolver-version, canonical-source/decision consistency, and seasonal-ordering migration counters.
 - Added deliberately small Netflix resolve controls (1 or 5 rows); there is no one-click full-queue action.
 - The existing admin seed API now returns the same acceptance snapshot after stage/resolve/retry.
-- `main` currently has no GitHub deployment workflow/status; deployment remains the existing manual `npm run deploy` / Wrangler path.
+- Added `.github/workflows/deploy-worker-production.yml`: production deploy is now a manual GitHub Actions workflow that reruns Anime tests, typecheck, build and Wrangler dry-run before deploy.
+- GitHub Actions preflight confirmed the repository currently has neither `CLOUDFLARE_API_TOKEN` nor `CLOUDFLARE_ACCOUNT_ID` configured, so production deployment cannot run from GitHub yet.
 - validate schema/idempotency against real D1 after deployment;
 - process a small private Netflix sample first;
 - verify Survey / Library / provenance all point to the same `anime_id`;
