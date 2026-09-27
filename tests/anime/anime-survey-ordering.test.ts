@@ -115,6 +115,8 @@ function fakeOrderingDb(initial: Candidate[]) {
               studio: null,
               popularity: null,
               average_score: item.score,
+              bangumi_collection_total: item.collection,
+              bangumi_average_score: item.score,
               decision_status: item.decisionStatus ?? null,
               detail_status: null,
             }));
