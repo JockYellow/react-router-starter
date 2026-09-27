@@ -12,23 +12,28 @@ test("survey credits pick animation studio and director relations", () => {
   ]);
 
   assert.equal(credits.studio, "Studio A");
+  assert.equal(credits.studioDisplay, "Studio A");
+  assert.equal(credits.studioPersonId, null);
   assert.deepEqual(credits.directors, ["Director A", "Director B"]);
 });
 
 test("survey credits accept traditional and Japanese relation labels", () => {
   const credits = parseBangumiSurveyCredits([
-    { name: "Studio B", relation: "動畫製作" },
+    { id: 77, name: "Studio B", relation: "動畫製作" },
     { name: "Director C", relation: "監督" },
     { name: "Studio C", relation: "アニメーション制作" },
   ]);
 
   assert.equal(credits.studio, "Studio B");
+  assert.equal(credits.studioPersonId, 77);
   assert.deepEqual(credits.directors, ["Director C"]);
 });
 
 test("survey credits fall back to stored studio and tolerate missing staff", () => {
   assert.deepEqual(parseBangumiSurveyCredits([], "Existing Studio"), {
     studio: "Existing Studio",
+    studioDisplay: "Existing Studio",
+    studioPersonId: null,
     directors: [],
   });
 });
