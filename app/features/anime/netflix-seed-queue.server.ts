@@ -155,8 +155,18 @@ export async function upgradeLegacyReviewedNetflixSeedQueue(
        WHERE source = 'netflix'
          AND (
            json_valid(payload_json) = 0
-           OR CAST(json_extract(payload_json, '$.resolverVersion') AS INTEGER) IS NULL
-           OR CAST(json_extract(payload_json, '$.resolverVersion') AS INTEGER) <> ?
+           OR CAST(
+             json_extract(
+               CASE WHEN json_valid(payload_json) = 1 THEN payload_json ELSE '{}' END,
+               '$.resolverVersion'
+             ) AS INTEGER
+           ) IS NULL
+           OR CAST(
+             json_extract(
+               CASE WHEN json_valid(payload_json) = 1 THEN payload_json ELSE '{}' END,
+               '$.resolverVersion'
+             ) AS INTEGER
+           ) <> ?
          )
        ORDER BY id ASC`,
     )
