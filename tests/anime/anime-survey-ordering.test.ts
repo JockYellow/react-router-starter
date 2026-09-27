@@ -73,6 +73,7 @@ function fakeOrderingDb(initial: Candidate[]) {
         if (
           sql.includes("FROM anime_scope_candidates c")
           && sql.includes("LEFT JOIN anime_bangumi_metrics")
+          && sql.includes("c.position AS existing_position")
         ) {
           return {
             results: [...candidates]
