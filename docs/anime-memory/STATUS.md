@@ -103,10 +103,16 @@ No production/private D1 data has been migrated by this branch yet.
 
 ### Phase D — survey information presentation
 
-- use the canonical metadata boundary;
-- expose Bangumi collection count for visible ordering verification;
-- add readable studio/director display names while keeping raw provider values;
-- remove duplicated production-information presentation.
+**Implemented on Draft PR #24; Anime CI run #154 passed tests, typecheck, build and Wrangler dry-run.**
+
+- Survey candidates expose provider-specific Bangumi collection/score metrics.
+- The card shows format, episode count and Bangumi collection count so recognition ordering can be inspected directly.
+- Production studio/director information moved into one responsive card block; the fixed hotkey footer no longer duplicates it.
+- Bangumi studio person ids are cached per anime.
+- Current-card studio display names use provider-supplied PersonDetail aliases: Chinese cn -> tw first, then English alias for kana-heavy raw names, then raw name.
+- Raw studio names remain preserved and are shown secondarily when a friendlier display alias is used.
+- Person display aliases are cached by Bangumi person id; the first-20 credits prefetch does not add PersonDetail requests for every queued item.
+- Provider/display-name failure remains non-blocking.
 
 ### Phase E — Netflix ingestion v2
 
