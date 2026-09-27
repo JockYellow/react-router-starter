@@ -5,7 +5,8 @@ import { getAnimeAcceptanceSnapshot } from "../../app/features/anime/anime-accep
 
 function fakeAcceptanceDb(counts: Record<string, number>) {
   function lookup(sql: string): number {
-    for (const [needle, value] of Object.entries(counts)) {
+    const entries = Object.entries(counts).sort((a, b) => b[0].length - a[0].length);
+    for (const [needle, value] of entries) {
       if (sql.includes(needle)) return value;
     }
     return 0;
