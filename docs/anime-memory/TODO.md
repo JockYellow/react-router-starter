@@ -8,7 +8,7 @@ Last reconciled with implementation: 2026-09-27.
 
 ## Current checkpoint
 
-Active branch: `feature/anime-data-foundation-v2`
+Current main: PR #24 merged as `6ebae1f9`
 
 Verified base before this work: `main@05c0e54d` (PR #23 merged).
 
@@ -63,7 +63,8 @@ identity/metadata foundation and are now split into independently verifiable pha
 - [x] Add `/anime/acceptance` UI with intentionally small 1/5-row production resolve controls.
 - [x] Return acceptance counters after stage/resolve/retry API actions.
 - [x] Verify Phase F harness with Anime CI #184: 83 tests, typecheck, build and Wrangler dry-run passed.
-- [ ] Deploy PR #24 code before touching production/private rows.
+- [x] Merge PR #24 to `main`.
+- [ ] Deploy current `main` before touching production/private rows.
 - [ ] Verify schema/idempotency against real `BLOG_DB`.
 - [ ] Run a small reviewed Netflix sample first.
 - [ ] Confirm Survey, Library and source provenance share the same `anime_id`.
