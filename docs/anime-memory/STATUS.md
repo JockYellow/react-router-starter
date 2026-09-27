@@ -74,7 +74,7 @@ moved to the canonical tables before the private production seed is executed.
 
 ### Phase B — shared canonical data capabilities
 
-**Implemented on the active branch; CI/PR verification still required.**
+**Implemented on Draft PR #24; Anime CI run #130 passed tests, typecheck, build and Wrangler dry-run.**
 
 - Added `anime-canonical-match.server.ts`.
 - Provider cache now uses the shared conservative matcher rather than private matching logic.
