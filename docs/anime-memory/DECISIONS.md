@@ -217,3 +217,12 @@ Candidates without provider-specific Bangumi collection metrics are not ranked w
 
 **Reason:** The corrected Bangumi ranking formula already exists, but historical/answered scopes were intentionally frozen before that correction. Versioning gives those scopes a one-time safe migration without turning seasonal order into a continuously changing live ranking.
 
+## D-037 — Survey production info uses provider aliases without overwriting raw credits
+**Decision:** The survey card is the single production-information surface. It shows format, episode count, provider-specific Bangumi collection count, studio, and director data. The fixed hotkey footer no longer duplicates studio/director information.
+
+Bangumi subject-person relations remain the raw credit source. For the currently visible card only, a studio company may be enriched through Bangumi PersonDetail. Display-name priority is provider-supplied Chinese name (converted cn -> tw), then an explicit English alias for kana-heavy raw names, then the raw provider name. Raw studio names remain stored separately and may be shown as secondary text.
+
+Person display aliases are cached globally by Bangumi person id. The existing rolling credits prefetch does not fetch PersonDetail for every queued anime.
+
+**Reason:** This improves recognition without inventing translations, preserves provider provenance, exposes the metric used by seasonal ranking, and avoids multiplying provider requests during rapid survey flow.
+
