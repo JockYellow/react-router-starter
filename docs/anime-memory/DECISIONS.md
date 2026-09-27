@@ -208,3 +208,12 @@ Bangumi `name_cn` is converted with OpenCC `cn -> tw` and may be used as the pra
 
 **Reason:** The previous mixed popularity field caused recognition ordering to appear incorrect even when a sort was technically applied.
 
+## D-036 — Existing TV-season scopes migrate lazily to ordering v2
+**Decision:** TV-season candidate order is versioned. Existing scopes without the current ordering version are migrated the next time that scope is opened. The migration rewrites only `anime_scope_candidates.position`, preserves candidate membership and all personal records, refreshes derived survey progress, and then records the applied ordering version.
+
+Concurrent migration attempts are guarded by a short D1 lock. A failed migration releases the lock and leaves the existing scope usable so a later request can retry.
+
+Candidates without provider-specific Bangumi collection metrics are not ranked with the legacy mixed `anime_items.popularity` field. They remain behind candidates with known Bangumi recognition data and preserve their previous relative order.
+
+**Reason:** The corrected Bangumi ranking formula already exists, but historical/answered scopes were intentionally frozen before that correction. Versioning gives those scopes a one-time safe migration without turning seasonal order into a continuously changing live ranking.
+
