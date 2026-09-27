@@ -6,6 +6,7 @@ import {
   applyAnimeSurveyRecognitionOrdering,
   buildAnimeSurveyRecognitionOrder,
 } from "../../app/features/anime/anime-survey-ordering.server";
+import { getNextUnresolvedSurveyCandidate } from "../../app/features/anime/anime-survey.server";
 
 function row(
   animeId: number,
@@ -52,6 +53,7 @@ type Candidate = {
   collection: number | null;
   score: number | null;
   format: string | null;
+  decisionStatus?: "WANT" | "NOT_SEEN" | null;
 };
 
 function fakeOrderingDb(initial: Candidate[]) {
@@ -83,6 +85,40 @@ function fakeOrderingDb(initial: Candidate[]) {
                 format: item.format,
               })) as T[],
           };
+        }
+
+        if (
+          sql.includes("FROM anime_scope_candidates c")
+          && sql.includes("LEFT JOIN anime_user_decisions")
+          && sql.includes("ORDER BY c.position ASC")
+        ) {
+          const limit = Number(values[values.length - 1]);
+          const unresolved = [...candidates]
+            .filter((item) => !item.decisionStatus)
+            .sort((a, b) => a.position - b.position)
+            .slice(0, Number.isFinite(limit) ? limit : candidates.length)
+            .map((item) => ({
+              position: item.position,
+              anime_id: item.animeId,
+              mal_id: null,
+              anilist_id: null,
+              bangumi_id: item.animeId,
+              title_zh_tw: `動畫 ${item.animeId}`,
+              title_native: null,
+              title_romaji: null,
+              title_english: null,
+              year: 2025,
+              season: "WINTER",
+              format: item.format,
+              episodes: 12,
+              cover_url: null,
+              studio: null,
+              popularity: null,
+              average_score: item.score,
+              decision_status: item.decisionStatus ?? null,
+              detail_status: null,
+            }));
+          return { results: unresolved as T[] };
         }
         return { results: [] as T[] };
       },
@@ -179,4 +215,29 @@ test("migration keeps the exact candidate membership while reassigning contiguou
     beforeIds,
   );
   assert.deepEqual(after.map((item) => item.animeId), [22, 11, 33]);
+});
+
+
+test("partially answered scope keeps answers and resumes at first unresolved item in migrated order", async () => {
+  const fake = fakeOrderingDb([
+    { animeId: 1, position: 1, collection: 100, score: 90, format: "TV" },
+    { animeId: 2, position: 2, collection: 900, score: 60, format: "TV", decisionStatus: "NOT_SEEN" },
+    { animeId: 3, position: 3, collection: 500, score: 80, format: "TV" },
+  ]);
+
+  await applyAnimeSurveyRecognitionOrdering(fake.db, "TV:2025:WINTER");
+
+  assert.deepEqual(fake.snapshot(), [
+    { animeId: 2, position: 1 },
+    { animeId: 3, position: 2 },
+    { animeId: 1, position: 3 },
+  ]);
+
+  const next = await getNextUnresolvedSurveyCandidate(fake.db, {
+    type: "TV_SEASON",
+    year: 2025,
+    season: "WINTER",
+  });
+
+  assert.equal(next?.animeId, 3);
 });
