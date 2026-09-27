@@ -158,6 +158,8 @@ export async function upgradeLegacyReviewedNetflixSeedQueue(
     .all<QueueRow>();
 
   let upgraded = 0;
+  const updates = [];
+
   for (const queueRow of rows.results ?? []) {
     let parsedPayload: Record<string, unknown> | null = null;
     try {
@@ -174,34 +176,37 @@ export async function upgradeLegacyReviewedNetflixSeedQueue(
     try {
       const [seedRow] = parseReviewedNetflixSeed([parsedPayload ?? JSON.parse(queueRow.payload_json)]);
       if (!seedRow) throw new Error("Legacy seed queue row did not contain a valid payload");
-      await db
-        .prepare(
-          `UPDATE anime_seed_queue
-           SET payload_json = ?,
-               queue_status = 'PENDING',
-               attempt_count = 0,
-               last_error = NULL,
-               updated_at = ?
-           WHERE id = ?`,
-        )
-        .bind(serializeReviewedNetflixSeedQueueRow(seedRow), Date.now(), queueRow.id)
-        .run();
+      updates.push(
+        db
+          .prepare(
+            `UPDATE anime_seed_queue
+             SET payload_json = ?,
+                 queue_status = 'PENDING',
+                 attempt_count = 0,
+                 last_error = NULL,
+                 updated_at = ?
+             WHERE id = ?`,
+          )
+          .bind(serializeReviewedNetflixSeedQueueRow(seedRow), Date.now(), queueRow.id),
+      );
       upgraded += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Legacy seed queue upgrade failed";
-      await db
-        .prepare(
-          `UPDATE anime_seed_queue
-           SET queue_status = 'ERROR',
-               last_error = ?,
-               updated_at = ?
-           WHERE id = ?`,
-        )
-        .bind(message.slice(0, 1000), Date.now(), queueRow.id)
-        .run();
+      updates.push(
+        db
+          .prepare(
+            `UPDATE anime_seed_queue
+             SET queue_status = 'ERROR',
+                 last_error = ?,
+                 updated_at = ?
+             WHERE id = ?`,
+          )
+          .bind(message.slice(0, 1000), Date.now(), queueRow.id),
+      );
     }
   }
 
+  if (updates.length) await db.batch(updates);
   return upgraded;
 }
 
