@@ -62,6 +62,7 @@ identity/metadata foundation and are now split into independently verifiable pha
 - [x] Add authenticated private-safe acceptance snapshot for queue/canonical/order counts.
 - [x] Add `/anime/acceptance` UI with intentionally small 1/5-row production resolve controls.
 - [x] Return acceptance counters after stage/resolve/retry API actions.
+- [x] Verify Phase F harness with Anime CI #184: 83 tests, typecheck, build and Wrangler dry-run passed.
 - [ ] Deploy PR #24 code before touching production/private rows.
 - [ ] Verify schema/idempotency against real `BLOG_DB`.
 - [ ] Run a small reviewed Netflix sample first.
