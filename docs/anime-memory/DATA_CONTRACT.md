@@ -20,6 +20,7 @@ New product behavior reads and writes through these tables:
 - `anime_user_evaluations` and `anime_user_evaluation_tags` — personal evaluation.
 - `anime_item_sources` — source/provenance rows such as imported viewing history.
 - `anime_scope_candidates` and `anime_survey_progress` — frozen survey membership/order and progress.
+- `anime_scope_ordering_state` — applied ordering version/lock and migration diagnostics for established TV-season scopes.
 - `anime_bangumi_metrics` — Bangumi-specific collection count / score / format observations.
 - `anime_survey_credits_cache` — cached Bangumi-derived studio/director credits.
 
@@ -93,7 +94,7 @@ in the public repository. Code/tests use synthetic fixtures only.
 
 - Phase A: canonical data contract — implemented on `feature/anime-data-foundation-v2`.
 - Phase B: shared canonical matching + metadata boundary — implemented on the same branch.
-- Phase C: versioned migration of existing seasonal ordering.
+- Phase C: versioned migration of existing seasonal ordering — implemented; CI verification pending.
 - Phase D: survey information presentation/localized credit names.
 - Phase E: Netflix ingestion v2 against canonical tables.
 - Phase F: real D1/private-data migration and cross-flow acceptance.
