@@ -69,8 +69,12 @@ export async function getAnimeAcceptanceSnapshot(
       `SELECT COUNT(*) AS count
        FROM anime_seed_queue
        WHERE source = 'netflix'
-         AND json_valid(payload_json) = 1
-         AND CAST(json_extract(payload_json, '$.resolverVersion') AS INTEGER) = ?`,
+         AND CAST(
+           json_extract(
+             CASE WHEN json_valid(payload_json) = 1 THEN payload_json ELSE '{}' END,
+             '$.resolverVersion'
+           ) AS INTEGER
+         ) = ?`,
       NETFLIX_SEED_RESOLVER_VERSION,
     ),
     count(db, "SELECT COUNT(*) AS count FROM anime_item_sources WHERE source = 'netflix'"),
