@@ -192,3 +192,19 @@ Bangumi `name_cn` is converted with OpenCC `cn -> tw` and may be used as the pra
 **Decision:** The Bangumi seasonal loader uses `anime_scope_load_state_v2`, separate from the earlier AniList/Jikan load-state experiments. Old failed 403 state must not block or resume the new provider flow.
 
 **Reason:** SQLite CHECK constraints and provider cursor semantics changed during the migration. A versioned state table is safer and clearer than trying to reinterpret an ERROR/page cursor that belonged to a different provider.
+
+## D-033 — Canonical tables are the only new product write boundary
+**Decision:** New Anime Memory features write through the provider-neutral `anime_items`, `anime_item_aliases`, `anime_user_*`, `anime_item_sources`, and scope tables. Legacy AniList-keyed tables remain compatibility/migration storage only.
+
+**Reason:** The application identity has already moved to `anime_id`. Allowing new feature code to keep writing legacy tables creates delayed-copy behavior and makes production state depend on schema re-initialization timing.
+
+## D-034 — Canonical matching is shared and conservative
+**Decision:** Provider caching and future external-history ingestion share one canonical matcher. Exact external ids have priority; otherwise only a unique exact normalized alias with compatible year may auto-match. Ambiguous/no-year title evidence remains unresolved.
+
+**Reason:** Identity rules must not differ between seasonal discovery, Netflix imports, and future sources. A false merge is harder to repair than an unresolved source row.
+
+## D-035 — Provider-specific metrics stay provider-specific
+**Decision:** Bangumi `collection_total` remains in `anime_bangumi_metrics`; legacy AniList popularity is not treated as the same scale. Shared metadata reads expose them as separate fields.
+
+**Reason:** The previous mixed popularity field caused recognition ordering to appear incorrect even when a sort was technically applied.
+
