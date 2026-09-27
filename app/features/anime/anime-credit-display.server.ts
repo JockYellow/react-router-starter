@@ -37,6 +37,10 @@ function isEnglishNameKey(value: string): boolean {
   return /(英文名|英語名|英语名|English)/i.test(value);
 }
 
+function isAliasKey(value: string): boolean {
+  return /(别名|別名|Alias)/i.test(value);
+}
+
 function hasKana(value: string): boolean {
   return /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(value);
 }
@@ -70,9 +74,15 @@ export function resolveBangumiPersonDisplayName(
       if (!item || typeof item !== "object") continue;
       const entry = item as InfoboxEntry;
       const key = clean(entry.key);
-      const direct = clean(entry.value);
-      if (direct) aliases.push({ key, value: direct });
-      aliases.push(...nestedNamedValues(entry.value));
+      if (!key) continue;
+
+      if (isChineseNameKey(key) || isEnglishNameKey(key)) {
+        const direct = clean(entry.value);
+        if (direct) aliases.push({ key, value: direct });
+        continue;
+      }
+
+      if (isAliasKey(key)) aliases.push(...nestedNamedValues(entry.value));
     }
   }
 
