@@ -320,8 +320,10 @@ export async function ensureAnimeSurveyOrdering(
 
   try {
     const stats = await applyAnimeSurveyRecognitionOrdering(db, scopeKey);
-    const refreshed = await refreshSurveyProgress(db, scope);
-    if (!refreshed) throw new Error(`Survey progress ${scopeKey} is missing after ordering migration`);
+    if (stats.candidateCount > 0) {
+      const refreshed = await refreshSurveyProgress(db, scope);
+      if (!refreshed) throw new Error(`Survey progress ${scopeKey} is missing after ordering migration`);
+    }
     await markAnimeSurveyOrderingCurrent(db, scopeKey, stats);
     return {
       status: "MIGRATED",
