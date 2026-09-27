@@ -4,7 +4,7 @@ Canonical project roadmap issue: #9
 
 Keep work split into independently verifiable segments. Personal Anime Memory rows never belong in this public repository.
 
-Last reconciled with implementation: 2026-09-17.
+Last reconciled with implementation: 2026-09-27.
 
 ## Current checkpoint
 
@@ -59,6 +59,10 @@ identity/metadata foundation and are now split into independently verifiable pha
 - [x] Cover canonical matched writes, resolver ambiguity/non-exact handling, queue upgrade and Bangumi detail normalization with synthetic tests; CI #164 passed.
 
 ### Phase F — real D1/private-data acceptance
+- [x] Add authenticated private-safe acceptance snapshot for queue/canonical/order counts.
+- [x] Add `/anime/acceptance` UI with intentionally small 1/5-row production resolve controls.
+- [x] Return acceptance counters after stage/resolve/retry API actions.
+- [ ] Deploy PR #24 code before touching production/private rows.
 - [ ] Verify schema/idempotency against real `BLOG_DB`.
 - [ ] Run a small reviewed Netflix sample first.
 - [ ] Confirm Survey, Library and source provenance share the same `anime_id`.
