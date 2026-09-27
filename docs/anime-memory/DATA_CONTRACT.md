@@ -98,5 +98,5 @@ in the public repository. Code/tests use synthetic fixtures only.
 - Phase B: shared canonical matching + metadata boundary — implemented on the same branch.
 - Phase C: versioned migration of existing seasonal ordering — implemented and verified in CI #140.
 - Phase D: survey information presentation/provider-alias display — implemented and verified in CI #154.
-- Phase E: Netflix ingestion v2 against canonical tables.
+- Phase E: Netflix ingestion v2 against canonical tables — implemented and verified in CI #164.
 - Phase F: real D1/private-data migration and cross-flow acceptance.
