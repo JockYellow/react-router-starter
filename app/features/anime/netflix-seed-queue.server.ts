@@ -1,6 +1,9 @@
 import { ensureAnimeSchema } from "./anime.schema.server";
 import { parseReviewedNetflixSeed } from "./netflix-seed-input";
-import { importReviewedNetflixRow } from "./netflix-seed.server";
+import {
+  importReviewedNetflixRow,
+  NETFLIX_SEED_RESOLVER_VERSION,
+} from "./netflix-seed.server";
 import {
   netflixSourceRef,
   type ReviewedNetflixSeedRow,
@@ -52,8 +55,9 @@ type CountRow = {
   count: number;
 };
 
-function serializeSeedRow(row: ReviewedNetflixSeedRow): string {
+export function serializeReviewedNetflixSeedQueueRow(row: ReviewedNetflixSeedRow): string {
   return JSON.stringify({
+    resolverVersion: NETFLIX_SEED_RESOLVER_VERSION,
     title: row.title,
     category: row.category ?? null,
     format: row.format ?? null,
@@ -84,7 +88,7 @@ export async function stageReviewedNetflixSeedRows(
 
   for (const row of rows) {
     const sourceRef = netflixSourceRef(row);
-    const payloadJson = serializeSeedRow(row);
+    const payloadJson = serializeReviewedNetflixSeedQueueRow(row);
     const existing = await db
       .prepare(
         `SELECT payload_json
