@@ -7,7 +7,7 @@ Last updated: 2026-09-27
 - Base branch: `main`
 - Verified `main` HEAD before this work: `05c0e54d` (PR #23 merged 2026-09-19).
 - PR #21 is merged; the rolling survey queue, credits prefetch/cache, finer seasonal loading feedback and Google search shortcut are already in `main`.
-- Active remediation branch: `feature/anime-data-foundation-v2`.
+- Remediation PR #24 merged to `main` as `6ebae1f9` on 2026-09-27.
 - Personal Netflix/history rows remain private and have not been written by this branch.
 
 ## Current product state
@@ -74,7 +74,7 @@ moved to the canonical tables before the private production seed is executed.
 
 ### Phase B — shared canonical data capabilities
 
-**Implemented on Draft PR #24; Anime CI run #130 passed tests, typecheck, build and Wrangler dry-run.**
+**Merged in PR #24; implementation previously passed Anime CI #130.**
 
 - Added `anime-canonical-match.server.ts`.
 - Provider cache now uses the shared conservative matcher rather than private matching logic.
@@ -86,7 +86,7 @@ No seasonal positions, personal decisions, Netflix rows or production D1 data we
 
 ### Phase C — versioned seasonal ordering migration
 
-**Implemented on Draft PR #24; Anime CI run #140 passed tests, typecheck, build and Wrangler dry-run.**
+**Merged in PR #24; implementation previously passed Anime CI #140.**
 
 - Ordering version v2 is tracked per TV-season scope.
 - Established scopes without v2 migrate lazily the next time they are opened.
@@ -103,7 +103,7 @@ No production/private D1 data has been migrated by this branch yet.
 
 ### Phase D — survey information presentation
 
-**Implemented on Draft PR #24; Anime CI run #154 passed tests, typecheck, build and Wrangler dry-run.**
+**Merged in PR #24; implementation previously passed Anime CI #154.**
 
 - Survey candidates expose provider-specific Bangumi collection/score metrics.
 - The card shows format, episode count and Bangumi collection count so recognition ordering can be inspected directly.
@@ -116,7 +116,7 @@ No production/private D1 data has been migrated by this branch yet.
 
 ### Phase E — Netflix ingestion v2
 
-**Implemented on Draft PR #24; Anime CI run #164 passed tests, typecheck, build and Wrangler dry-run.**
+**Merged in PR #24; implementation previously passed Anime CI #164.**
 
 - AniList is no longer a required Netflix resolver.
 - Existing canonical Netflix source mappings are reused when present.
@@ -132,13 +132,13 @@ No production/private Netflix rows have been processed on this branch.
 
 ### Phase F — production/private migration and end-to-end acceptance
 
-**Acceptance harness implemented and verified by Anime CI #184 (83 Anime tests, typecheck, build, Wrangler dry-run); real D1 execution remains blocked until this Draft PR is deployed.**
+**Acceptance harness merged in PR #24. Latest branch verification passed Anime CI #186 (83 Anime tests, typecheck, build, Wrangler dry-run). Real D1 execution remains pending production deployment of main.**
 
 - Added authenticated `/anime/acceptance` page with private-safe counts only.
 - Added resolver-version, canonical-source/decision consistency, and seasonal-ordering migration counters.
 - Added deliberately small Netflix resolve controls (1 or 5 rows); there is no one-click full-queue action.
 - The existing admin seed API now returns the same acceptance snapshot after stage/resolve/retry.
-- Repository CI can build/dry-run Workers, but this repository has no deployment workflow and available tooling has no Cloudflare/D1 connection.
+- `main` currently has no GitHub deployment workflow/status; deployment remains the existing manual `npm run deploy` / Wrangler path.
 - validate schema/idempotency against real D1 after deployment;
 - process a small private Netflix sample first;
 - verify Survey / Library / provenance all point to the same `anime_id`;
@@ -154,4 +154,4 @@ No production/private Netflix rows have been processed on this branch.
 - Provider enrichment is best-effort; cached personal data remains usable during provider failure.
 - Raw provider names are preserved even when a friendlier display alias is added.
 - Personal Anime Memory / Netflix rows never enter this public repository.
-- Do not merge the active branch without explicit user instruction.
+- PR #24 is merged; subsequent production/private-data changes still require safe staged acceptance.
