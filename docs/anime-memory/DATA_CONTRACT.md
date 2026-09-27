@@ -22,7 +22,9 @@ New product behavior reads and writes through these tables:
 - `anime_scope_candidates` and `anime_survey_progress` — frozen survey membership/order and progress.
 - `anime_scope_ordering_state` — applied ordering version/lock and migration diagnostics for established TV-season scopes.
 - `anime_bangumi_metrics` — Bangumi-specific collection count / score / format observations.
-- `anime_survey_credits_cache` — cached Bangumi-derived studio/director credits.
+- `anime_survey_credits_cache` — cached Bangumi-derived raw studio/director credits.
+- `anime_survey_credit_studio_identity` — Bangumi studio person identity observed for one anime.
+- `anime_credit_person_display_cache` — provider-supplied readable aliases cached by Bangumi person id.
 
 ## Provider-specific metrics
 
@@ -95,6 +97,6 @@ in the public repository. Code/tests use synthetic fixtures only.
 - Phase A: canonical data contract — implemented on `feature/anime-data-foundation-v2`.
 - Phase B: shared canonical matching + metadata boundary — implemented on the same branch.
 - Phase C: versioned migration of existing seasonal ordering — implemented and verified in CI #140.
-- Phase D: survey information presentation/localized credit names.
+- Phase D: survey information presentation/provider-alias display — implemented and verified in CI #154.
 - Phase E: Netflix ingestion v2 against canonical tables.
 - Phase F: real D1/private-data migration and cross-flow acceptance.
