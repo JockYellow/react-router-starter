@@ -132,7 +132,14 @@ No production/private Netflix rows have been processed on this branch.
 
 ### Phase F — production/private migration and end-to-end acceptance
 
-- validate schema/idempotency against real D1;
+**Acceptance harness implemented; real D1 execution remains blocked until this Draft PR is deployed.**
+
+- Added authenticated `/anime/acceptance` page with private-safe counts only.
+- Added resolver-version, canonical-source/decision consistency, and seasonal-ordering migration counters.
+- Added deliberately small Netflix resolve controls (1 or 5 rows); there is no one-click full-queue action.
+- The existing admin seed API now returns the same acceptance snapshot after stage/resolve/retry.
+- Repository CI can build/dry-run Workers, but this repository has no deployment workflow and available tooling has no Cloudflare/D1 connection.
+- validate schema/idempotency against real D1 after deployment;
 - process a small private Netflix sample first;
 - verify Survey / Library / provenance all point to the same `anime_id`;
 - then process the full private queue;
