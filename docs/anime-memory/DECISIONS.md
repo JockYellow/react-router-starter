@@ -226,3 +226,17 @@ Person display aliases are cached globally by Bangumi person id. The existing ro
 
 **Reason:** This improves recognition without inventing translations, preserves provider provenance, exposes the metric used by seasonal ranking, and avoids multiplying provider requests during rapid survey flow.
 
+## D-038 — Netflix ingestion v2 resolves through canonical provenance and Bangumi
+**Decision:** Reviewed Netflix history no longer uses AniList as its required resolver or writes new rows to legacy AniList-keyed tables.
+
+Resolution order is:
+1. reuse an existing MATCHED canonical `anime_item_sources` Netflix mapping when present;
+2. otherwise search Bangumi by title and accept only one exact provider alias (native, Chinese, or cn -> tw equivalent);
+3. ambiguous/non-exact search results remain unresolved.
+
+A matched Bangumi subject is fetched by id and cached through the normal canonical provider cache. Netflix provenance writes directly to `anime_item_sources`; missing personal history writes directly to `anime_user_decisions` using `INSERT OR IGNORE`, so an existing manual/survey decision wins.
+
+Netflix queue payloads carry `resolverVersion: 2`. Legacy staged payloads are automatically normalized to v2 and reset to PENDING before processing, allowing the already-staged private queue to be re-resolved without re-entering source rows.
+
+**Reason:** The runtime application is provider-neutral/Bangumi-based. Continuing to route new Netflix history through legacy AniList tables created timing-dependent copy behavior and could leave the current library/survey unaware of newly imported decisions.
+
