@@ -132,7 +132,7 @@ No production/private Netflix rows have been processed on this branch.
 
 ### Phase F — production/private migration and end-to-end acceptance
 
-**Acceptance harness implemented; real D1 execution remains blocked until this Draft PR is deployed.**
+**Acceptance harness implemented and verified by Anime CI #184 (83 Anime tests, typecheck, build, Wrangler dry-run); real D1 execution remains blocked until this Draft PR is deployed.**
 
 - Added authenticated `/anime/acceptance` page with private-safe counts only.
 - Added resolver-version, canonical-source/decision consistency, and seasonal-ordering migration counters.
