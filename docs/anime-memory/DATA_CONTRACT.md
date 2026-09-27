@@ -94,7 +94,7 @@ in the public repository. Code/tests use synthetic fixtures only.
 
 - Phase A: canonical data contract — implemented on `feature/anime-data-foundation-v2`.
 - Phase B: shared canonical matching + metadata boundary — implemented on the same branch.
-- Phase C: versioned migration of existing seasonal ordering — implemented; CI verification pending.
+- Phase C: versioned migration of existing seasonal ordering — implemented and verified in CI #140.
 - Phase D: survey information presentation/localized credit names.
 - Phase E: Netflix ingestion v2 against canonical tables.
 - Phase F: real D1/private-data migration and cross-flow acceptance.
