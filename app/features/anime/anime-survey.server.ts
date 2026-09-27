@@ -1,3 +1,4 @@
+import { ensureAnimeBangumiMetricsSchema } from "./anime-bangumi-metrics.server";
 import { animeCoverProxyPath } from "./anime-cover.server";
 import { ensureAnimeChineseTitle } from "./anime-chinese-title.server";
 import { ensureAnimeSchema } from "./anime.schema.server";
@@ -21,6 +22,8 @@ export type SurveyCandidateRow = {
   studio: string | null;
   popularity: number | null;
   averageScore: number | null;
+  bangumiCollectionTotal: number | null;
+  bangumiAverageScore: number | null;
   decisionStatus: string | null;
   detailStatus: string | null;
 };
@@ -69,6 +72,8 @@ type CandidateDbRow = {
   studio: string | null;
   popularity: number | null;
   average_score: number | null;
+  bangumi_collection_total: number | null;
+  bangumi_average_score: number | null;
   decision_status: string | null;
   detail_status: string | null;
 };
@@ -92,6 +97,8 @@ function mapCandidateRow(row: CandidateDbRow): SurveyCandidateRow {
     studio: row.studio,
     popularity: row.popularity,
     averageScore: row.average_score,
+    bangumiCollectionTotal: row.bangumi_collection_total,
+    bangumiAverageScore: row.bangumi_average_score,
     decisionStatus: row.decision_status,
     detailStatus: row.detail_status,
   };
@@ -172,10 +179,13 @@ const CANDIDATE_SELECT = `
     a.studio,
     a.popularity,
     a.average_score,
+    m.collection_total AS bangumi_collection_total,
+    m.average_score AS bangumi_average_score,
     d.status AS decision_status,
     d.detail_status
   FROM anime_scope_candidates c
   JOIN anime_items a ON a.anime_id = c.anime_id
+  LEFT JOIN anime_bangumi_metrics m ON m.anime_id = c.anime_id
   LEFT JOIN anime_user_decisions d ON d.anime_id = c.anime_id`;
 
 async function enrichFirstCandidateTitle(
@@ -199,6 +209,7 @@ export async function getSurveyCandidates(
   scope: AnimeSurveyScope,
 ): Promise<SurveyCandidateRow[]> {
   await ensureAnimeSchema(db);
+  await ensureAnimeBangumiMetricsSchema(db);
   const scopeKey = animeSurveyScopeKey(scope);
   const result = await db
     .prepare(`${CANDIDATE_SELECT} WHERE c.scope_key = ? ORDER BY c.position ASC`)
@@ -223,6 +234,7 @@ export async function getNextUnresolvedSurveyCandidates(
   options: { limit?: number; excludeAnimeIds?: readonly number[] } = {},
 ): Promise<SurveyCandidateRow[]> {
   await ensureAnimeSchema(db);
+  await ensureAnimeBangumiMetricsSchema(db);
   const scopeKey = animeSurveyScopeKey(scope);
   const limit = Math.max(1, Math.min(Math.trunc(options.limit ?? 5), 10));
   const excluded = Array.from(new Set(options.excludeAnimeIds ?? []))
