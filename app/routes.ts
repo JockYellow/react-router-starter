@@ -11,6 +11,7 @@ export default [
   route("changelog", "routes/changelog.tsx"),
   route("anime", "routes/anime/index.tsx"),
   route("anime/library", "routes/anime/library.tsx"),
+  route("anime/acceptance", "routes/anime/acceptance.tsx"),
   route("anime/library/:animeId", "routes/anime/library.$animeId.tsx"),
   route("anime/watchlist", "routes/anime/watchlist.tsx"),
   route("anime/watchlist/manage", "routes/anime/watchlist-manage.tsx"),
