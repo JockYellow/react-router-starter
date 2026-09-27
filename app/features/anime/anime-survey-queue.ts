@@ -23,6 +23,8 @@ export type AnimeSurveyQueueCandidate = {
   studio: string | null;
   popularity: number | null;
   averageScore: number | null;
+  bangumiCollectionTotal: number | null;
+  bangumiAverageScore: number | null;
   decisionStatus: string | null;
   detailStatus: string | null;
 };
