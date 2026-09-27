@@ -58,16 +58,22 @@ export async function action({ request, context }: ActionFunctionArgs) {
     if (intent === "stage") {
       const rows = parseReviewedNetflixSeed(payload);
       const staged = await stageReviewedNetflixSeedRows(db, rows);
-      const summary = await getReviewedNetflixSeedQueueSummary(db);
-      return Response.json({ ok: true, staged, summary });
+      const [summary, acceptance] = await Promise.all([
+        getReviewedNetflixSeedQueueSummary(db),
+        getAnimeAcceptanceSnapshot(db),
+      ]);
+      return Response.json({ ok: true, staged, summary, acceptance });
     }
 
     if (intent === "resolve") {
       const rawLimit = Number(payload.limit ?? 5);
       const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(Math.trunc(rawLimit), 10)) : 5;
       const processed = await processReviewedNetflixSeedQueue(db, { limit });
-      const summary = await getReviewedNetflixSeedQueueSummary(db);
-      return Response.json({ ok: true, processed, summary });
+      const [summary, acceptance] = await Promise.all([
+        getReviewedNetflixSeedQueueSummary(db),
+        getAnimeAcceptanceSnapshot(db),
+      ]);
+      return Response.json({ ok: true, processed, summary, acceptance });
     }
 
     if (intent === "retry") {
@@ -78,8 +84,11 @@ export async function action({ request, context }: ActionFunctionArgs) {
           (NETFLIX_SEED_QUEUE_STATUSES as readonly string[]).includes(value),
       );
       const reset = await retryReviewedNetflixSeedQueue(db, statuses);
-      const summary = await getReviewedNetflixSeedQueueSummary(db);
-      return Response.json({ ok: true, reset, summary });
+      const [summary, acceptance] = await Promise.all([
+        getReviewedNetflixSeedQueueSummary(db),
+        getAnimeAcceptanceSnapshot(db),
+      ]);
+      return Response.json({ ok: true, reset, summary, acceptance });
     }
   } catch (error) {
     if (error instanceof NetflixSeedValidationError) {
