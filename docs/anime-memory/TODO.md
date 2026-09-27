@@ -4,14 +4,74 @@ Canonical project roadmap issue: #9
 
 Keep work split into independently verifiable segments. Personal Anime Memory rows never belong in this public repository.
 
-Last reconciled with implementation: 2026-09-17.
+Last reconciled with implementation: 2026-09-27.
 
 ## Current checkpoint
 
-- `main` already contains the core TV seasonal survey, provider-neutral identity, Bangumi discovery, same-origin covers, fast background saves, Library, detail editing, Watchlist, production credits, and the first mobile survey pass.
-- PR #21 is **code-complete and CI-green, but still Draft / unmerged pending user production testing**.
-- PR #21 adds: 20/10 survey queue buffering, credits prefetch + D1 cache, finer 25-row Bangumi load feedback, conservative CN/US-origin seasonal filtering, and direct Google search using `片名 動畫 製作背景`.
-- The next action is **production test PR #21**, not more feature work.
+Active branch: `feature/anime-data-foundation-v2`
+
+Verified base before this work: `main@05c0e54d` (PR #23 merged).
+
+The 2026-09-27 review found that seasonal ordering, production-info readability and
+Netflix history should not be treated as three independent fixes. They share a canonical
+identity/metadata foundation and are now split into independently verifiable phases.
+
+### Phase A — canonical data contract
+- [x] Define provider-neutral tables as the only new product write boundary.
+- [x] Mark AniList-keyed tables as compatibility/migration storage.
+- [x] Document provider-specific metric separation.
+- [x] Preserve the private-data boundary.
+- [x] Add `DATA_CONTRACT.md` and durable decisions.
+
+### Phase B — shared canonical data capabilities
+- [x] Extract shared conservative canonical matcher.
+- [x] Make provider cache use the shared matcher.
+- [x] Add canonical metadata read/enrichment boundary.
+- [x] Expose Bangumi collection metrics separately from legacy AniList popularity.
+- [x] Add focused matcher/display-title tests.
+- [x] Open Draft PR #24 and pass Anime CI/typecheck/build/Wrangler dry-run (run #130).
+
+### Phase C — versioned seasonal ordering migration
+- [x] Add explicit ordering version/state for established TV-season scopes.
+- [x] Re-rank old candidate positions once using Bangumi collection count first.
+- [x] Preserve candidate membership.
+- [x] Preserve all user decisions/evaluations/tags/notes.
+- [x] Recompute survey progress after non-empty migration while preserving empty-scope completion semantics.
+- [x] Verify next unresolved candidate follows the migrated order.
+- [x] Add tests for partially answered scopes, missing metrics, membership preservation and idempotent re-entry; CI #140 passed.
+
+### Phase D — survey production-information presentation
+- [x] Expose canonical/provider-specific metadata needed by survey presentation.
+- [x] Show Bangumi collection count for visible ordering verification.
+- [x] Define studio display alias strategy from Bangumi PersonDetail; directors remain best-effort raw provider names.
+- [x] Preserve raw provider names separately.
+- [x] Remove duplicated studio/credits presentation; card is the single metadata surface.
+- [x] Keep one responsive card metadata block for desktop/mobile; CI #154 tests/typecheck/build/dry-run passed.
+
+### Phase E — Netflix ingestion v2
+- [x] Stop using AniList as the required Netflix resolver.
+- [x] Reuse existing canonical Netflix provenance first; alias-only local matching remains intentionally blocked without year evidence.
+- [x] Use Bangumi fallback only under conservative exact-match rules.
+- [x] Write provenance to `anime_item_sources` directly.
+- [x] Write missing personal decisions to `anime_user_decisions` directly.
+- [x] Never overwrite newer manual/survey decisions (`INSERT OR IGNORE`).
+- [x] Re-resolve existing staged queue rows idempotently through resolverVersion 2 auto-upgrade.
+- [x] Cover canonical matched writes, resolver ambiguity/non-exact handling, queue upgrade and Bangumi detail normalization with synthetic tests; CI #164 passed.
+
+### Phase F — real D1/private-data acceptance
+- [x] Add authenticated private-safe acceptance snapshot for queue/canonical/order counts.
+- [x] Add `/anime/acceptance` UI with intentionally small 1/5-row production resolve controls.
+- [x] Return acceptance counters after stage/resolve/retry API actions.
+- [x] Verify Phase F harness with Anime CI #184: 83 tests, typecheck, build and Wrangler dry-run passed.
+- [ ] Deploy PR #24 code before touching production/private rows.
+- [ ] Verify schema/idempotency against real `BLOG_DB`.
+- [ ] Run a small reviewed Netflix sample first.
+- [ ] Confirm Survey, Library and source provenance share the same `anime_id`.
+- [ ] Process the full private queue only after the sample passes.
+- [ ] Inspect final MATCHED / AMBIGUOUS / UNMATCHED / ERROR counts.
+- [ ] Cross-check migrated old-season ordering with preserved answers.
+- [ ] Run full Anime CI/typecheck/build/Wrangler dry-run.
+- [ ] Update/close roadmap issues after production acceptance.
 
 ---
 

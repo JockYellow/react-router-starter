@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { fetchBangumiSeasonBatch, isExcludedBangumiSeasonTags } from "../../app/features/anime/providers/bangumi.server";
+import { fetchBangumiAnimeById, fetchBangumiSeasonBatch, isExcludedBangumiSeasonTags } from "../../app/features/anime/providers/bangumi.server";
 
 test("Bangumi seasonal provider normalizes TV data and converts Chinese titles to Traditional", async () => {
   const originalFetch = globalThis.fetch;
@@ -127,4 +127,48 @@ test("Bangumi seasonal exclusion tags reject Chinese and US animation labels", (
   assert.equal(isExcludedBangumiSeasonTags(["科幻", "国产"]), true);
   assert.equal(isExcludedBangumiSeasonTags(["美國動畫"]), true);
   assert.equal(isExcludedBangumiSeasonTags(["日本", "校園"]), false);
+});
+
+
+test("Bangumi subject detail normalizes canonical provider metadata and collection total", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    assert.match(String(input), /api\.bgm\.tv\/v0\/subjects\/456$/);
+    return new Response(JSON.stringify({
+      id: 456,
+      type: 2,
+      name: "テスト作品",
+      name_cn: "测试作品",
+      date: "2024-10-05",
+      platform: "TV",
+      eps: 13,
+      rating: { score: 8.4, total: 1000 },
+      collection: {
+        wish: 100,
+        collect: 500,
+        doing: 200,
+        on_hold: 50,
+        dropped: 25,
+      },
+      images: { large: "https://lain.bgm.tv/pic/cover/l/detail.jpg" },
+      tags: [{ name: "科幻" }],
+      meta_tags: ["原创"],
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+
+  try {
+    const anime = await fetchBangumiAnimeById(456);
+    assert.equal(anime.provider, "BANGUMI");
+    assert.equal(anime.bangumiId, 456);
+    assert.equal(anime.titleZhTw, "測試作品");
+    assert.equal(anime.seasonYear, 2024);
+    assert.equal(anime.season, "FALL");
+    assert.equal(anime.format, "TV");
+    assert.equal(anime.episodes, 13);
+    assert.equal(anime.popularity, 875);
+    assert.equal(anime.averageScore, 84);
+    assert.deepEqual(anime.genres, ["科幻", "原创"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

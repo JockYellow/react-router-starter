@@ -5,6 +5,7 @@ import {
   requireCsrf,
 } from "../../../features/admin/admin-auth.server";
 import { requireBlogDb } from "../../../lib/d1.server";
+import { getAnimeAcceptanceSnapshot } from "../../../features/anime/anime-acceptance.server";
 import {
   NetflixSeedValidationError,
   parseReviewedNetflixSeed,
@@ -25,9 +26,12 @@ function jsonError(message: string, status = 400, details?: unknown) {
 export async function loader({ request, context }: LoaderFunctionArgs) {
   const csrf = await getCsrfToken(request, context);
   const db = requireBlogDb(context);
-  const summary = await getReviewedNetflixSeedQueueSummary(db);
+  const [summary, acceptance] = await Promise.all([
+    getReviewedNetflixSeedQueueSummary(db),
+    getAnimeAcceptanceSnapshot(db),
+  ]);
   return Response.json(
-    { ok: true, csrfToken: csrf.token, summary },
+    { ok: true, csrfToken: csrf.token, summary, acceptance },
     { headers: { "Set-Cookie": csrf.cookie } },
   );
 }
@@ -54,16 +58,22 @@ export async function action({ request, context }: ActionFunctionArgs) {
     if (intent === "stage") {
       const rows = parseReviewedNetflixSeed(payload);
       const staged = await stageReviewedNetflixSeedRows(db, rows);
-      const summary = await getReviewedNetflixSeedQueueSummary(db);
-      return Response.json({ ok: true, staged, summary });
+      const [summary, acceptance] = await Promise.all([
+        getReviewedNetflixSeedQueueSummary(db),
+        getAnimeAcceptanceSnapshot(db),
+      ]);
+      return Response.json({ ok: true, staged, summary, acceptance });
     }
 
     if (intent === "resolve") {
       const rawLimit = Number(payload.limit ?? 5);
       const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(Math.trunc(rawLimit), 10)) : 5;
       const processed = await processReviewedNetflixSeedQueue(db, { limit });
-      const summary = await getReviewedNetflixSeedQueueSummary(db);
-      return Response.json({ ok: true, processed, summary });
+      const [summary, acceptance] = await Promise.all([
+        getReviewedNetflixSeedQueueSummary(db),
+        getAnimeAcceptanceSnapshot(db),
+      ]);
+      return Response.json({ ok: true, processed, summary, acceptance });
     }
 
     if (intent === "retry") {
@@ -74,8 +84,11 @@ export async function action({ request, context }: ActionFunctionArgs) {
           (NETFLIX_SEED_QUEUE_STATUSES as readonly string[]).includes(value),
       );
       const reset = await retryReviewedNetflixSeedQueue(db, statuses);
-      const summary = await getReviewedNetflixSeedQueueSummary(db);
-      return Response.json({ ok: true, reset, summary });
+      const [summary, acceptance] = await Promise.all([
+        getReviewedNetflixSeedQueueSummary(db),
+        getAnimeAcceptanceSnapshot(db),
+      ]);
+      return Response.json({ ok: true, reset, summary, acceptance });
     }
   } catch (error) {
     if (error instanceof NetflixSeedValidationError) {

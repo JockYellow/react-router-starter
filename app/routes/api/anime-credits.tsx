@@ -19,9 +19,12 @@ export async function loader({ request, context }: LoaderFunctionArgs): Promise<
   const url = new URL(request.url);
   const animeIds = parseAnimeIds(url.searchParams.get("ids"));
   if (!animeIds.length) return Response.json({ ok: true, items: [] });
+  const resolveDisplayName = url.searchParams.get("display") === "1";
 
   const db = requireBlogDb(context);
-  const items = await prefetchAnimeSurveyCredits(db, animeIds, 4);
+  const items = await prefetchAnimeSurveyCredits(db, animeIds, resolveDisplayName ? 1 : 4, {
+    resolveDisplayName,
+  });
   return Response.json({ ok: true, items }, {
     headers: { "Cache-Control": "private, max-age=300" },
   });

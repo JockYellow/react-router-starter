@@ -11,6 +11,7 @@ import {
 import { requireAdmin } from "../../features/admin/admin-auth.server";
 import { AnimeSeenAutosave } from "../../features/anime/AnimeSeenAutosave";
 import { AnimeSurveyHotkeys } from "../../features/anime/AnimeSurveyHotkeys";
+import { AnimeSurveyProductionInfo } from "../../features/anime/AnimeSurveyProductionInfo";
 import { AnimeSurveyInitializer } from "../../features/anime/AnimeSurveyInitializer";
 import { useAnimeSurveyOptimisticQueue } from "../../features/anime/AnimeSurveyOptimisticQueue";
 import {
@@ -436,9 +437,8 @@ export default function AnimeSurvey() {
               </div>
 
               <div className="p-4 sm:p-5 md:p-8">
-                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs font-bold text-neutral-500">
-                  <span>第 {candidate.position} 部{data.reviewMode ? " · 修改模式" : ""}</span>
-                  <span>{[candidate.format, candidate.episodes ? `${candidate.episodes} 集` : null, candidate.studio].filter(Boolean).join(" · ")}</span>
+                <div className="text-xs font-bold text-neutral-500">
+                  第 {candidate.position} 部{data.reviewMode ? " · 修改模式" : ""}
                 </div>
                 <h2 className="mt-3 text-2xl font-black leading-tight sm:mt-4 sm:text-3xl md:text-4xl">
                   {candidate.titleZhTw ?? candidate.titleNative ?? candidate.titleRomaji ?? candidate.titleEnglish ?? "未命名作品"}
@@ -448,6 +448,13 @@ export default function AnimeSurvey() {
                     {alternateTitles(candidate).slice(0, 3).map((title) => <div key={title}>{title}</div>)}
                   </div>
                 ) : null}
+
+                <AnimeSurveyProductionInfo
+                  animeId={candidate.animeId}
+                  format={candidate.format}
+                  episodes={candidate.episodes}
+                  bangumiCollectionTotal={candidate.bangumiCollectionTotal}
+                />
 
                 {record?.status === "SEEN" ? (
                   <div className="mt-7">

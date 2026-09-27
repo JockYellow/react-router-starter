@@ -1,6 +1,9 @@
-import { ensureAnimeBangumiMetricsSchema } from "./anime-bangumi-metrics.server";
 import { cacheAnimeProviderBatch } from "./anime-catalog.server";
-import { compareAnimeSurveyRecognitionRank } from "./anime-survey-ranking";
+import {
+  applyAnimeSurveyRecognitionOrdering,
+  ensureAnimeSurveyOrdering,
+  markAnimeSurveyOrderingCurrent,
+} from "./anime-survey-ordering.server";
 import { ensureAnimeSchema } from "./anime.schema.server";
 import { animeSurveyScopeKey, type AnimeSeason, type AnimeSurveyScope } from "./anime.types";
 import { fetchBangumiSeasonBatch } from "./providers/bangumi.server";
@@ -49,13 +52,6 @@ type ProgressDbRow = {
   completed: number;
 };
 
-type CandidateRankDbRow = {
-  anime_id: number;
-  existing_position: number;
-  collection_total: number | null;
-  bangumi_average_score: number | null;
-  format: string | null;
-};
 
 const LOAD_LOCK_MS = 30_000;
 const BANGUMI_PAGE_SIZE = 25;
@@ -211,66 +207,6 @@ async function candidateCount(db: D1Database, scopeKey: string): Promise<number>
   return row?.count ?? 0;
 }
 
-async function sortFrozenCandidates(db: D1Database, scopeKey: string): Promise<void> {
-  await ensureAnimeBangumiMetricsSchema(db);
-
-  const answered = await db
-    .prepare(
-      `SELECT 1 AS found
-       FROM anime_scope_candidates c
-       JOIN anime_user_decisions d ON d.anime_id = c.anime_id
-       WHERE c.scope_key = ?
-       LIMIT 1`,
-    )
-    .bind(scopeKey)
-    .first<{ found: number }>();
-
-  if (answered) return;
-
-  const rows = await db
-    .prepare(
-      `SELECT
-         c.anime_id,
-         c.position AS existing_position,
-         m.collection_total,
-         m.average_score AS bangumi_average_score,
-         COALESCE(m.format, i.format) AS format
-       FROM anime_scope_candidates c
-       JOIN anime_items i ON i.anime_id = c.anime_id
-       LEFT JOIN anime_bangumi_metrics m ON m.anime_id = c.anime_id
-       WHERE c.scope_key = ?`,
-    )
-    .bind(scopeKey)
-    .all<CandidateRankDbRow>();
-
-  const ranked = (rows.results ?? [])
-    .map((row) => ({
-      animeId: row.anime_id,
-      bangumiCollectionTotal: row.collection_total,
-      bangumiAverageScore: row.bangumi_average_score,
-      format: row.format,
-      existingPosition: row.existing_position,
-    }))
-    .sort(compareAnimeSurveyRecognitionRank);
-
-  if (!ranked.length) return;
-
-  await db.batch([
-    db
-      .prepare("UPDATE anime_scope_candidates SET position = position + 1000000 WHERE scope_key = ?")
-      .bind(scopeKey),
-    ...ranked.map((item, index) =>
-      db
-        .prepare(
-          `UPDATE anime_scope_candidates
-           SET position = ?
-           WHERE scope_key = ? AND anime_id = ?`,
-        )
-        .bind(index + 1, scopeKey, item.animeId),
-    ),
-  ]);
-}
-
 export async function ensureSurveyInitialization(
   db: D1Database,
   scope: AnimeSurveyScope,
@@ -280,7 +216,10 @@ export async function ensureSurveyInitialization(
   await ensureProviderLoadSchema(db);
   const scopeKey = animeSurveyScopeKey(scope);
   const existingLoad = await readLoadState(db, scopeKey);
-  if (existingLoad?.phase === "READY") return { ready: true, state: mapLoadState(existingLoad) };
+  if (existingLoad?.phase === "READY") {
+    await ensureAnimeSurveyOrdering(db, scope);
+    return { ready: true, state: mapLoadState(existingLoad) };
+  }
 
   const [existingProgress, candidates] = await Promise.all([
     db
@@ -291,6 +230,7 @@ export async function ensureSurveyInitialization(
   ]);
 
   if (!existingLoad && (candidates > 0 || existingProgress?.completed === 1)) {
+    await ensureAnimeSurveyOrdering(db, scope);
     return { ready: true, state: null };
   }
 
@@ -384,7 +324,7 @@ export async function processSurveyLoadStep(
 
   try {
     if (stateRow.phase === "BUILDING_SCOPE") {
-      await sortFrozenCandidates(db, scopeKey);
+      const orderingStats = await applyAnimeSurveyRecognitionOrdering(db, scopeKey);
       const count = await candidateCount(db, scopeKey);
       const finishedAt = Date.now();
       await db.batch([
@@ -405,6 +345,7 @@ export async function processSurveyLoadStep(
           )
           .bind(count, count, finishedAt, scopeKey),
       ]);
+      await markAnimeSurveyOrderingCurrent(db, scopeKey, orderingStats);
       const ready = await readLoadState(db, scopeKey);
       if (!ready) throw new Error(`Survey load state ${scopeKey} disappeared after finalize`);
       return { kind: "READY", state: mapLoadState(ready) };

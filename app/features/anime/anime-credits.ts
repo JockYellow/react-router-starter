@@ -1,9 +1,12 @@
 export type AnimeSurveyCredits = {
   studio: string | null;
+  studioDisplay: string | null;
+  studioPersonId: number | null;
   directors: string[];
 };
 
 type BangumiRelatedPersonLike = {
+  id?: unknown;
   name?: unknown;
   type?: unknown;
   relation?: unknown;
@@ -35,14 +38,23 @@ export function parseBangumiSurveyCredits(
       .map((person) => cleanName(person.name)),
   );
 
-  const studios = unique(
-    people
-      .filter((person) => /(动画制作|動畫製作|动画制作公司|動畫製作公司|アニメーション制作)/.test(cleanRelation(person.relation)))
-      .map((person) => cleanName(person.name)),
-  );
+  const studioPeople = people
+    .filter((person) => /(动画制作|動畫製作|动画制作公司|動畫製作公司|アニメーション制作)/.test(cleanRelation(person.relation)))
+    .map((person) => ({
+      id: typeof person.id === "number" && Number.isInteger(person.id) && person.id > 0 ? person.id : null,
+      name: cleanName(person.name),
+    }))
+    .filter((person): person is { id: number | null; name: string } => Boolean(person.name));
+
+  const studio = unique(studioPeople.map((person) => person.name))[0] ?? cleanName(fallbackStudio);
+  const studioPersonId = studio
+    ? studioPeople.find((person) => person.name === studio)?.id ?? null
+    : null;
 
   return {
-    studio: studios[0] ?? cleanName(fallbackStudio),
+    studio,
+    studioDisplay: studio,
+    studioPersonId,
     directors,
   };
 }

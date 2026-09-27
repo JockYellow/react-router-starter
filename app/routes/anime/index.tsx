@@ -94,6 +94,12 @@ export default function AnimeDashboard() {
             >
               瀏覽 Library
             </Link>
+            <Link
+              className="rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm font-bold hover:border-neutral-300"
+              to="/anime/acceptance"
+            >
+              驗收狀態
+            </Link>
             {data.latestScope ? (
               <Link
                 className="rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-neutral-700"

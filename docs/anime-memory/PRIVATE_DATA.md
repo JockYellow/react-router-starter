@@ -32,4 +32,16 @@ Git should contain only:
 
 ## Seed precedence
 
-A seed is historical evidence. If an `anime_decisions` record already exists, the seed does not overwrite it. Manual/survey decisions are authoritative over old seed material.
+A seed is historical evidence. Netflix v2 writes missing history directly to `anime_user_decisions` with `INSERT OR IGNORE`, so an existing manual/survey decision is never overwritten. Canonical provenance is stored in `anime_item_sources`.
+
+
+## Production acceptance
+
+The authenticated Netflix seed loader also returns a private-safe `acceptance` snapshot containing counts only:
+
+- queue rows already on resolver v2 vs legacy payloads;
+- canonical Netflix MATCHED / AMBIGUOUS / UNMATCHED source counts;
+- matched provenance rows missing `anime_id` or personal decisions;
+- TV-season ordering-v2 migrated vs pending scope counts.
+
+The snapshot intentionally does not return private titles, payloads, notes, ratings, or aliases.

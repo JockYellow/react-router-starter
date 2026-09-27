@@ -1,4 +1,5 @@
 import { upsertAnimeBangumiMetrics } from "./anime-bangumi-metrics.server";
+import { findCanonicalAnimeId } from "./anime-canonical-match.server";
 import { distinctAnimeAliases, normalizeAnimeAlias } from "./anime-title";
 import { ensureAnimeSchema } from "./anime.schema.server";
 import type { AniListAnime } from "./providers/anilist.server";
@@ -52,74 +53,6 @@ function buildProviderAliases(record: AnimeProviderRecord, titleZhTw?: string | 
   });
 }
 
-async function findByExternalId(db: D1Database, record: AnimeProviderRecord): Promise<number | null> {
-  if (record.malId) {
-    const byMal = await db
-      .prepare("SELECT anime_id FROM anime_items WHERE mal_id = ?")
-      .bind(record.malId)
-      .first<{ anime_id: number }>();
-    if (byMal) return byMal.anime_id;
-  }
-  if (record.anilistId) {
-    const byAniList = await db
-      .prepare("SELECT anime_id FROM anime_items WHERE anilist_id = ?")
-      .bind(record.anilistId)
-      .first<{ anime_id: number }>();
-    if (byAniList) return byAniList.anime_id;
-  }
-  if (record.bangumiId) {
-    const byBangumi = await db
-      .prepare("SELECT anime_id FROM anime_items WHERE bangumi_id = ?")
-      .bind(record.bangumiId)
-      .first<{ anime_id: number }>();
-    if (byBangumi) return byBangumi.anime_id;
-  }
-  return null;
-}
-
-async function findUniqueExactAliasMatch(
-  db: D1Database,
-  record: AnimeProviderRecord,
-  titleZhTw: string | null,
-): Promise<number | null> {
-  if (!record.seasonYear) return null;
-  const normalizedAliases = Array.from(
-    new Set(
-      buildProviderAliases(record, titleZhTw)
-        .map((entry) => normalizeAnimeAlias(entry.alias))
-        .filter(Boolean),
-    ),
-  );
-  if (!normalizedAliases.length) return null;
-
-  const matchingIds = new Set<number>();
-  for (const normalized of normalizedAliases) {
-    const rows = await db
-      .prepare(
-        `SELECT DISTINCT i.anime_id
-         FROM anime_item_aliases a
-         JOIN anime_items i ON i.anime_id = a.anime_id
-         WHERE a.normalized_alias = ?
-           AND (i.year = ? OR i.year IS NULL)
-         LIMIT 3`,
-      )
-      .bind(normalized, record.seasonYear)
-      .all<{ anime_id: number }>();
-    for (const row of rows.results ?? []) matchingIds.add(row.anime_id);
-    if (matchingIds.size > 1) return null;
-  }
-
-  return matchingIds.size === 1 ? [...matchingIds][0] : null;
-}
-
-async function findAnimeId(
-  db: D1Database,
-  record: AnimeProviderRecord,
-  titleZhTw: string | null,
-): Promise<number | null> {
-  return (await findByExternalId(db, record)) ?? findUniqueExactAliasMatch(db, record, titleZhTw);
-}
-
 export async function cacheAnimeProviderRecord(
   db: D1Database,
   record: AnimeProviderRecord,
@@ -129,7 +62,16 @@ export async function cacheAnimeProviderRecord(
   const now = Date.now();
   const titleZhTw = effectiveZhTitle(record, options.titleZhTw);
   const sharedPopularity = record.provider === "ANILIST" ? record.popularity : null;
-  let animeId = await findAnimeId(db, record, titleZhTw);
+  const aliases = buildProviderAliases(record, titleZhTw);
+  let animeId = await findCanonicalAnimeId(db, {
+    externalIds: {
+      malId: record.malId,
+      anilistId: record.anilistId,
+      bangumiId: record.bangumiId,
+    },
+    aliases: aliases.map((input) => input.alias),
+    year: record.seasonYear,
+  });
 
   if (animeId) {
     await db
@@ -219,12 +161,17 @@ export async function cacheAnimeProviderRecord(
     if (typeof insertedId === "number" && insertedId > 0) {
       animeId = insertedId;
     } else {
-      animeId = await findByExternalId(db, record);
+      animeId = await findCanonicalAnimeId(db, {
+        externalIds: {
+          malId: record.malId,
+          anilistId: record.anilistId,
+          bangumiId: record.bangumiId,
+        },
+      });
       if (!animeId) throw new Error(`Unable to cache ${record.provider} anime ${record.providerId}`);
     }
   }
 
-  const aliases = buildProviderAliases(record, titleZhTw);
   if (aliases.length) {
     await db.batch(
       aliases.map((input) =>

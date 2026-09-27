@@ -1,6 +1,9 @@
 import { ensureAnimeSchema } from "./anime.schema.server";
 import { parseReviewedNetflixSeed } from "./netflix-seed-input";
-import { importReviewedNetflixRow } from "./netflix-seed.server";
+import {
+  importReviewedNetflixRow,
+  NETFLIX_SEED_RESOLVER_VERSION,
+} from "./netflix-seed.server";
 import {
   netflixSourceRef,
   type ReviewedNetflixSeedRow,
@@ -25,6 +28,7 @@ export type NetflixSeedStageResult = {
 };
 
 export type NetflixSeedProcessResult = {
+  upgraded: number;
   selected: number;
   matched: number;
   ambiguous: number;
@@ -52,8 +56,9 @@ type CountRow = {
   count: number;
 };
 
-function serializeSeedRow(row: ReviewedNetflixSeedRow): string {
+export function serializeReviewedNetflixSeedQueueRow(row: ReviewedNetflixSeedRow): string {
   return JSON.stringify({
+    resolverVersion: NETFLIX_SEED_RESOLVER_VERSION,
     title: row.title,
     category: row.category ?? null,
     format: row.format ?? null,
@@ -84,7 +89,7 @@ export async function stageReviewedNetflixSeedRows(
 
   for (const row of rows) {
     const sourceRef = netflixSourceRef(row);
-    const payloadJson = serializeSeedRow(row);
+    const payloadJson = serializeReviewedNetflixSeedQueueRow(row);
     const existing = await db
       .prepare(
         `SELECT payload_json
@@ -139,13 +144,98 @@ function outcomeToQueueStatus(
   return outcome;
 }
 
+export async function upgradeLegacyReviewedNetflixSeedQueue(
+  db: D1Database,
+  options: { limit?: number } = {},
+): Promise<number> {
+  await ensureAnimeSchema(db);
+  const limit = Math.max(1, Math.min(Math.trunc(options.limit ?? 10), 10));
+  const rows = await db
+    .prepare(
+      `SELECT id, source_ref, payload_json
+       FROM anime_seed_queue
+       WHERE source = 'netflix'
+         AND (
+           json_valid(payload_json) = 0
+           OR CAST(
+             json_extract(
+               CASE WHEN json_valid(payload_json) = 1 THEN payload_json ELSE '{}' END,
+               '$.resolverVersion'
+             ) AS INTEGER
+           ) IS NULL
+           OR CAST(
+             json_extract(
+               CASE WHEN json_valid(payload_json) = 1 THEN payload_json ELSE '{}' END,
+               '$.resolverVersion'
+             ) AS INTEGER
+           ) <> ?
+         )
+       ORDER BY id ASC
+       LIMIT ?`,
+    )
+    .bind(NETFLIX_SEED_RESOLVER_VERSION, limit)
+    .all<QueueRow>();
+
+  let upgraded = 0;
+  const updates = [];
+
+  for (const queueRow of rows.results ?? []) {
+    let parsedPayload: Record<string, unknown> | null = null;
+    try {
+      const value: unknown = JSON.parse(queueRow.payload_json);
+      parsedPayload = value && typeof value === "object" && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : null;
+    } catch {
+      parsedPayload = null;
+    }
+
+    if (parsedPayload?.resolverVersion === NETFLIX_SEED_RESOLVER_VERSION) continue;
+
+    try {
+      const [seedRow] = parseReviewedNetflixSeed([parsedPayload ?? JSON.parse(queueRow.payload_json)]);
+      if (!seedRow) throw new Error("Legacy seed queue row did not contain a valid payload");
+      updates.push(
+        db
+          .prepare(
+            `UPDATE anime_seed_queue
+             SET payload_json = ?,
+                 queue_status = 'PENDING',
+                 attempt_count = 0,
+                 last_error = NULL,
+                 updated_at = ?
+             WHERE id = ?`,
+          )
+          .bind(serializeReviewedNetflixSeedQueueRow(seedRow), Date.now(), queueRow.id),
+      );
+      upgraded += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Legacy seed queue upgrade failed";
+      updates.push(
+        db
+          .prepare(
+            `UPDATE anime_seed_queue
+             SET queue_status = 'ERROR',
+                 last_error = ?,
+                 updated_at = ?
+             WHERE id = ?`,
+          )
+          .bind(message.slice(0, 1000), Date.now(), queueRow.id),
+      );
+    }
+  }
+
+  if (updates.length) await db.batch(updates);
+  return upgraded;
+}
+
 export async function processReviewedNetflixSeedQueue(
   db: D1Database,
   options: { limit?: number } = {},
 ): Promise<NetflixSeedProcessResult> {
   await ensureAnimeSchema(db);
-
   const limit = Math.max(1, Math.min(Math.trunc(options.limit ?? 5), 10));
+  const upgraded = await upgradeLegacyReviewedNetflixSeedQueue(db, { limit });
   const pending = await db
     .prepare(
       `SELECT id, source_ref, payload_json
@@ -159,6 +249,7 @@ export async function processReviewedNetflixSeedQueue(
 
   const rows = pending.results ?? [];
   const result: NetflixSeedProcessResult = {
+    upgraded,
     selected: rows.length,
     matched: 0,
     ambiguous: 0,

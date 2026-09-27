@@ -192,3 +192,51 @@ Bangumi `name_cn` is converted with OpenCC `cn -> tw` and may be used as the pra
 **Decision:** The Bangumi seasonal loader uses `anime_scope_load_state_v2`, separate from the earlier AniList/Jikan load-state experiments. Old failed 403 state must not block or resume the new provider flow.
 
 **Reason:** SQLite CHECK constraints and provider cursor semantics changed during the migration. A versioned state table is safer and clearer than trying to reinterpret an ERROR/page cursor that belonged to a different provider.
+
+## D-033 — Canonical tables are the only new product write boundary
+**Decision:** New Anime Memory features write through the provider-neutral `anime_items`, `anime_item_aliases`, `anime_user_*`, `anime_item_sources`, and scope tables. Legacy AniList-keyed tables remain compatibility/migration storage only.
+
+**Reason:** The application identity has already moved to `anime_id`. Allowing new feature code to keep writing legacy tables creates delayed-copy behavior and makes production state depend on schema re-initialization timing.
+
+## D-034 — Canonical matching is shared and conservative
+**Decision:** Provider caching and future external-history ingestion share one canonical matcher. Exact external ids have priority; otherwise only a unique exact normalized alias with compatible year may auto-match. Ambiguous/no-year title evidence remains unresolved.
+
+**Reason:** Identity rules must not differ between seasonal discovery, Netflix imports, and future sources. A false merge is harder to repair than an unresolved source row.
+
+## D-035 — Provider-specific metrics stay provider-specific
+**Decision:** Bangumi `collection_total` remains in `anime_bangumi_metrics`; legacy AniList popularity is not treated as the same scale. Shared metadata reads expose them as separate fields.
+
+**Reason:** The previous mixed popularity field caused recognition ordering to appear incorrect even when a sort was technically applied.
+
+## D-036 — Existing TV-season scopes migrate lazily to ordering v2
+**Decision:** TV-season candidate order is versioned. Existing scopes without the current ordering version are migrated the next time that scope is opened. The migration rewrites only `anime_scope_candidates.position`, preserves candidate membership and all personal records, refreshes derived survey progress, and then records the applied ordering version.
+
+Concurrent migration attempts are guarded by a short D1 lock. A failed migration releases the lock and leaves the existing scope usable so a later request can retry.
+
+Candidates without provider-specific Bangumi collection metrics are not ranked with the legacy mixed `anime_items.popularity` field. They remain behind candidates with known Bangumi recognition data and preserve their previous relative order.
+
+**Reason:** The corrected Bangumi ranking formula already exists, but historical/answered scopes were intentionally frozen before that correction. Versioning gives those scopes a one-time safe migration without turning seasonal order into a continuously changing live ranking.
+
+## D-037 — Survey production info uses provider aliases without overwriting raw credits
+**Decision:** The survey card is the single production-information surface. It shows format, episode count, provider-specific Bangumi collection count, studio, and director data. The fixed hotkey footer no longer duplicates studio/director information.
+
+Bangumi subject-person relations remain the raw credit source. For the currently visible card only, a studio company may be enriched through Bangumi PersonDetail. Display-name priority is provider-supplied Chinese name (converted cn -> tw), then an explicit English alias for kana-heavy raw names, then the raw provider name. Raw studio names remain stored separately and may be shown as secondary text.
+
+Person display aliases are cached globally by Bangumi person id. The existing rolling credits prefetch does not fetch PersonDetail for every queued anime.
+
+**Reason:** This improves recognition without inventing translations, preserves provider provenance, exposes the metric used by seasonal ranking, and avoids multiplying provider requests during rapid survey flow.
+
+## D-038 — Netflix ingestion v2 resolves through canonical provenance and Bangumi
+**Decision:** Reviewed Netflix history no longer uses AniList as its required resolver or writes new rows to legacy AniList-keyed tables.
+
+Resolution order is:
+1. reuse an existing MATCHED canonical `anime_item_sources` Netflix mapping when present;
+2. otherwise search Bangumi by title and accept only one exact provider alias (native, Chinese, or cn -> tw equivalent);
+3. ambiguous/non-exact search results remain unresolved.
+
+A matched Bangumi subject is fetched by id and cached through the normal canonical provider cache. Netflix provenance writes directly to `anime_item_sources`; missing personal history writes directly to `anime_user_decisions` using `INSERT OR IGNORE`, so an existing manual/survey decision wins.
+
+Netflix queue payloads carry `resolverVersion: 2`. Legacy staged payloads are automatically normalized to v2 and reset to PENDING before processing, allowing the already-staged private queue to be re-resolved without re-entering source rows.
+
+**Reason:** The runtime application is provider-neutral/Bangumi-based. Continuing to route new Netflix history through legacy AniList tables created timing-dependent copy behavior and could leave the current library/survey unaware of newly imported decisions.
+

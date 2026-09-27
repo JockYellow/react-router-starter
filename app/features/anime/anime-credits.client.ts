@@ -9,10 +9,19 @@ function parseCredits(value: unknown): AnimeSurveyCredits | null {
   const studio = typeof record.studio === "string" && record.studio.trim()
     ? record.studio.trim()
     : null;
+  const studioDisplay = typeof record.studioDisplay === "string" && record.studioDisplay.trim()
+    ? record.studioDisplay.trim()
+    : studio;
+  const studioPersonId = Number(record.studioPersonId);
   const directors = Array.isArray(record.directors)
     ? record.directors.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
     : [];
-  return { studio, directors };
+  return {
+    studio,
+    studioDisplay,
+    studioPersonId: Number.isInteger(studioPersonId) && studioPersonId > 0 ? studioPersonId : null,
+    directors,
+  };
 }
 
 function normalizeAnimeIds(animeIds: readonly number[]): number[] {
@@ -21,8 +30,9 @@ function normalizeAnimeIds(animeIds: readonly number[]): number[] {
   )).slice(0, 20);
 }
 
-async function startBatch(ids: number[]): Promise<void> {
+async function startBatch(ids: number[], display = false): Promise<void> {
   const params = new URLSearchParams({ ids: ids.join(",") });
+  if (display) params.set("display", "1");
   const response = await fetch(`/api/anime/credits?${params.toString()}`, {
     credentials: "same-origin",
     headers: { Accept: "application/json" },
@@ -93,5 +103,12 @@ export async function loadAnimeCredits(animeId: number): Promise<AnimeSurveyCred
   const pending = pendingCredits.get(animeId);
   if (pending) return pending;
   await prefetchAnimeCredits([animeId]);
+  return creditsCache.get(animeId) ?? null;
+}
+
+
+export async function loadAnimeDisplayCredits(animeId: number): Promise<AnimeSurveyCredits | null> {
+  if (!Number.isInteger(animeId) || animeId <= 0) return null;
+  await startBatch([animeId], true);
   return creditsCache.get(animeId) ?? null;
 }

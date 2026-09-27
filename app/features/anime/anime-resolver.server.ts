@@ -1,3 +1,4 @@
+import { toTaiwanTraditionalChinese } from "./anime-chinese-title.server";
 import { distinctAnimeAliases, normalizeAnimeAlias } from "./anime-title";
 import type { AniListAnime } from "./providers/anilist.server";
 import { searchAniListAnime } from "./providers/anilist.server";
@@ -85,6 +86,98 @@ export async function resolveAniListByTitle(
         ? "MULTIPLE_EXACT_ALIASES"
         : "SEARCH_RESULTS_WITHOUT_EXACT_ALIAS",
     candidates,
+  };
+}
+
+export type BangumiTitleResolution =
+  | {
+      status: "MATCHED";
+      candidate: BangumiAnimeCandidate;
+      reason: "EXACT_ALIAS" | "EXACT_ALIAS_AND_YEAR";
+      candidates: BangumiAnimeCandidate[];
+    }
+  | {
+      status: "AMBIGUOUS";
+      reason: "MULTIPLE_EXACT_ALIASES" | "SEARCH_RESULTS_WITHOUT_EXACT_ALIAS";
+      candidates: BangumiAnimeCandidate[];
+    }
+  | {
+      status: "UNMATCHED";
+      reason: "NO_RESULTS" | "EMPTY_TITLE";
+      candidates: BangumiAnimeCandidate[];
+    };
+
+function bangumiCandidateAliases(candidate: BangumiAnimeCandidate): string[] {
+  const nameCnTw = candidate.nameCn
+    ? toTaiwanTraditionalChinese(candidate.nameCn)
+    : null;
+  return distinctAnimeAliases([
+    candidate.name,
+    candidate.nameCn,
+    nameCnTw,
+  ]);
+}
+
+function bangumiCandidateHasExactAlias(
+  candidate: BangumiAnimeCandidate,
+  normalizedTitle: string,
+): boolean {
+  return bangumiCandidateAliases(candidate).some(
+    (alias) => normalizeAnimeAlias(alias) === normalizedTitle,
+  );
+}
+
+export async function resolveBangumiByTitle(
+  title: string,
+  options: { year?: number | null; searchLimit?: number } = {},
+): Promise<BangumiTitleResolution> {
+  const normalizedTitle = normalizeAnimeAlias(title);
+  if (!normalizedTitle) {
+    return { status: "UNMATCHED", reason: "EMPTY_TITLE", candidates: [] };
+  }
+
+  const candidates = await searchBangumiAnime(title, {
+    limit: options.searchLimit ?? 10,
+  });
+  if (!candidates.length) {
+    return { status: "UNMATCHED", reason: "NO_RESULTS", candidates: [] };
+  }
+
+  const exact = candidates.filter((candidate) =>
+    bangumiCandidateHasExactAlias(candidate, normalizedTitle),
+  );
+
+  if (exact.length === 1) {
+    return {
+      status: "MATCHED",
+      candidate: exact[0],
+      reason:
+        options.year != null && bangumiYear(exact[0]) === options.year
+          ? "EXACT_ALIAS_AND_YEAR"
+          : "EXACT_ALIAS",
+      candidates,
+    };
+  }
+
+  if (exact.length > 1 && options.year != null) {
+    const sameYear = exact.filter((candidate) => bangumiYear(candidate) === options.year);
+    if (sameYear.length === 1) {
+      return {
+        status: "MATCHED",
+        candidate: sameYear[0],
+        reason: "EXACT_ALIAS_AND_YEAR",
+        candidates,
+      };
+    }
+  }
+
+  return {
+    status: "AMBIGUOUS",
+    reason:
+      exact.length > 1
+        ? "MULTIPLE_EXACT_ALIASES"
+        : "SEARCH_RESULTS_WITHOUT_EXACT_ALIAS",
+    candidates: exact.length ? exact : candidates,
   };
 }
 
