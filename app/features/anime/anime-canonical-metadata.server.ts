@@ -23,7 +23,7 @@ export type AnimeCanonicalMetadata = {
   coverUrl: string | null;
   genres: string[];
   metadataSource: string;
-  legacyAniListPopularity: number | null;
+  legacySharedPopularity: number | null;
   bangumi: {
     collectionTotal: number | null;
     averageScore: number | null;
@@ -175,7 +175,7 @@ export async function getAnimeCanonicalMetadata(
     coverUrl: row.cover_url,
     genres: parseGenres(row.genres_json),
     metadataSource: row.metadata_source,
-    legacyAniListPopularity: row.popularity,
+    legacySharedPopularity: row.popularity,
     bangumi: row.bangumi_observed_at == null
       ? null
       : {
