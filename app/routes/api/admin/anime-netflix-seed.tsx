@@ -5,6 +5,7 @@ import {
   requireCsrf,
 } from "../../../features/admin/admin-auth.server";
 import { requireBlogDb } from "../../../lib/d1.server";
+import { getAnimeAcceptanceSnapshot } from "../../../features/anime/anime-acceptance.server";
 import {
   NetflixSeedValidationError,
   parseReviewedNetflixSeed,
@@ -25,9 +26,12 @@ function jsonError(message: string, status = 400, details?: unknown) {
 export async function loader({ request, context }: LoaderFunctionArgs) {
   const csrf = await getCsrfToken(request, context);
   const db = requireBlogDb(context);
-  const summary = await getReviewedNetflixSeedQueueSummary(db);
+  const [summary, acceptance] = await Promise.all([
+    getReviewedNetflixSeedQueueSummary(db),
+    getAnimeAcceptanceSnapshot(db),
+  ]);
   return Response.json(
-    { ok: true, csrfToken: csrf.token, summary },
+    { ok: true, csrfToken: csrf.token, summary, acceptance },
     { headers: { "Set-Cookie": csrf.cookie } },
   );
 }
