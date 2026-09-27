@@ -49,14 +49,14 @@ identity/metadata foundation and are now split into independently verifiable pha
 - [x] Keep one responsive card metadata block for desktop/mobile; CI #154 tests/typecheck/build/dry-run passed.
 
 ### Phase E — Netflix ingestion v2
-- [ ] Stop using AniList as the required Netflix resolver.
-- [ ] Match canonical local identity first using the shared matcher.
-- [ ] Use Bangumi fallback only under conservative exact-match rules.
-- [ ] Write provenance to `anime_item_sources` directly.
-- [ ] Write missing personal decisions to `anime_user_decisions` directly.
-- [ ] Never overwrite newer manual/survey decisions.
-- [ ] Re-resolve existing staged queue rows idempotently.
-- [ ] Cover MATCHED / AMBIGUOUS / UNMATCHED / ERROR with synthetic fixtures.
+- [x] Stop using AniList as the required Netflix resolver.
+- [x] Reuse existing canonical Netflix provenance first; alias-only local matching remains intentionally blocked without year evidence.
+- [x] Use Bangumi fallback only under conservative exact-match rules.
+- [x] Write provenance to `anime_item_sources` directly.
+- [x] Write missing personal decisions to `anime_user_decisions` directly.
+- [x] Never overwrite newer manual/survey decisions (`INSERT OR IGNORE`).
+- [x] Re-resolve existing staged queue rows idempotently through resolverVersion 2 auto-upgrade.
+- [x] Cover canonical matched writes, resolver ambiguity/non-exact handling, queue upgrade and Bangumi detail normalization with synthetic tests; CI #164 passed.
 
 ### Phase F — real D1/private-data acceptance
 - [ ] Verify schema/idempotency against real `BLOG_DB`.
