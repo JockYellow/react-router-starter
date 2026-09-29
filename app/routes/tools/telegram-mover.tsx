@@ -266,8 +266,6 @@ export default function TelegramMover() {
   const [status, setStatus] = useState("等待設定");
   const [error, setError] = useState<string | null>(null);
 
-  const [qrUrl, setQrUrl] = useState<string | null>(null);
-  const [qrExpiresAt, setQrExpiresAt] = useState<Date | null>(null);
   const authAbortRef = useRef<AbortController | null>(null);
 
   const [channels, setChannels] = useState<ChannelOption[]>([]);
@@ -398,41 +396,7 @@ export default function TelegramMover() {
     setChannels([]);
     setSourceId(null);
     setCandidates([]);
-    setQrUrl(null);
     setStatus("等待設定");
-  }
-
-  async function loginWithTelegramApp() {
-    if (!telegramClient) return;
-    authAbortRef.current?.abort();
-    const abortController = new AbortController();
-    authAbortRef.current = abortController;
-
-    setError(null);
-    setQrUrl(null);
-    setStatus("正在產生 Telegram App 授權連結…");
-
-    try {
-      const currentUser = await telegramClient.start({
-        qrCodeHandler: (url: string, expires: Date) => {
-          setQrUrl(url);
-          setQrExpiresAt(expires);
-          setStatus("請點下方按鈕到 Telegram App 確認登入");
-        },
-        password: async () => window.prompt("Telegram 兩步驟驗證密碼") ?? "",
-        abortSignal: abortController.signal,
-      });
-
-      setMe(currentUser);
-      setQrUrl(null);
-      setQrExpiresAt(null);
-      setStatus("已登入：" + currentUser.displayName);
-      await loadChannels();
-    } catch (cause) {
-      if (abortController.signal.aborted) return;
-      setError(cause instanceof Error ? cause.message : String(cause));
-      setStatus("Telegram App 授權未完成");
-    }
   }
 
   async function loginWithPhone() {
@@ -445,7 +409,6 @@ export default function TelegramMover() {
     if (!phone) return;
 
     setError(null);
-    setQrUrl(null);
     setStatus("等待 Telegram 驗證碼…");
 
     try {
@@ -1203,7 +1166,9 @@ export default function TelegramMover() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="font-semibold">2. 登入 Telegram</h2>
-                <p className="mt-1 text-sm text-slate-400">優先使用已登入的 Telegram App 授權。</p>
+                <p className="mt-1 text-sm text-slate-400">
+                  這個工具主要在同一支手機上使用，因此改用手機號碼＋驗證碼登入。Telegram 的 QR 登入需要另一個已登入裝置掃描，不適合單手機流程。
+                </p>
               </div>
               <button type="button" onClick={resetCredentials} className="text-xs text-slate-500 underline">
                 重設 API 憑證
@@ -1211,39 +1176,17 @@ export default function TelegramMover() {
             </div>
 
             <div className="mt-4 grid gap-3">
-              {!qrUrl ? (
-                <button
-                  type="button"
-                  onClick={() => void loginWithTelegramApp()}
-                  disabled={booting}
-                  className="rounded-xl bg-sky-500 px-4 py-3 font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-50"
-                >
-                  使用 Telegram App 授權
-                </button>
-              ) : (
-                <div className="rounded-xl border border-sky-800 bg-sky-950/40 p-3">
-                  <p className="text-sm text-sky-100">授權連結已產生，請在失效前開啟 Telegram 並確認。</p>
-                  {qrExpiresAt && (
-                    <p className="mt-1 text-xs text-slate-400">
-                      有效至 {qrExpiresAt.toLocaleTimeString("zh-TW")}
-                    </p>
-                  )}
-                  <a
-                    href={qrUrl}
-                    className="mt-3 block rounded-xl bg-sky-500 px-4 py-3 text-center font-semibold text-slate-950"
-                  >
-                    在 Telegram App 開啟
-                  </a>
-                </div>
-              )}
-
               <button
                 type="button"
                 onClick={() => void loginWithPhone()}
-                className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-semibold text-slate-200 hover:bg-slate-800"
+                disabled={booting}
+                className="rounded-xl bg-sky-500 px-4 py-3 font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-50"
               >
-                改用手機號碼＋驗證碼
+                使用手機號碼＋驗證碼登入
               </button>
+              <p className="text-xs leading-5 text-slate-500">
+                驗證碼通常會送到你現有的 Telegram App。切到 Telegram 查看後再切回此頁輸入即可；如果帳號有兩步驟驗證，接著會再要求密碼。
+              </p>
             </div>
           </section>
         )}
