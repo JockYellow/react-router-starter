@@ -934,7 +934,6 @@ export default function TelegramMover() {
           ? {
               ...channel,
               lastReadIngoing: Math.max(channel.lastReadIngoing, target),
-              unreadCount: 0,
             }
           : channel,
       ),
@@ -1053,7 +1052,7 @@ export default function TelegramMover() {
 
       if (stopped) {
         setStatus(
-          "已停止，可下次續傳。" +
+          "已停止；重新掃描同一範圍即可從現有檔案續傳。" +
             (readTarget ? " 已讀安全更新至訊息 " + readTarget + "。" : ""),
         );
       } else {
@@ -1063,11 +1062,14 @@ export default function TelegramMover() {
             " 支，失敗 " +
             failed +
             " 支。" +
+            (failed > 0 ? " 重新掃描即可只處理失敗／未完成項目。" : "") +
             (readTarget ? " 已讀安全更新至訊息 " + readTarget + "。" : ""),
         );
       }
 
-      await scanVideos();
+      setCandidates([]);
+      setScanHandledIds([]);
+      setScanBlockerIds([]);
     } catch (cause) {
       if (isAbortError(cause) || abortController.signal.aborted) {
         setStatus("已停止，可下次續傳");
