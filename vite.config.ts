@@ -14,6 +14,9 @@ export default defineConfig({
     reactRouter(),
     tsconfigPaths(),
   ],
+  optimizeDeps: {
+    exclude: ["@mtcute/wasm"],
+  },
   ssr: {
     optimizeDeps: {
       noDiscovery: true,
