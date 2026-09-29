@@ -919,13 +919,14 @@ export default function TelegramMover() {
     if (!markReadAfter || !telegramClient || !source || handledIds.size === 0) return null;
 
     let target = Math.max(...handledIds);
-    const blockingBeforeTarget = [...blockerIds].filter((id) => id <= target);
+    const blockingBeforeTarget = [...blockerIds].filter(
+      (id) => id > source.lastReadIngoing && id <= target,
+    );
     if (blockingBeforeTarget.length > 0) {
       target = Math.min(target, Math.min(...blockingBeforeTarget) - 1);
     }
 
-    if (target <= 0) return null;
-    if (rangeMode === "unread" && target <= source.lastReadIngoing) return null;
+    if (target <= source.lastReadIngoing) return null;
 
     await telegramClient.readHistory(source.id, { maxId: target });
     setChannels((current) =>
