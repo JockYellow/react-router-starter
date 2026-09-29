@@ -860,10 +860,16 @@ export default function TelegramMover() {
       } catch (cause) {
         if (writable) {
           try {
-            await writable.abort();
+            // createWritable commits changes on close; keep the partial bytes so the next run can resume.
+            await writable.close();
           } catch {
-            // Ignore cleanup failures.
+            try {
+              await writable.abort();
+            } catch {
+              // Ignore cleanup failures.
+            }
           }
+          writable = null;
         }
 
         if (isAbortError(cause) || abortSignal.aborted) {
@@ -916,7 +922,15 @@ export default function TelegramMover() {
   }
 
   async function markSafeReadBoundary(handledIds: Set<number>, blockerIds: Set<number>) {
-    if (!markReadAfter || !telegramClient || !source || handledIds.size === 0) return null;
+    if (
+      !markReadAfter ||
+      rangeMode !== "unread" ||
+      !telegramClient ||
+      !source ||
+      handledIds.size === 0
+    ) {
+      return null;
+    }
 
     let target = Math.max(...handledIds);
     const blockingBeforeTarget = [...blockerIds].filter(
@@ -952,6 +966,8 @@ export default function TelegramMover() {
       return;
     }
 
+    const effectiveMarkRead = markReadAfter && rangeMode === "unread";
+
     const confirmation =
       "即將處理 " +
       (candidates.length + scanHandledIds.length) +
@@ -967,9 +983,11 @@ export default function TelegramMover() {
       "速度：" +
       (limitEnabled ? parsedLimit + " Mbps" : "不限速") +
       "\n" +
-      (markReadAfter
+      (effectiveMarkRead
         ? "完成後會把 Telegram 已讀位置推進到安全邊界；失敗／受保護影片不會被跨過。"
-        : "不修改 Telegram 已讀狀態。");
+        : rangeMode === "date"
+          ? "指定日期模式為避免誤讀更舊訊息，不修改 Telegram 已讀狀態。"
+          : "不修改 Telegram 已讀狀態。");
 
     if (!window.confirm(confirmation)) return;
 
@@ -1393,14 +1411,16 @@ export default function TelegramMover() {
                   <input
                     type="checkbox"
                     checked={markReadAfter}
-                    disabled={downloading}
+                    disabled={downloading || rangeMode !== "unread"}
                     onChange={(event) => setMarkReadAfter(event.target.checked)}
                     className="mt-1"
                   />
                   <span>
                     <span className="block font-medium">下載後更新 Telegram 已讀位置</span>
                     <span className="text-xs leading-5 text-slate-500">
-                      只推進到安全邊界；如果中間有下載失敗、內容保護或異常檔案，就不跨過它。中間的文字／圖片也會隨 Telegram 的 read boundary 一起變成已讀。
+                      {rangeMode === "date"
+                        ? "指定日期模式不自動改已讀，避免 Telegram 的整段 read boundary 誤讀日期之前的舊訊息。切回「目前未讀」即可使用。"
+                        : "只推進到安全邊界；如果中間有下載失敗、內容保護或異常檔案，就不跨過它。中間的文字／圖片也會隨 Telegram 的 read boundary 一起變成已讀。"}
                     </span>
                   </span>
                 </label>
@@ -1486,7 +1506,9 @@ export default function TelegramMover() {
                     >
                       {candidates.length > 0
                         ? "開始下載 " + candidates.length + " 支影片"
-                        : "沒有新檔案；套用安全已讀位置"}
+                        : markReadAfter && rangeMode === "unread"
+                          ? "沒有新檔案；套用安全已讀位置"
+                          : "沒有新檔案；完成本輪確認"}
                     </button>
                   ) : (
                     <button
