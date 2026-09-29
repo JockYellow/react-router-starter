@@ -64,9 +64,8 @@ identity/metadata foundation and are now split into independently verifiable pha
 - [x] Return acceptance counters after stage/resolve/retry API actions.
 - [x] Verify Phase F harness with Anime CI #184: 83 tests, typecheck, build and Wrangler dry-run passed.
 - [x] Merge PR #24 to `main`.
-- [x] Add manual GitHub Actions production deploy workflow.
-- [ ] Configure GitHub Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
-- [ ] Run `Deploy Worker Production` for current `main` before touching production/private rows.
+- [x] Confirm Cloudflare Workers Builds / Git integration is active for the repository.
+- [ ] Confirm the merged `main` revision is live on the production Worker before touching production/private rows.
 - [ ] Verify schema/idempotency against real `BLOG_DB`.
 - [ ] Run a small reviewed Netflix sample first.
 - [ ] Confirm Survey, Library and source provenance share the same `anime_id`.
