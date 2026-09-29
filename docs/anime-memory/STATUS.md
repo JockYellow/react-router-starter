@@ -132,14 +132,14 @@ No production/private Netflix rows have been processed on this branch.
 
 ### Phase F — production/private migration and end-to-end acceptance
 
-**Acceptance harness merged in PR #24. Latest branch verification passed Anime CI #186 (83 Anime tests, typecheck, build, Wrangler dry-run). Real D1 execution remains pending production deployment of main.**
+**Acceptance harness merged in PR #24. Latest branch verification passed Anime CI #186 (83 Anime tests, typecheck, build, Wrangler dry-run). Cloudflare Git integration is active; production/private D1 acceptance remains the next validation step after confirming the main-branch deployment.**
 
 - Added authenticated `/anime/acceptance` page with private-safe counts only.
 - Added resolver-version, canonical-source/decision consistency, and seasonal-ordering migration counters.
 - Added deliberately small Netflix resolve controls (1 or 5 rows); there is no one-click full-queue action.
 - The existing admin seed API now returns the same acceptance snapshot after stage/resolve/retry.
-- Added `.github/workflows/deploy-worker-production.yml`: production deploy is now a manual GitHub Actions workflow that reruns Anime tests, typecheck, build and Wrangler dry-run before deploy.
-- GitHub Actions preflight confirmed the repository currently has neither `CLOUDFLARE_API_TOKEN` nor `CLOUDFLARE_ACCOUNT_ID` configured, so production deployment cannot run from GitHub yet.
+- The Worker is connected directly to Cloudflare Workers Builds / Git integration. Cloudflare automatically builds and deploys repository pushes; no GitHub Actions deployment secrets are required for that path.
+- PR #24 received a successful Cloudflare Workers deployment comment for head `02665158`, confirming the Git integration is active.
 - validate schema/idempotency against real D1 after deployment;
 - process a small private Netflix sample first;
 - verify Survey / Library / provenance all point to the same `anime_id`;
