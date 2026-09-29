@@ -7,6 +7,7 @@ on:
       - "public/telegram-mover.webmanifest"
       - "public/telegram-mover-icon.svg"
       - "vite.config.ts"
+      - "workers/app.ts"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/telegram-downloader-ci.yml"
