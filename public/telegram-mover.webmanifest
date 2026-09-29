@@ -1,7 +1,7 @@
 {
-  "name": "Telegram 影片搬運器",
-  "short_name": "影片搬運器",
-  "description": "掃描 Telegram 私人頻道影片並批次轉入 Turrit 下載佇列",
+  "name": "Telegram 私人影片下載器",
+  "short_name": "Telegram 下載器",
+  "description": "直接下載 Telegram 私人頻道影片到手機，可限速、續傳與防重複",
   "start_url": "/telegram-mover",
   "scope": "/telegram-mover",
   "display": "standalone",
