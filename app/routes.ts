@@ -5,6 +5,8 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 export default [
   index("routes/missing.tsx"),
   route("jock_space", "routes/home.tsx"),
+  route("trip-map", "routes/trip-map.tsx"),
+  route("api/trip-map", "routes/api/trip-map.tsx"),
   route("about", "routes/about.tsx"),
   route("blog", "routes/blog/index.tsx"),
   route("blog/:slug", "routes/blog/$slug.tsx"),
