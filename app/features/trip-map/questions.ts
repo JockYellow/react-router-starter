@@ -69,7 +69,7 @@ export function individualFit(ans:Answers) {
   const route=ROUTES[id]; const projected=Object.entries(route.traits).reduce((s,[k,w])=>s+clamp(traits[k]??3)*w,0);
   let fit=clamp((Number(routeStars[id]||3)*.58)+(projected*.42));
   const alerts:string[]=[];
-  if(Number(reality.cap||0)>0 && reality.cap<route.price[0]) alerts.push("估計低消超過預算上限");
+  if(typeof reality.cap==="number" && Number.isFinite(reality.cap) && reality.cap<route.price[0]) alerts.push("估計低消超過預算上限");
   else if(Number(reality.preferred||0)>0 && reality.preferred<route.price[1]) alerts.push("部分玩法可能超出舒服預算");
   if(reality.moto===false && ["A","C","D","G","H"].includes(id)) alerts.push("需要重新安排大眾運輸或接駁");
   if(id==="F" && reality.cold<=2) alerts.push("對海風耐受度低");
