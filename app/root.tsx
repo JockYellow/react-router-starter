@@ -71,6 +71,7 @@ function App() {
     pathname === "/" ||
     pathname === "/resume" ||
     pathname.startsWith("/resume/") ||
+    pathname === "/trip-map" ||
     pathname === "/gift" ||
     pathname.startsWith("/gift/") ||
     pathname === "/food-mind" ||
