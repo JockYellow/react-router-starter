@@ -3,6 +3,9 @@ import type { MetaFunction } from "react-router";
 import "../styles/trip-map-ukiyo.css";
 import "../styles/trip-map-story.css";
 import { ThreeDayPrelude, RouteGallery } from "../features/trip-map/TravelStory";
+import { JourneyLedger } from "../features/trip-map/JourneyLedger";
+import { makeTourState, type TourPhase } from "../features/trip-map/tour";
+import "../styles/trip-map-creator.css";
 import { ArrowRight, Check, ChevronRight, Heart, LockKeyhole } from "lucide-react";
 import { PEOPLE, QUESTIONS, ROUTES, ROUTE_KEYS, ROLES, pairFit, validAnswer, type Answers, type Role } from "../features/trip-map/questions";
 
@@ -99,8 +102,21 @@ export default function TripMap(){
  const [error,setError]=useState("");
  const [busy,setBusy]=useState(false);
  const [loading,setLoading]=useState(false);
+ const [creatorTour,setCreatorTour]=useState(false);
+ const tourOverrides=useRef<Record<number,Value>>({});
+ const tourFinalists=useRef<Partial<Record<Role,string[]>>>({});
  const lastRef=useRef<string>("");
  const sessionRef=useRef(session); sessionRef.current=session;
+ function startTour(){
+  setError("");setCreatorTour(true);tourOverrides.current={};tourFinalists.current={};lastRef.current="";
+  const role:Role="yanzhen";setSession({role,token:"creator-tour-only"});
+  setState(makeTourState(role,0,"answer"));setChoice([]);
+ }
+ function tourJump(step:number,phase:TourPhase){
+  if(!sessionRef.current)return;
+  const nextStep=phase==="result"?QUESTIONS.length:Math.max(0,Math.min(QUESTIONS.length-1,step));
+  setError("");setState(makeTourState(sessionRef.current.role,nextStep,phase,tourOverrides.current,tourFinalists.current));
+ }
  async function enter(role:Role){
   setLoading(true);setError("");
   const key="trip-map-2027-"+role;
@@ -115,13 +131,24 @@ export default function TripMap(){
  }
  async function invoke(op:string,payload:Value={}){
   if(!sessionRef.current) return;
+  if(creatorTour){
+   const role=sessionRef.current.role;
+   if(op==="answer"&&state&&validAnswer(state.step,payload.answer)){
+    tourOverrides.current[state.step]=structuredClone(payload.answer);tourJump(state.step,"waiting");
+   }else if(op==="advance"&&state){
+    tourJump(state.step+1,state.step+1>=QUESTIONS.length?"result":"answer");
+   }else if(op==="finalists"&&Array.isArray(payload.choices)){
+    tourFinalists.current={...tourFinalists.current,[role]:[...payload.choices]};tourJump(QUESTIONS.length,"result");
+   }
+   return;
+  }
   setBusy(true);setError("");
   try{const s=await send(op,sessionRef.current.role,sessionRef.current.token,payload);setState(s);}
   catch(e){setError(e instanceof Error?e.message:"連線失敗");}
   finally{setBusy(false);}
  }
  useEffect(()=>{
-  if(!session)return;
+  if(!session||creatorTour)return;
   let active=true;
   const poll=async()=>{
    try{const s=await send("state",session.role,session.token);if(active)setState(s);}
@@ -129,7 +156,7 @@ export default function TripMap(){
   };
   const id=window.setInterval(poll,2500);
   return ()=>{active=false;window.clearInterval(id);};
- },[session?.role,session?.token]);
+ },[session?.role,session?.token,creatorTour]);
  useEffect(()=>{
   if(!session||!state)return;
   const key=session.role+"-"+state.step;
@@ -166,6 +193,7 @@ export default function TripMap(){
      <div className="tm-role-card__hint">選擇此身分，展開手札 <ArrowRight size={15}/></div>
     </button>)}
    </div>
+   <div className="tm-creator-entry"><button type="button" onClick={startTour}><span aria-hidden="true">試</span><span>製作者遊覽</span><small>查看作答、等待、揭曉與結算頁</small></button></div>
    <div className="tm-entry__note"><span className="tm-serif font-bold" lang="ja">旅の心得 · </span>請各自使用自己的手機或瀏覽器。首次選擇身分後，裝置會保存專屬識別碼；目前不支援自行換機。</div>
    {!!error&&<p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
    <p className="tm-scroll-note">— 旅の謎 · ふたりで解く小さな物語 —</p>
