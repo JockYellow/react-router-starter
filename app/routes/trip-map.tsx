@@ -4,6 +4,8 @@ import "../styles/trip-map-ukiyo.css";
 import "../styles/trip-map-story.css";
 import { ThreeDayPrelude, RouteGallery } from "../features/trip-map/TravelStory";
 import { TripFinale } from "../features/trip-map/TripFinale";
+import { ScrollUnfurl } from "../features/trip-map/ScrollUnfurl";
+import "../styles/trip-map-scroll.css";
 import "../styles/trip-map-finale.css";
 import { makeTourState, type TourPhase } from "../features/trip-map/tour";
 import "../styles/trip-map-creator.css";
@@ -206,7 +208,11 @@ export default function TripMap(){
  const fits=state.finished?pairFit({yanzhen:extract(state,"yanzhen"),hanyu:extract(state,"hanyu")}):[];
  const finalNames=(r:Role)=>state.finalists?.[r]||[];
  const bothFinal=finalNames("yanzhen").length>=2&&finalNames("hanyu").length>=2;
+ const pagePhase=state.finished?"finish":reveal?"reveal":answered?"waiting":"question";
+ const pageKey=(creatorTour?"tour":"live")+":"+me+":"+state.step+":"+pagePhase;
+ const pageTitle=state.finished?"最終卷 · 兩人的旅行":reveal?"雙人答案，終於揭曉":answered?"答案封存，等另一個人":("第 "+String(state.step+1).padStart(2,"0")+" 卷 · "+q.title);
  return <div className="tm-ukiyo min-h-screen pb-20">
+  <ScrollUnfurl key={pageKey} title={pageTitle} subtitle={state.finished?"ふたりの旅 · 終ノ巻":reveal?"答え合わせ · 謎底揭曉":answered?"ひと休み · 等待中":"旅の謎 · 次の一巻"}/>
   <div className="tm-kana-watermark tm-kana-watermark--left" lang="ja" aria-hidden="true">旅の謎</div>
   <div className="tm-kana-watermark tm-kana-watermark--right" lang="ja" aria-hidden="true">一期一会</div>
   <header className="tm-topbar"><div className="tm-topbar__inner">
