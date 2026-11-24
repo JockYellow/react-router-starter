@@ -17,7 +17,7 @@ export function TripFinale({matches,children}:{matches:Matches;children:ReactNod
  const next=(value:Scene)=>{setHasTurned(true);setScene(value);root.current?.scrollIntoView({block:"start",behavior:"smooth"});};
  useEffect(()=>{
   if(scene!==1){setUnlocked(0);return;}
-  const timers=[window.setTimeout(()=>setUnlocked(1),420),window.setTimeout(()=>setUnlocked(2),1150),window.setTimeout(()=>setUnlocked(3),1900)];
+  const timers=[window.setTimeout(()=>setUnlocked(1),1100),window.setTimeout(()=>setUnlocked(2),1800),window.setTimeout(()=>setUnlocked(3),2500)];
   return ()=>timers.forEach(window.clearTimeout);
  },[scene]);
  const titles=["兩張地圖，重新攤開","第一封密函 · 看看分數","第二封密函 · 那張帳單","帳單揭曉 · 我們的秘密","六條岔路 · 最後一卷"];
