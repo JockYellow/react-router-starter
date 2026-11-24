@@ -110,25 +110,88 @@ export default function TripMap(){
  const [landingIncoming,setLandingIncoming]=useState(false);
  const landingLock=useRef(false);
  const landingTimers=useRef<ReturnType<typeof setTimeout>[]>([]);
- const landingTouch=useRef<number|null>(null);
- const goLanding=(target:number)=>{
+ const landingPaper=useRef<HTMLDivElement>(null);
+ const landingGesture=useRef<{id:number;startX:number;startY:number;active:boolean;angle:number}|null>(null);
+ const landingSuppressClick=useRef(false);
+ const landingSnapTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+ const clearLandingDrag=()=>{
+  const paper=landingPaper.current;
+  if(paper){paper.classList.remove("tm-entry-book__paper--dragging");paper.style.removeProperty("transition");paper.style.removeProperty("transform");paper.style.removeProperty("filter");}
+ };
+ const goLanding=(target:number,fromAngle?:number)=>{
   if(landingLock.current||target<0||target>2||target===landingPage)return;
   const book=document.getElementById("tm-landing-book");
   const reduce=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-  if(reduce){setLandingPage(target);book?.scrollIntoView({behavior:"instant",block:"start"});return;}
+  if(reduce){clearLandingDrag();setLandingPage(target);book?.scrollIntoView({behavior:"instant",block:"start"});return;}
   landingLock.current=true;
   setLandingIncoming(false);
-  setLandingTurn(target>landingPage?"next":"prev");
+  const direction=target>landingPage?"next":"prev";
+  if(typeof fromAngle==="number" && landingPaper.current){
+   const paper=landingPaper.current;
+   paper.classList.remove("tm-entry-book__paper--dragging");
+   paper.style.transition="transform 270ms cubic-bezier(.25,.7,.2,1), filter 270ms ease";
+   paper.style.transform="rotateY("+fromAngle+"deg)";
+   paper.style.filter="brightness("+(1-Math.abs(fromAngle)/180)+")";
+   requestAnimationFrame(()=>{paper.style.transform="rotateY("+(direction==="next"?-89:89)+"deg)";paper.style.filter="brightness(.75)";});
+  }else{
+   setLandingTurn(direction);
+  }
   landingTimers.current.push(setTimeout(()=>{
+   clearLandingDrag();
    setLandingPage(target);
+   setLandingTurn(direction);
    setLandingIncoming(true);
    book?.scrollIntoView({behavior:"smooth",block:"start"});
   },320));
   landingTimers.current.push(setTimeout(()=>{
    setLandingTurn(null);setLandingIncoming(false);landingLock.current=false;
-  },680));
+  },700));
  };
- useEffect(()=>()=>{landingTimers.current.forEach(clearTimeout);},[]);
+ const snapBack=()=>{
+  const paper=landingPaper.current;
+  if(!paper)return;
+  paper.classList.remove("tm-entry-book__paper--dragging");
+  paper.style.transition="transform 240ms ease-out,filter 240ms ease-out";
+  paper.style.transform="rotateY(0deg)";
+  paper.style.filter="brightness(1)";
+  landingLock.current=true;
+  landingSnapTimer.current=setTimeout(()=>{clearLandingDrag();landingLock.current=false;landingSnapTimer.current=null;},260);
+ };
+ const beginLandingDrag=(e:React.PointerEvent<HTMLDivElement>)=>{
+  if(landingLock.current||e.pointerType==="mouse"&&e.button!==0)return;
+  if((e.target as HTMLElement).closest("button,a,input,textarea,select"))return;
+  landingGesture.current={id:e.pointerId,startX:e.clientX,startY:e.clientY,active:false,angle:0};
+ };
+ const moveLandingDrag=(e:React.PointerEvent<HTMLDivElement>)=>{
+  const g=landingGesture.current;
+  if(!g||g.id!==e.pointerId||landingLock.current)return;
+  const dx=e.clientX-g.startX,dy=e.clientY-g.startY;
+  if(!g.active){
+   if(Math.abs(dx)<12||Math.abs(dx)<Math.abs(dy)*1.2)return;
+   if(dx<0&&landingPage===2||dx>0&&landingPage===0){landingGesture.current=null;return;}
+   g.active=true;
+   e.currentTarget.setPointerCapture(e.pointerId);
+   landingPaper.current?.classList.add("tm-entry-book__paper--dragging");
+  }
+  const distance=Math.max(180,e.currentTarget.clientWidth*.8);
+  g.angle=Math.max(-88,Math.min(88,dx/distance*89));
+  if(landingPaper.current){
+   landingPaper.current.style.transform="rotateY("+g.angle+"deg)";
+   landingPaper.current.style.filter="brightness("+(1-Math.abs(g.angle)/180)+")";
+  }
+ };
+ const finishLandingDrag=(e:React.PointerEvent<HTMLDivElement>,cancel=false)=>{
+  const g=landingGesture.current;
+  if(!g||g.id!==e.pointerId)return;
+  landingGesture.current=null;
+  if(!g.active)return;
+  landingSuppressClick.current=true;
+  if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);
+  const target=landingPage+(g.angle<0?1:-1);
+  if(!cancel&&Math.abs(g.angle)>=30)goLanding(target,g.angle);
+  else snapBack();
+ };
+ useEffect(()=>()=>{landingTimers.current.forEach(clearTimeout);if(landingSnapTimer.current)clearTimeout(landingSnapTimer.current);},[]);
 
  const tourOverrides=useRef<Record<number,Value>>({});
  const tourFinalists=useRef<Partial<Record<Role,string[]>>>({});
@@ -198,9 +261,12 @@ export default function TripMap(){
    <div className="tm-entry-book__chapter" aria-hidden="true"><span>旅</span><span>日</span><span>記</span></div>
    <div className="tm-entry-book__stage" tabIndex={0} aria-label="旅行手札三頁導覽" aria-roledescription="可以翻頁的故事書"
     onKeyDown={e=>{if(e.target!==e.currentTarget)return;if(e.key==="ArrowRight"){e.preventDefault();goLanding(landingPage+1);}else if(e.key==="ArrowLeft"){e.preventDefault();goLanding(landingPage-1);}}}
-    onTouchStart={e=>{landingTouch.current=e.touches[0]?.clientX??null;}}
-    onTouchEnd={e=>{if(landingTouch.current===null)return;const x=e.changedTouches[0]?.clientX??landingTouch.current;const dx=x-landingTouch.current;landingTouch.current=null;if(Math.abs(dx)>75)goLanding(landingPage+(dx<0?1:-1));}}>
-    <div className={"tm-entry-book__paper "+(landingTurn?"tm-entry-book__paper--"+landingTurn+(landingIncoming?" tm-entry-book__paper--incoming":""):"")} aria-live="polite">
+    onPointerDown={beginLandingDrag}
+    onPointerMove={moveLandingDrag}
+    onPointerUp={e=>finishLandingDrag(e)}
+    onPointerCancel={e=>finishLandingDrag(e,true)}
+    onClickCapture={e=>{if(landingSuppressClick.current){e.preventDefault();e.stopPropagation();landingSuppressClick.current=false;}}}>
+    <div ref={landingPaper} className={"tm-entry-book__paper "+(landingTurn?"tm-entry-book__paper--"+landingTurn+(landingIncoming?" tm-entry-book__paper--incoming":""):"")} aria-live="polite">
      {landingPage===0&&<div className="tm-cover">
       <img className="tm-cover__art" src="/trip-map/ukiyo-fuji.svg" alt="朱紅日輪、富士山與層層海浪構成的浮世繪風格旅行圖景"/>
       <div className="tm-cover__wash" aria-hidden="true"/>
