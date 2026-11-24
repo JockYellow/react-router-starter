@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Compass, Footprints, MapPin, Sparkles, X } from "lucide-react";
 import { ROUTE_STORIES, type RouteStory, type StoryId } from "./stories";
+import { REAL_PHOTOS, commonsImage, commonsSource, type Photo } from "./photos";
 
 export function ThreeDayPrelude(){
  const days=[
@@ -28,15 +29,28 @@ export function ThreeDayPrelude(){
  </section>;
 }
 
+function RealityPhoto({photo,priority=false}:{photo:Photo;priority?:boolean}){
+ const [failed,setFailed]=useState(false);
+ return <div className="tm-reality-photo">
+  {failed?
+   <div className="tm-reality-photo__unavailable">照片目前無法載入，<a href={commonsSource(photo.file)} target="_blank" rel="noopener noreferrer">開啟原始圖片</a></div>:
+   <img src={commonsImage(photo.file)} alt={photo.label} loading={priority?"eager":"lazy"} referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>}
+  <div className="tm-reality-photo__credit">
+   <span>{photo.label}</span>
+   <a href={commonsSource(photo.file)} target="_blank" rel="noopener noreferrer" aria-label={"查看"+photo.label+"的照片作者與授權"}>實景照片 · 作者及授權</a>
+  </div>
+ </div>;
+}
 function ScrollVignette({story,index}:{story:RouteStory;index:number}){
  const beat=story.journey[index];
  return <div className="tm-story-beat" key={beat.part}>
   <div className="tm-story-beat__image">
-   <img src={"/trip-map/stories/"+story.id.toLowerCase()+".svg"} alt={story.gallery[index]} loading="lazy" style={{objectPosition:["left center","center center","right center"][index]}}/>
+   <RealityPhoto photo={REAL_PHOTOS[story.id][index]}/>
    <div className="tm-story-beat__scene">{beat.scene}</div>
   </div>
   <div className="tm-story-beat__body">
    <div className="tm-story-beat__marker"><span>{beat.part}</span><small>{beat.time}</small></div>
+   {REAL_PHOTOS[story.id][index].note&&<p className="tm-reality-photo__note">{REAL_PHOTOS[story.id][index].note}</p>}
    <h4>{beat.heading}</h4>
    <p>{beat.description}</p>
   </div>
@@ -60,7 +74,7 @@ function RouteDetail({story,onClose,selected,onToggle,canAdd}:{story:RouteStory;
   <div className="tm-story-modal" role="dialog" aria-modal="true" aria-label={story.title+" 旅卷"}>
    <button type="button" className="tm-story-close" onClick={onClose} aria-label="關閉旅卷"><X size={19}/><span>收起旅卷</span></button>
    <div className="tm-story-modal__hero">
-    <img src={"/trip-map/stories/"+story.id.toLowerCase()+".svg"} alt={story.gallery.join("、")+"的木版畫風景"} />
+    <RealityPhoto photo={REAL_PHOTOS[story.id][0]} priority/>
     <div className="tm-story-modal__hero-shade"/>
     <div className="tm-story-modal__hero-caption">
      <p lang="ja">旅の謎 · {story.jp}</p>
@@ -78,8 +92,8 @@ function RouteDetail({story,onClose,selected,onToggle,canAdd}:{story:RouteStory;
     </div>
     <div className="tm-story-chips" aria-label="代表性景點">{story.highlight.map(x=><span key={x}><MapPin size={12} aria-hidden="true"/>{x}</span>)}</div>
     <div className="tm-story-section-head">
-     <span lang="ja">一日の絵巻 · 故事的三幕</span>
-     <h3>如果這一天，真的走進這張畫裡</h3>
+     <span lang="ja">旅の記録 · 真實景色</span>
+     <h3>看看這一天，實際會遇見的風景</h3>
      <p>從早晨到午後，把不同的景色與體驗串成一段完整的旅行。</p>
     </div>
     <div className="tm-story-beats">{[0,1,2].map(i=><ScrollVignette key={i} story={story} index={i}/>)}</div>
