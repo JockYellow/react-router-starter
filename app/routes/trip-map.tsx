@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { MetaFunction } from "react-router";
 import "../styles/trip-map-ukiyo.css";
-import { ArrowRight, Check, ChevronRight, Compass, Heart, LockKeyhole, MapPinned } from "lucide-react";
+import { ArrowRight, Check, ChevronRight, Heart, LockKeyhole } from "lucide-react";
 import { PEOPLE, QUESTIONS, ROUTES, ROUTE_KEYS, ROLES, pairFit, validAnswer, type Answers, type Role } from "../features/trip-map/questions";
 
 export const meta:MetaFunction=()=>[{title:"旅の謎｜我們的旅行地圖 · 彥禎 × 涵郁"},{name:"description",content:"浮世繪風格的新竹雙人同步解謎旅行"}];
