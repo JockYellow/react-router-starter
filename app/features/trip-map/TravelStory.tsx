@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, ArrowRight, Check, Compass, Footprints, MapPin, Sparkles, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Compass, Footprints, MapPin, Sparkles, X } from "lucide-react";
 import { ROUTE_STORIES, type RouteStory, type StoryId } from "./stories";
 import { REAL_PHOTOS, commonsImage, commonsOriginal, commonsSource, type Photo } from "./photos";
 import { ScrollUnfurl } from "./ScrollUnfurl";
@@ -9,25 +9,76 @@ export function ThreeDayPrelude(){
  const days=[
   {day:"D1",date:"1/1 · 五",jp:"序ノ巻",title:"第一天，先跟新竹打聲招呼",desc:"第一天抵達新竹，先把行李放好。東門城、護城河、舊城的小吃，都還在市區等著。今天不用跑太遠，我想先習慣身旁多了一個人一起走路的感覺。",tags:["舊城隨意走走","先安頓，再吃飯","慢慢走、慢慢聊"]},
   {day:"D2",date:"1/2 · 六",jp:"本ノ巻",title:"第二天，地圖還缺了最重要的一塊",desc:"今天最自由，也最令人猶豫。想往山裡走？想看海？還是乾脆找間老店待久一點？六條路攤開了，我有好多想去的地方，但更想知道你會把手指停在哪裡。",tags:["六條有趣的岔路","把整天交給它","一起選出答案"]},
-  {day:"D3",date:"1/3 · 日",jp:"結ノ巻",title:"第三天，讓旅程慢慢落地",desc:"上午先參加上午主日聚會，午後留在新竹市區。公園、玻璃工藝、咖啡店，想逛哪裡就逛哪裡。旅行總得結束，但我想留一點時間，讓這兩天的事情慢慢沉下來。",tags:["上午主日聚會","午後留在市區","別急著說再見"]}
+  {day:"D3",date:"1/3 · 日",jp:"結ノ巻",title:"第三天，讓旅程慢慢落地",desc:"上午先參加主日聚會，午後留在新竹市區。公園、玻璃工藝、咖啡店，想逛哪裡就逛哪裡。旅行總得結束，但我想留一點時間，讓這兩天的事情慢慢沉下來。",tags:["上午主日聚會","午後留在市區","別急著說再見"]}
  ];
- return <section className="tm-three-days" aria-label="新竹三天兩夜旅行架構">
+ const [page,setPage]=useState(0);
+ const [turn,setTurn]=useState<"next"|"prev"|null>(null);
+ const [incoming,setIncoming]=useState(false);
+ const turnRef=useRef(false);
+ const timers=useRef<ReturnType<typeof setTimeout>[]>([]);
+ const touchX=useRef<number|null>(null);
+ const move=(direction:"next"|"prev",destination?:number)=>{
+  const target=destination??page+(direction==="next"?1:-1);
+  if(turnRef.current||target<0||target>=days.length)return;
+  const reduced=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  if(reduced){setPage(target);return;}
+  turnRef.current=true;
+  setIncoming(false);
+  setTurn(direction);
+  timers.current.push(setTimeout(()=>{
+   setPage(target);
+   setIncoming(true);
+  },310));
+  timers.current.push(setTimeout(()=>{
+   setTurn(null);
+   setIncoming(false);
+   turnRef.current=false;
+  },640));
+ };
+ useEffect(()=>()=>{timers.current.forEach(clearTimeout);},[]);
+ const onKeyDown=(event:KeyboardEvent<HTMLElement>)=>{
+  if(event.key==="ArrowRight"){event.preventDefault();move("next");}
+  else if(event.key==="ArrowLeft"){event.preventDefault();move("prev");}
+ };
+ const day=days[page];
+ return <section className="tm-three-days tm-flipbook" aria-label="新竹三天兩夜旅行手札">
   <div className="tm-three-days__intro">
    <span className="tm-three-days__eyebrow" lang="ja">三日旅帖 · 旅のはじまり</span>
    <h2>一張地圖，先寫好了開頭和結尾。</h2>
    <p>元旦的三天兩夜，第一天與第三天大致留給新竹市區。真正懸而未決的是中間那個週六。路很多，時間只有一天——光靠我一個人的期待，好像還不太夠。</p>
   </div>
-  <div className="tm-three-days__timeline">
-   {days.map((d,i)=><article className={"tm-day-slip "+(i===1?"tm-day-slip--main":"")} key={d.day}>
-    <div className="tm-day-slip__head"><span>{d.day}</span><span>{d.date}</span></div>
-    <div className="tm-day-slip__jp" lang="ja">{d.jp}</div>
-    <h3>{d.title}</h3>
-    <p>{d.desc}</p>
-    <div className="tm-day-slip__tags">{d.tags.map(t=><span key={t}>{t}</span>)}</div>
-    {i===1&&<div className="tm-day-slip__seal" aria-hidden="true">謎</div>}
-   </article>)}
+  <div className="tm-flipbook__stage" tabIndex={0} onKeyDown={onKeyDown} aria-roledescription="可以翻頁的三日旅行手札"
+   onTouchStart={e=>{touchX.current=e.touches[0]?.clientX??null;}}
+   onTouchEnd={e=>{if(touchX.current===null)return;const delta=(e.changedTouches[0]?.clientX??touchX.current)-touchX.current;touchX.current=null;if(Math.abs(delta)>65)move(delta<0?"next":"prev");}}>
+   <div className="tm-flipbook__spine" aria-hidden="true"/>
+   <div className="tm-flipbook__left" aria-hidden="true">
+    <span className="tm-flipbook__left-top" lang="ja">旅の記録</span>
+    <div className="tm-flipbook__left-art"><span>旅</span><span>日</span><span>記</span></div>
+    <div className="tm-flipbook__left-rule"/>
+    <p>一日一頁，<br/>三天的路還沒有走，<br/>卻已經可以先有些期待。</p>
+    <span className="tm-flipbook__left-bottom">二〇二七　新竹</span>
+   </div>
+   <div className={"tm-flipbook__sheet "+(turn?"tm-flipbook__sheet--"+turn+(incoming?" tm-flipbook__sheet--incoming":""):"")}>
+    <article className={"tm-day-slip tm-flipbook__page "+(page===1?"tm-day-slip--main":"")} key={day.day} aria-live="polite">
+     <div className="tm-day-slip__head"><span>{day.day}</span><span>{day.date}</span></div>
+     <div className="tm-day-slip__jp" lang="ja">{day.jp}</div>
+     <h3>{day.title}</h3>
+     <p>{day.desc}</p>
+     <div className="tm-day-slip__tags">{day.tags.map(t=><span key={t}>{t}</span>)}</div>
+     {page===1&&<div className="tm-day-slip__seal" aria-hidden="true">謎</div>}
+     <span className="tm-flipbook__page-no">{String(page+1).padStart(2,"0")} / 03</span>
+    </article>
+   </div>
+   <div className="tm-flipbook__page-edge" aria-hidden="true"/>
   </div>
-  <div className="tm-three-days__footnote"><span lang="ja">旅の道しるべ</span> · 兩晚先留在同一間住宿。至於中間那天要往哪裡走，就讓接下來的答案慢慢說話。</div>
+  <div className="tm-flipbook__controls">
+   <button type="button" onClick={()=>move("prev")} disabled={page===0||!!turn} aria-label="翻回前一天"><ChevronLeft size={19}/>上一頁</button>
+   <div className="tm-flipbook__dots" aria-label="旅行日期">
+    {days.map((d,i)=><button type="button" key={d.day} onClick={()=>{if(i===page)return;move(i>page?"next":"prev",i);}} disabled={!!turn||i===page} aria-label={"翻到第 "+(i+1)+" 天"} aria-current={page===i?"step":undefined} className={i===page?"is-active":""}>{String(i+1).padStart(2,"0")}</button>)}
+   </div>
+   <button type="button" onClick={()=>move("next")} disabled={page===days.length-1||!!turn}>下一頁<ChevronRight size={19}/></button>
+  </div>
+  <div className="tm-three-days__footnote"><span lang="ja">旅の道しるべ</span> · 左右翻頁看看這三天。兩晚先留在同一間住宿，至於中間要往哪裡走，就讓接下來的答案慢慢說話。</div>
  </section>;
 }
 
