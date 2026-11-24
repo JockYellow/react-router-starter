@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title">
+ <title id="title">F 旅卷 · 南寮漁港・海岸單車・香山濕地</title>
+ <defs><pattern id="paper" width="43" height="39" patternUnits="userSpaceOnUse"><path d="M3 14h11m8 18h16m-14-25h7" stroke="#765c46" stroke-width=".7" opacity=".22"/><circle cx="6" cy="5" r="1" fill="#765c46" opacity=".17"/></pattern></defs>
+ <rect width="1200" height="630" fill="#eedfc4"/>
+ <g transform="translate(0 0)">
+ <rect width="400" height="630" fill="#c4d4ce"/>
+ <g opacity=".30" stroke="#fbf0dc" stroke-width="5" fill="none"><path d="M-36 136q55-36 118 0t130 0q61-31 115-6m-360 37q87 28 157-2t191-10"/></g>
+ <circle cx="285" cy="142" r="85" fill="#b84b3b" opacity=".87"/>
+ <g opacity=".30" stroke="#f8e5ca" stroke-width="4"><path d="M192 80h180m-170 18h140m-230 56h74"/></g>
+ <path d="M-20 365q84-94 155-54t136 0q70-42 153 3v250H-20Z" fill="#b0b39b" stroke="#456274" stroke-width="5"/>
+ <path d="M-10 407q106-84 203-27t220-4" fill="none" stroke="#f3e7ce" stroke-width="5" opacity=".6"/>
+ <path d="M0 390q90-38 190 0t210-1v170H0Z" fill="#416f89"/><path d="M0 447q110-31 231-1t169-3m-378 61q130-25 270 12" fill="none" stroke="#d5e4d7" stroke-width="7"/><path d="M70 390h273l-46 94H124Z" fill="#e4c7a3" stroke="#29475a" stroke-width="7"/><path d="M193 256v138m0-116 91 92H193" stroke="#2b455a" fill="#efefda" stroke-width="6"/><path d="M60 304q18-19 38 0m208-29q25-18 50 0" fill="none" stroke="#42566a" stroke-width="6"/>
+ <path d="M0 553q109-22 201 8t200-15v84H0Z" fill="#253f56"/>
+ <path d="M0 558q109-22 201 8t200-15" stroke="#eedfc9" stroke-width="6" fill="none"/>
+ <rect x="16" y="575" width="368" height="36" fill="#f2e5cb" opacity=".9"/>
+ <text x="200" y="600" text-anchor="middle" fill="#213b51" font-size="19" letter-spacing="5" font-family="serif" font-weight="700">南寮漁港</text>
+ <rect x="10" y="10" width="380" height="610" fill="none" stroke="#917b61" stroke-width="2" opacity=".5"/>
+ </g><g transform="translate(400 0)">
+ <rect width="400" height="630" fill="#d0d9cf"/>
+ <g opacity=".30" stroke="#fbf0dc" stroke-width="5" fill="none"><path d="M-36 136q55-36 118 0t130 0q61-31 115-6m-360 37q87 28 157-2t191-10"/></g>
+ <circle cx="95" cy="152" r="81" fill="#b84b3b" opacity=".87"/>
+ <g opacity=".30" stroke="#f8e5ca" stroke-width="4"><path d="M192 80h180m-170 18h140m-230 56h74"/></g>
+ <path d="M-20 365q84-94 155-54t136 0q70-42 153 3v250H-20Z" fill="#b0b39b" stroke="#456274" stroke-width="5"/>
+ <path d="M-10 407q106-84 203-27t220-4" fill="none" stroke="#f3e7ce" stroke-width="5" opacity=".6"/>
+ <circle cx="104" cy="449" r="69" fill="none" stroke="#213d52" stroke-width="13"/><circle cx="294" cy="449" r="69" fill="none" stroke="#213d52" stroke-width="13"/><path d="M104 449l78-131 69 131H104l78-131 112 131m-112-131-23-28h-32m124 159 38-104h37" stroke="#b24e38" stroke-width="11" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="182" cy="318" r="13" fill="#d6b27d"/><path d="M0 545h400" stroke="#53717a" stroke-width="12"/>
+ <path d="M0 553q109-22 201 8t200-15v84H0Z" fill="#253f56"/>
+ <path d="M0 558q109-22 201 8t200-15" stroke="#eedfc9" stroke-width="6" fill="none"/>
+ <rect x="16" y="575" width="368" height="36" fill="#f2e5cb" opacity=".9"/>
+ <text x="200" y="600" text-anchor="middle" fill="#213b51" font-size="19" letter-spacing="5" font-family="serif" font-weight="700">海岸單車</text>
+ <rect x="10" y="10" width="380" height="610" fill="none" stroke="#917b61" stroke-width="2" opacity=".5"/>
+ </g><g transform="translate(800 0)">
+ <rect width="400" height="630" fill="#d5c6b5"/>
+ <g opacity=".30" stroke="#fbf0dc" stroke-width="5" fill="none"><path d="M-36 136q55-36 118 0t130 0q61-31 115-6m-360 37q87 28 157-2t191-10"/></g>
+ <circle cx="285" cy="162" r="77" fill="#b84b3b" opacity=".87"/>
+ <g opacity=".30" stroke="#f8e5ca" stroke-width="4"><path d="M192 80h180m-170 18h140m-230 56h74"/></g>
+ <path d="M-20 365q84-94 155-54t136 0q70-42 153 3v250H-20Z" fill="#b0b39b" stroke="#456274" stroke-width="5"/>
+ <path d="M-10 407q106-84 203-27t220-4" fill="none" stroke="#f3e7ce" stroke-width="5" opacity=".6"/>
+ <path d="M0 410q105-37 208 0t192-2v140H0Z" fill="#75969b"/><path d="M0 473q138-23 249 11t151 0" fill="none" stroke="#e7d8bf" stroke-width="7"/><path d="M29 520l145-160 181 2-137 170" fill="none" stroke="#9b6049" stroke-width="25"/><path d="M29 520l145-160 181 2-137 170" fill="none" stroke="#e6c8a0" stroke-width="14"/><path d="M88 424l-20-100m20 92 29-80m243 116-15-114m20 106 22-77" stroke="#547463" stroke-width="9" stroke-linecap="round"/><path d="M111 309q13-14 28 0m105-46q18-20 39 0" stroke="#2e4b5e" stroke-width="5" fill="none"/>
+ <path d="M0 553q109-22 201 8t200-15v84H0Z" fill="#253f56"/>
+ <path d="M0 558q109-22 201 8t200-15" stroke="#eedfc9" stroke-width="6" fill="none"/>
+ <rect x="16" y="575" width="368" height="36" fill="#f2e5cb" opacity=".9"/>
+ <text x="200" y="600" text-anchor="middle" fill="#213b51" font-size="19" letter-spacing="5" font-family="serif" font-weight="700">香山濕地</text>
+ <rect x="10" y="10" width="380" height="610" fill="none" stroke="#917b61" stroke-width="2" opacity=".5"/>
+ </g>
+ <rect width="1200" height="630" fill="url(#paper)" pointer-events="none"/>
+ <path d="M400 0v630M800 0v630" stroke="#f9ecd5" stroke-width="15" opacity=".8"/>
+ <path d="M400 0v630M800 0v630" stroke="#30495d" stroke-width="3" opacity=".6"/>
+ <rect x="8" y="8" width="1184" height="614" fill="none" stroke="#264258" stroke-width="5" opacity=".7"/>
+ </svg>
