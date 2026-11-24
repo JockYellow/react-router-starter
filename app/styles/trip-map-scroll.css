@@ -59,7 +59,9 @@
  text-align:center;
  padding:20px;
  font-family:"Noto Serif TC","Yu Mincho",serif;
- white-space:nowrap;
+ max-width:calc(100% - 24px);
+ white-space:normal;
+ text-wrap:balance;
  animation:tm-unfurl-content 760ms ease both;
 }
 .tm-unfurl__stamp{
