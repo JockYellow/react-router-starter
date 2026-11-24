@@ -16,6 +16,28 @@ async function init(db:Db){
  await db.prepare("INSERT OR IGNORE INTO trip_duo_progress (id,step,revealed) VALUES (1,0,0)").run();
  schemaSeen=true;
 }
+/**
+ * 使用者要求清空早期跨裝置試玩的資料。
+ * 透過 D1 交易式單次重置標記，防止 Worker 冷啟動重複清除正式答案。
+ * 只影響 trip_duo_ 前綴資料，保留網站其他資料。
+ */
+const INITIAL_RESET_KEY="trip-map-creator-tour-reset-2026-11-24-v1";
+let initialResetComplete=false;
+async function runOneTimeRequestedReset(db:Db){
+ if(initialResetComplete)return;
+ await db.prepare("CREATE TABLE IF NOT EXISTS trip_duo_maintenance (key TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+ const onlyFirst="NOT EXISTS (SELECT 1 FROM trip_duo_maintenance WHERE key=?)";
+ // Batch 內按順序交易執行：若已有標記，所有刪除與重置皆不會生效。
+ await db.batch([
+  db.prepare("DELETE FROM trip_duo_answers WHERE "+onlyFirst).bind(INITIAL_RESET_KEY),
+  db.prepare("DELETE FROM trip_duo_finalists WHERE "+onlyFirst).bind(INITIAL_RESET_KEY),
+  db.prepare("DELETE FROM trip_duo_players WHERE "+onlyFirst).bind(INITIAL_RESET_KEY),
+  db.prepare("UPDATE trip_duo_progress SET step=0,revealed=0,updated_at=CURRENT_TIMESTAMP WHERE id=1 AND "+onlyFirst).bind(INITIAL_RESET_KEY),
+  db.prepare("INSERT OR IGNORE INTO trip_duo_maintenance(key) VALUES (?)").bind(INITIAL_RESET_KEY)
+ ]);
+ initialResetComplete=true;
+}
+
 const denied=(message:string,status=400)=>Response.json({error:message},{status,headers:{"Cache-Control":"no-store"}});
 function roleOf(input:unknown):Role|null{return typeof input==="string"&&ROLES.includes(input as Role)? input as Role:null;}
 function tokenOkay(t:unknown){return typeof t==="string"&&t.length>=30&&t.length<=256&&/^[a-zA-Z0-9_-]+$/.test(t);}
@@ -63,7 +85,7 @@ export async function handleTripMap({request,context}:ActionFunctionArgs){
  let body:any; try{body=await request.json();}catch{return denied("資料格式錯誤");}
  const op=body?.op; const role=roleOf(body?.role); const token=body?.token;
  if(!role || !tokenOkay(token))return denied("無效的身分或識別碼");
- const db=requireBlogDb(context); await init(db);
+ const db=requireBlogDb(context); await init(db); await runOneTimeRequestedReset(db);
  if(op==="claim"){
   const hash=await digest(token);
   await db.prepare("INSERT OR IGNORE INTO trip_duo_players (role,token_hash) VALUES (?,?)").bind(role,hash).run();
