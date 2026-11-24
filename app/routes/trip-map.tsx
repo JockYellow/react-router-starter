@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { MetaFunction } from "react-router";
-import { ArrowRight, Check, ChevronRight, Compass, Heart, LockKeyhole, MapPinned } from "lucide-react";
+import "../styles/trip-map-ukiyo.css";
+import { ArrowRight, Check, ChevronRight, Heart, LockKeyhole } from "lucide-react";
 import { PEOPLE, QUESTIONS, ROUTES, ROUTE_KEYS, ROLES, pairFit, validAnswer, type Answers, type Role } from "../features/trip-map/questions";
 
-export const meta:MetaFunction=()=>[{title:"我們的旅行地圖｜彥禎 × 涵郁"},{name:"description",content:"2027 新竹雙人旅行偏好探險"}];
+export const meta:MetaFunction=()=>[{title:"旅の謎｜我們的旅行地圖 · 彥禎 × 涵郁"},{name:"description",content:"浮世繪風格的新竹雙人同步解謎旅行"}];
 
 type Value=Record<string,any>;
 type State={
@@ -12,9 +13,9 @@ type State={
 };
 const other=(r:Role):Role=>r==="yanzhen"?"hanyu":"yanzhen";
 const toAmount=(n:unknown)=>"NT$ "+Number(n||0).toLocaleString("zh-TW");
-const inputBase="w-full rounded-2xl border border-emerald-900/15 bg-white px-4 py-3 text-slate-800 outline-none focus:ring-2 focus:ring-emerald-600/30";
-const cardBase="rounded-3xl border border-emerald-900/10 bg-white/90 p-5 shadow-sm md:p-7";
-const buttonBase="rounded-2xl px-5 py-3 font-semibold transition disabled:cursor-not-allowed disabled:opacity-40";
+const inputBase="tm-textbox w-full rounded-xl border border-emerald-900/15 bg-white px-4 py-3 text-slate-800 outline-none focus:ring-2 focus:ring-emerald-600/30";
+const cardBase="tm-paper-card rounded-2xl border border-emerald-900/10 bg-white/90 p-5 shadow-sm md:p-7";
+const buttonBase="tm-action rounded-xl px-5 py-3 font-semibold transition disabled:cursor-not-allowed disabled:opacity-40";
 const labelFor=(qIndex:number,k:string)=>QUESTIONS[qIndex]?.items?.find(i=>i[0]===k)?.[1]||k;
 
 function defaultValue(step:number):Value{
@@ -35,7 +36,7 @@ async function send(op:string,role:Role,token:string,payload:Value={}){
 }
 
 function Marks({value,onChange,low,high}:{value?:number;onChange:(n:number)=>void;low?:string;high?:string}){
- return <div className="flex items-center gap-1.5">
+ return <div className="tm-marks flex items-center gap-1.5">
   {[1,2,3,4,5].map(n=><button type="button" key={n} aria-label={String(n)+" 分"} aria-pressed={value===n} onClick={()=>onChange(n)} className={"flex h-10 min-w-0 flex-1 items-center justify-center rounded-xl border text-sm font-bold transition "+(value===n?"border-emerald-900 bg-emerald-900 text-white":"border-emerald-900/15 bg-emerald-50/60 text-emerald-950 hover:bg-emerald-100")}>{n}</button>)}
   <span className="ml-2 hidden w-20 text-xs text-slate-500 sm:block">{value===1?low:value===5?high:value?value+" 分":""}</span>
  </div>;
@@ -135,30 +136,58 @@ export default function TripMap(){
   setForm(state.answers?.[session.role]?.[String(state.step)]||defaultValue(state.step));
   window.scrollTo({top:0,behavior:"smooth"});
  },[state?.step,session?.role]);
- if(!session)return <div className="min-h-screen bg-[#eef3ea] text-[#17392f]">
-  <style>{":root{color-scheme:light} body{margin:0}"}</style>
-  <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-5 py-16">
-   <div className="mb-8 text-xs font-bold tracking-[.25em] text-emerald-700">FIELD NOTES · 2027 / 01 / 02</div>
-   <div className="mb-8 rounded-[2rem] bg-[#174b3d] p-8 text-white shadow-xl md:p-12"><MapPinned size={36}/><p className="mt-8 text-sm text-emerald-100">一場雙人同步的旅行默契探險</p><h1 className="mt-3 text-4xl font-black leading-tight md:text-5xl">我們的<br/>旅行地圖</h1><p className="mt-6 max-w-md leading-8 text-emerald-100">各自完成同一題，兩個人都送出後，就一起翻開答案。十個小關卡，找出這趟新竹旅行最值得一起期待的可能。</p></div>
-   <h2 className="mb-4 text-xl font-bold">今天你是哪位旅人？</h2>
-   <div className="grid grid-cols-2 gap-4">{ROLES.map(role=><button disabled={loading} onClick={()=>enter(role)} key={role} className="rounded-3xl border border-emerald-900/10 bg-white p-7 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md disabled:opacity-50"><div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-2xl font-black text-emerald-900">{PEOPLE[role][0]}</div><div className="text-2xl font-bold">{PEOPLE[role]}</div><div className="mt-2 flex items-center gap-1 text-xs text-slate-500">以這個身分開始 <ArrowRight size={13}/></div></button>)}</div>
-   <p className="mt-6 text-sm leading-7 text-slate-600">兩人請各自使用自己的手機或瀏覽器。首次選擇身分後，裝置會保存專屬識別碼；同一身分暫不支援跨裝置轉移。</p>
-   {!!error&&<p role="alert" className="mt-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
-  </main></div>;
- if(!state)return <div className="min-h-screen bg-[#eef3ea] p-12 text-center">連線中……</div>;
+ if(!session)return <div className="tm-ukiyo min-h-screen">
+  <main className="tm-entry">
+   <div className="tm-entry__eyebrow"><span>旅の謎解き · 2027 / 01 / 02</span></div>
+   <div className="tm-cover">
+    <img className="tm-cover__art" src="/trip-map/ukiyo-fuji.svg" alt="朱紅日輪、富士山與層層海浪構成的浮世繪風格旅行圖景" />
+    <div className="tm-cover__wash" aria-hidden="true"/>
+    <div className="tm-cover__copy">
+     <div className="tm-stamp" aria-hidden="true">謎</div>
+     <p className="tm-cover__kicker">第壱章　ふたりの旅</p>
+     <h1 className="tm-cover__title">我們的<br/>旅行地圖</h1>
+     <span className="tm-cover__jp" lang="ja">ふたりの旅の地図</span>
+     <p className="tm-cover__lead">十道謎題，兩張各自完成的地圖。每揭開一題，就多發現一點彼此心中的旅行。故事的終點，由你們一起決定。</p>
+    </div>
+    <span className="tm-cover__side" aria-hidden="true" lang="ja">旅のしるべ　一期一会</span>
+   </div>
+   <div className="tm-entry__intro">
+    <p className="tm-progress-kicker text-xs font-bold tracking-[.23em]">壱 · 謎解きのはじまり</p>
+    <h2 className="mt-2">請領取你的旅人身分</h2>
+    <p>一人一個入口，各自解開同一題。兩人都送出答案，才會一起翻開謎底。</p>
+   </div>
+   <div className="tm-role-grid">
+    {ROLES.map(role=><button key={role} disabled={loading} onClick={()=>enter(role)} className="tm-role-card disabled:opacity-40">
+     <div className="tm-role-card__seal" aria-hidden="true">{PEOPLE[role][0]}</div>
+     <div className="tm-role-card__name">{PEOPLE[role]}</div>
+     <div className="tm-role-card__hint">選擇此身分，展開手札 <ArrowRight size={15}/></div>
+    </button>)}
+   </div>
+   <div className="tm-entry__note"><span className="tm-serif font-bold" lang="ja">旅の心得 · </span>請各自使用自己的手機或瀏覽器。首次選擇身分後，裝置會保存專屬識別碼；目前不支援自行換機。</div>
+   {!!error&&<p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
+   <p className="tm-scroll-note">— 旅の謎 · ふたりで解く小さな物語 —</p>
+  </main>
+ </div>;
+ if(!state)return <div className="tm-ukiyo min-h-screen p-12 text-center">旅の謎 · 地圖展開中……</div>;
  const me=session.role,them=other(me),q=QUESTIONS[state.step],answered=state.submitted.includes(me),theAnswered=state.submitted.includes(them);
  const reveal=state.revealed&&!state.finished;
  const answers={yanzhen:state.answers.yanzhen?.[String(state.step)]||{},hanyu:state.answers.hanyu?.[String(state.step)]||{}};
  const fits=state.finished?pairFit({yanzhen:extract(state,"yanzhen"),hanyu:extract(state,"hanyu")}):[];
  const finalNames=(r:Role)=>state.finalists?.[r]||[];
  const bothFinal=finalNames("yanzhen").length>=2&&finalNames("hanyu").length>=2;
- return <div className="min-h-screen bg-[#eef3ea] pb-20 text-[#17392f]">
-  <div className="border-b border-emerald-900/10 bg-[#174b3d] text-white"><div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-4"><div className="flex items-center gap-2 text-sm font-bold"><MapPinned size={19}/> 我們的旅行地圖</div><div className="flex items-center gap-2 text-xs text-emerald-100">{PEOPLE[me]} <span className="rounded-full bg-white/15 px-2 py-1">同步中</span></div></div></div>
-  <div className="mx-auto max-w-3xl space-y-5 px-4 py-6 md:px-6 md:py-10">
-   {!state.finished&&<div className="flex items-center justify-between text-xs font-bold text-emerald-800"><span>{q.chapter}</span><span>第 {state.step+1} / {QUESTIONS.length} 題</span></div>}
-   {!state.finished&&<div className="h-2 overflow-hidden rounded-full bg-emerald-900/10"><div className="h-full rounded-full bg-emerald-700 transition-all" style={{width:((state.step+1)/QUESTIONS.length*100)+"%"}}/></div>}
+ return <div className="tm-ukiyo min-h-screen pb-20">
+  <div className="tm-kana-watermark tm-kana-watermark--left" lang="ja" aria-hidden="true">旅の謎</div>
+  <div className="tm-kana-watermark tm-kana-watermark--right" lang="ja" aria-hidden="true">一期一会</div>
+  <header className="tm-topbar"><div className="tm-topbar__inner">
+   <div className="tm-topbar__brand"><span className="tm-topbar__crest" aria-hidden="true">旅</span><span>我們的旅行地圖<small className="tm-topbar__sub ml-2" lang="ja">ふたりの旅</small></span></div>
+   <div className="tm-topbar__state">{PEOPLE[me]} <span className="tm-online" lang="ja">謎解き中 · 同步</span></div>
+  </div></header>
+  <div className="tm-scene-banner" aria-hidden="true"><img src="/trip-map/ukiyo-fuji.svg" alt=""/><span className="tm-scene-banner__label" lang="ja">旅の途中 · 道しるべ</span></div>
+  <div className="tm-board relative z-10 mx-auto max-w-3xl space-y-5 px-4 py-6 md:px-6 md:py-10">
+   {!state.finished&&<div className="tm-progress-kicker flex items-center justify-between text-xs font-bold"><span>{q.chapter}</span><span>第 {state.step+1} / {QUESTIONS.length} 題</span></div>}
+   {!state.finished&&<div className="tm-progress-bar h-2 overflow-hidden rounded-full bg-emerald-900/10"><div className="h-full rounded-full bg-emerald-700 transition-all" style={{width:((state.step+1)/QUESTIONS.length*100)+"%"}}/></div>}
    {state.finished ? <>
-    <section className={cardBase}><p className="text-sm font-bold text-emerald-700">兩張地圖已經完成</p><h1 className="mt-2 text-3xl font-black">你們的旅行交集</h1><p className="mt-4 leading-7 text-slate-600">這裡同時參考兩人的直覺心動程度與各項偏好。分數是選路線的參考，不代表誰比較適合誰。</p></section>
+    <section className={cardBase}><div className="tm-question-stamp"><span aria-hidden="true">終</span> 最終章 · 答え合わせ</div><p className="mt-5 text-sm font-bold text-emerald-700">兩張地圖已經完成</p><h1 className="mt-2 text-3xl font-black">你們的旅行交集</h1><p className="mt-4 leading-7 text-slate-600">這裡同時參考兩人的直覺心動程度與各項偏好。分數是選路線的參考，不代表誰比較適合誰。</p></section>
     <section className={cardBase}><h2 className="mb-5 text-xl font-black">值得一起討論的三條路</h2><div className="space-y-3">{fits.slice(0,3).map((it,i)=><div key={it.id} className="rounded-2xl bg-emerald-50 p-4"><div className="flex items-start justify-between gap-2"><div><span className="text-xs font-semibold text-emerald-700">候選 {i+1} · {it.id}</span><h3 className="mt-1 text-lg font-bold">{ROUTES[it.id].name}</h3><p className="mt-1 text-sm text-slate-600">{ROUTES[it.id].desc}</p></div><span className="shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-bold">{it.score.toFixed(1)}/5</span></div><div className="mt-3 flex flex-wrap gap-3 text-xs"><span>彥禎直覺 {it.people.yanzhen.direct}/5</span><span>涵郁直覺 {it.people.hanyu.direct}/5</span></div>{it.alerts.length>0&&<p className="mt-2 text-xs leading-6 text-amber-800">留意：{it.alerts.join("、")}</p>}</div>)}</div><p className="mt-4 text-xs leading-6 text-slate-500">排名基於啟發式權重，未經心理計量校驗；你們可以從全部六條自由挑選。</p></section>
     <section className={cardBase}><h2 className="mb-5 text-xl font-black">六條路線的不同吸引力</h2><div className="space-y-4">{fits.map(it=><div key={it.id}><div className="mb-2 flex items-center justify-between gap-2 text-sm"><b>{it.id} · {ROUTES[it.id].name}</b><span>{it.score.toFixed(1)} / 5</span></div><div className="h-2 rounded-full bg-emerald-900/10"><div style={{width:it.score/5*100+"%"}} className="h-full rounded-full bg-emerald-700"/></div></div>)}</div></section>
     <section className={cardBase}><h2 className="text-xl font-black">我們各自想留下哪幾條路？</h2><p className="my-3 text-sm text-slate-600">請各自選擇 2～3 條想進一步討論的路線。這是最後共同拍板的起點。</p>
@@ -169,15 +198,15 @@ export default function TripMap(){
     </section>
     <section className={cardBase}><h2 className="mb-3 text-xl font-black">給彼此的秘密註記</h2><Compare step={QUESTIONS.length-1} answers={{yanzhen:state.answers.yanzhen?.[String(QUESTIONS.length-1)]||{},hanyu:state.answers.hanyu?.[String(QUESTIONS.length-1)]||{}}}/></section>
    </> : <>
-    <section className={cardBase}><div className="mb-3 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800"><Compass size={14}/>{reveal?"一起揭曉答案":"你的旅行地圖"}</div><h1 className="mt-2 text-2xl font-black leading-snug md:text-3xl">{q.title}</h1><p className="mt-4 leading-7 text-slate-600">{q.desc}</p></section>
+    <section className={cardBase}><div className="tm-question-stamp"><span aria-hidden="true">{reveal?"解":"問"}</span>{reveal?"答え合わせ · 謎底揭曉":"旅の謎 · "+String(state.step+1).padStart(2,"0")}</div><h1 className="mt-5 text-2xl font-black leading-snug md:text-3xl">{q.title}</h1><div className="tm-question-rule" aria-hidden="true"/><p className="mt-5 leading-7 text-slate-600">{q.desc}</p></section>
     {!reveal ? <section className={cardBase}>
      {answered?<div className="py-10 text-center"><LockKeyhole className="mx-auto mb-4 text-emerald-800" size={36}/><h2 className="text-xl font-bold">你的答案已封存</h2><p className="mt-3 text-slate-600">{theAnswered?"你們已經答完，正在準備揭曉……":"正在等 "+PEOPLE[them]+" 完成這一題"}</p><p className="mt-3 text-xs text-slate-500">另一位完成後會自動揭曉，不必重新整理。</p></div>:
      <><Form step={state.step} value={form} onChange={setForm}/><button disabled={busy||!validAnswer(state.step,form)} onClick={()=>invoke("answer",{step:state.step,answer:form})} className={buttonBase+" mt-6 w-full bg-emerald-900 text-white"}>送出這一題 <ArrowRight className="ml-2 inline-block" size={16}/></button><p className="mt-3 text-center text-xs text-slate-500">兩人都送出後，答案會同時解鎖。</p></>}
-    </section>:<section className={cardBase}><div className="mb-4 flex items-center gap-2 text-lg font-bold"><Heart size={20}/>答案揭曉</div><Compare step={state.step} answers={answers}/><div className="mt-6 rounded-2xl bg-amber-50 p-4"><p className="mb-2 text-xs font-bold tracking-wider text-amber-800">聊聊這題</p><p className="leading-7 text-amber-950">{q.talk}</p></div><button disabled={busy} onClick={()=>invoke("advance",{step:state.step})} className={buttonBase+" mt-6 flex w-full items-center justify-center gap-2 bg-emerald-900 text-white"}>{state.step===QUESTIONS.length-1?"展開我們的旅行報告":"一起前往下一題"} <ChevronRight size={17}/></button><p className="mt-3 text-center text-xs text-slate-500">任一人按下，兩台裝置都會一起前進。</p></section>}
-    <div className="grid grid-cols-2 gap-3 text-center text-xs"><div className={"rounded-xl p-3 "+(state.submitted.includes("yanzhen")?"bg-emerald-200 text-emerald-900":"bg-white text-slate-500")}>{answered?<Check size={15} className="mr-1 inline"/>:null}彥禎 {state.submitted.includes("yanzhen")?"已完成":"作答中"}</div><div className={"rounded-xl p-3 "+(state.submitted.includes("hanyu")?"bg-emerald-200 text-emerald-900":"bg-white text-slate-500")}>{state.submitted.includes("hanyu")?<Check size={15} className="mr-1 inline"/>:null}涵郁 {state.submitted.includes("hanyu")?"已完成":"作答中"}</div></div>
+    </section>:<section className={cardBase}><div className="mb-5 tm-reveal-tag"><Heart size={18}/>答え合わせ · 雙人答案揭曉</div><Compare step={state.step} answers={answers}/><div className="tm-response-box mt-6 bg-amber-50 p-4"><p className="mb-2 text-xs font-bold tracking-wider text-amber-800">ひとこと · 聊聊這題</p><p className="leading-7 text-amber-950">{q.talk}</p></div><button disabled={busy} onClick={()=>invoke("advance",{step:state.step})} className={buttonBase+" mt-6 flex w-full items-center justify-center gap-2 bg-emerald-900 text-white"}>{state.step===QUESTIONS.length-1?"展開我們的旅行報告":"一起前往下一題"} <ChevronRight size={17}/></button><p className="mt-3 text-center text-xs text-slate-500">任一人按下，兩台裝置都會一起前進。</p></section>}
+    <div className="grid grid-cols-2 gap-3 text-center text-xs"><div className={"rounded-xl p-3 "+(state.submitted.includes("yanzhen")?"bg-emerald-200 text-emerald-900":"bg-white text-slate-500")}>{state.submitted.includes("yanzhen")?<Check size={15} className="mr-1 inline"/>:null}彥禎 {state.submitted.includes("yanzhen")?"已完成":"作答中"}</div><div className={"rounded-xl p-3 "+(state.submitted.includes("hanyu")?"bg-emerald-200 text-emerald-900":"bg-white text-slate-500")}>{state.submitted.includes("hanyu")?<Check size={15} className="mr-1 inline"/>:null}涵郁 {state.submitted.includes("hanyu")?"已完成":"作答中"}</div></div>
    </>}
    {!!error&&<div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}<button className="ml-3 underline" onClick={()=>setError("")}>關閉</button></div>}
-   <footer className="pt-5 text-center text-xs leading-6 text-slate-500">2027 / 01 / 02 · 新竹旅行 · 本頁每 2.5 秒同步一次 · 你們的回答保存在專案 D1 資料庫</footer>
+   <footer className="pt-5 text-center text-xs leading-6 text-slate-500">旅の謎 · 2027 / 01 / 02 · 新竹旅行<br/>本頁每 2.5 秒同步一次 · 你們的回答保存在專案 D1 資料庫</footer>
   </div>
  </div>;
 }
