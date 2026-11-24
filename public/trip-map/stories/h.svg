@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title">
+ <title id="title">H 旅卷 · 竹東市場・藝術老屋・山林古道</title>
+ <defs><pattern id="paper" width="43" height="39" patternUnits="userSpaceOnUse"><path d="M3 14h11m8 18h16m-14-25h7" stroke="#765c46" stroke-width=".7" opacity=".22"/><circle cx="6" cy="5" r="1" fill="#765c46" opacity=".17"/></pattern></defs>
+ <rect width="1200" height="630" fill="#eedfc4"/>
+ <g transform="translate(0 0)">
+ <rect width="400" height="630" fill="#e4cdb5"/>
+ <g opacity=".30" stroke="#fbf0dc" stroke-width="5" fill="none"><path d="M-36 136q55-36 118 0t130 0q61-31 115-6m-360 37q87 28 157-2t191-10"/></g>
+ <circle cx="285" cy="142" r="85" fill="#b84b3b" opacity=".87"/>
+ <g opacity=".30" stroke="#f8e5ca" stroke-width="4"><path d="M192 80h180m-170 18h140m-230 56h74"/></g>
+ <path d="M-20 365q84-94 155-54t136 0q70-42 153 3v250H-20Z" fill="#b0b39b" stroke="#456274" stroke-width="5"/>
+ <path d="M-10 407q106-84 203-27t220-4" fill="none" stroke="#f3e7ce" stroke-width="5" opacity=".6"/>
+ <path d="M34 328h332v214H34Z" fill="#e4c9a4" stroke="#29455a" stroke-width="7"/><path d="M23 328l23-75h308l23 75Z" fill="#a84535" stroke="#273f54" stroke-width="7"/><path d="M55 257v69m58-69v69m58-69v69m58-69v69m58-69v69m58-69v69" stroke="#edc29d" stroke-width="13"/><path d="M83 380h225v105H83Z" fill="#8f674e"/><ellipse cx="139" cy="393" rx="36" ry="22" fill="#d8a15e"/><ellipse cx="236" cy="394" rx="40" ry="20" fill="#6e8965"/><path d="M78 484h235" stroke="#27455a" stroke-width="9"/>
+ <path d="M0 553q109-22 201 8t200-15v84H0Z" fill="#253f56"/>
+ <path d="M0 558q109-22 201 8t200-15" stroke="#eedfc9" stroke-width="6" fill="none"/>
+ <rect x="16" y="575" width="368" height="36" fill="#f2e5cb" opacity=".9"/>
+ <text x="200" y="600" text-anchor="middle" fill="#213b51" font-size="19" letter-spacing="5" font-family="serif" font-weight="700">竹東市場</text>
+ <rect x="10" y="10" width="380" height="610" fill="none" stroke="#917b61" stroke-width="2" opacity=".5"/>
+ </g><g transform="translate(400 0)">
+ <rect width="400" height="630" fill="#d7d4bb"/>
+ <g opacity=".30" stroke="#fbf0dc" stroke-width="5" fill="none"><path d="M-36 136q55-36 118 0t130 0q61-31 115-6m-360 37q87 28 157-2t191-10"/></g>
+ <circle cx="95" cy="152" r="81" fill="#b84b3b" opacity=".87"/>
+ <g opacity=".30" stroke="#f8e5ca" stroke-width="4"><path d="M192 80h180m-170 18h140m-230 56h74"/></g>
+ <path d="M-20 365q84-94 155-54t136 0q70-42 153 3v250H-20Z" fill="#b0b39b" stroke="#456274" stroke-width="5"/>
+ <path d="M-10 407q106-84 203-27t220-4" fill="none" stroke="#f3e7ce" stroke-width="5" opacity=".6"/>
+ <path d="M36 343l164-100 164 100H36Z" fill="#354f65" stroke="#243b50" stroke-width="7"/><path d="M63 348h274v184H63Z" fill="#eadcc1" stroke="#314b5c" stroke-width="7"/><path d="M108 383h84v115h-84Zm111 0h83v115h-83Z" fill="#9a583d" stroke="#294456" stroke-width="7"/><path d="M122 398l56 84m0-84-56 84" stroke="#e9bf90" stroke-width="4"/><path d="M232 401q28 35 55 0v74h-55Z" fill="#d2b48a"/>
+ <path d="M0 553q109-22 201 8t200-15v84H0Z" fill="#253f56"/>
+ <path d="M0 558q109-22 201 8t200-15" stroke="#eedfc9" stroke-width="6" fill="none"/>
+ <rect x="16" y="575" width="368" height="36" fill="#f2e5cb" opacity=".9"/>
+ <text x="200" y="600" text-anchor="middle" fill="#213b51" font-size="19" letter-spacing="5" font-family="serif" font-weight="700">藝術老屋</text>
+ <rect x="10" y="10" width="380" height="610" fill="none" stroke="#917b61" stroke-width="2" opacity=".5"/>
+ </g><g transform="translate(800 0)">
+ <rect width="400" height="630" fill="#bfd1c2"/>
+ <g opacity=".30" stroke="#fbf0dc" stroke-width="5" fill="none"><path d="M-36 136q55-36 118 0t130 0q61-31 115-6m-360 37q87 28 157-2t191-10"/></g>
+ <circle cx="285" cy="162" r="77" fill="#b84b3b" opacity=".87"/>
+ <g opacity=".30" stroke="#f8e5ca" stroke-width="4"><path d="M192 80h180m-170 18h140m-230 56h74"/></g>
+ <path d="M-20 365q84-94 155-54t136 0q70-42 153 3v250H-20Z" fill="#b0b39b" stroke="#456274" stroke-width="5"/>
+ <path d="M-10 407q106-84 203-27t220-4" fill="none" stroke="#f3e7ce" stroke-width="5" opacity=".6"/>
+ <path d="M0 423q95-94 182-64t218-34v230H0Z" fill="#5d7c6a"/><path d="M135 553q17-109 102-147t54-127" fill="none" stroke="#d5bb94" stroke-width="65"/><path d="M135 553q17-109 102-147t54-127" fill="none" stroke="#af8d68" stroke-width="8" stroke-dasharray="15 16"/><path d="M60 460V228m-24 49 24-87 31 88M343 486V190m-36 88 36-115 37 115m-258 125V200m-26 63 26-91 34 91" stroke="#294d53" stroke-width="14" fill="none" stroke-linejoin="round"/><circle cx="344" cy="222" r="36" fill="#5e7d6d"/>
+ <path d="M0 553q109-22 201 8t200-15v84H0Z" fill="#253f56"/>
+ <path d="M0 558q109-22 201 8t200-15" stroke="#eedfc9" stroke-width="6" fill="none"/>
+ <rect x="16" y="575" width="368" height="36" fill="#f2e5cb" opacity=".9"/>
+ <text x="200" y="600" text-anchor="middle" fill="#213b51" font-size="19" letter-spacing="5" font-family="serif" font-weight="700">山林古道</text>
+ <rect x="10" y="10" width="380" height="610" fill="none" stroke="#917b61" stroke-width="2" opacity=".5"/>
+ </g>
+ <rect width="1200" height="630" fill="url(#paper)" pointer-events="none"/>
+ <path d="M400 0v630M800 0v630" stroke="#f9ecd5" stroke-width="15" opacity=".8"/>
+ <path d="M400 0v630M800 0v630" stroke="#30495d" stroke-width="3" opacity=".6"/>
+ <rect x="8" y="8" width="1184" height="614" fill="none" stroke="#264258" stroke-width="5" opacity=".7"/>
+ </svg>

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { MetaFunction } from "react-router";
 import "../styles/trip-map-ukiyo.css";
+import "../styles/trip-map-story.css";
+import { ThreeDayPrelude, RouteGallery } from "../features/trip-map/TravelStory";
 import { ArrowRight, Check, ChevronRight, Heart, LockKeyhole } from "lucide-react";
 import { PEOPLE, QUESTIONS, ROUTES, ROUTE_KEYS, ROLES, pairFit, validAnswer, type Answers, type Role } from "../features/trip-map/questions";
 
@@ -147,10 +149,11 @@ export default function TripMap(){
      <p className="tm-cover__kicker">第壱章　ふたりの旅</p>
      <h1 className="tm-cover__title">我們的<br/>旅行地圖</h1>
      <span className="tm-cover__jp" lang="ja">ふたりの旅の地図</span>
-     <p className="tm-cover__lead">十道謎題，兩張各自完成的地圖。每揭開一題，就多發現一點彼此心中的旅行。故事的終點，由你們一起決定。</p>
+     <p className="tm-cover__lead">第一天在風城相遇，第三天從市區帶著回憶返程。中間最自由的那一天，還是一張空白地圖；用十道謎題，把它寫成兩個人都期待的故事。</p>
     </div>
     <span className="tm-cover__side" aria-hidden="true" lang="ja">旅のしるべ　一期一会</span>
    </div>
+   <ThreeDayPrelude/>
    <div className="tm-entry__intro">
     <p className="tm-progress-kicker text-xs font-bold tracking-[.23em]">壱 · 謎解きのはじまり</p>
     <h2 className="mt-2">請領取你的旅人身分</h2>
@@ -188,7 +191,8 @@ export default function TripMap(){
    {!state.finished&&<div className="tm-progress-bar h-2 overflow-hidden rounded-full bg-emerald-900/10"><div className="h-full rounded-full bg-emerald-700 transition-all" style={{width:((state.step+1)/QUESTIONS.length*100)+"%"}}/></div>}
    {state.finished ? <>
     <section className={cardBase}><div className="tm-question-stamp"><span aria-hidden="true">終</span> 最終章 · 答え合わせ</div><p className="mt-5 text-sm font-bold text-emerald-700">兩張地圖已經完成</p><h1 className="mt-2 text-3xl font-black">你們的旅行交集</h1><p className="mt-4 leading-7 text-slate-600">這裡同時參考兩人的直覺心動程度與各項偏好。分數是選路線的參考，不代表誰比較適合誰。</p></section>
-    <section className={cardBase}><h2 className="mb-5 text-xl font-black">值得一起討論的三條路</h2><div className="space-y-3">{fits.slice(0,3).map((it,i)=><div key={it.id} className="rounded-2xl bg-emerald-50 p-4"><div className="flex items-start justify-between gap-2"><div><span className="text-xs font-semibold text-emerald-700">候選 {i+1} · {it.id}</span><h3 className="mt-1 text-lg font-bold">{ROUTES[it.id].name}</h3><p className="mt-1 text-sm text-slate-600">{ROUTES[it.id].desc}</p></div><span className="shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-bold">{it.score.toFixed(1)}/5</span></div><div className="mt-3 flex flex-wrap gap-3 text-xs"><span>彥禎直覺 {it.people.yanzhen.direct}/5</span><span>涵郁直覺 {it.people.hanyu.direct}/5</span></div>{it.alerts.length>0&&<p className="mt-2 text-xs leading-6 text-amber-800">留意：{it.alerts.join("、")}</p>}</div>)}</div><p className="mt-4 text-xs leading-6 text-slate-500">排名基於啟發式權重，未經心理計量校驗；你們可以從全部六條自由挑選。</p></section>
+    <RouteGallery selected={choice} onToggle={(id)=>setChoice(old=>old.includes(id)?old.filter(x=>x!==id):old.length<3?[...old,id]:old)}/>
+    <section className={cardBase}><h2 className="mb-5 text-xl font-black">值得一起討論的三條路</h2><div className="space-y-3">{fits.slice(0,3).map((it,i)=><div key={it.id} className="rounded-2xl bg-emerald-50 p-4"><div className="flex items-start justify-between gap-2"><div><span className="text-xs font-semibold text-emerald-700">候選 {i+1} · {it.id}</span><h3 className="mt-1 text-lg font-bold">{ROUTES[it.id].name}</h3><p className="mt-1 text-sm text-slate-600">{ROUTES[it.id].desc}</p></div><span className="shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-bold">{it.score.toFixed(1)}/5</span></div><div className="mt-3 flex flex-wrap gap-3 text-xs"><span>彥禎直覺 {it.people.yanzhen.direct}/5</span><span>涵郁直覺 {it.people.hanyu.direct}/5</span></div></div>)}</div><p className="mt-4 text-xs leading-6 text-slate-500">排名基於啟發式權重，未經心理計量校驗；你們可以從全部六條自由挑選。</p></section>
     <section className={cardBase}><h2 className="mb-5 text-xl font-black">六條路線的不同吸引力</h2><div className="space-y-4">{fits.map(it=><div key={it.id}><div className="mb-2 flex items-center justify-between gap-2 text-sm"><b>{it.id} · {ROUTES[it.id].name}</b><span>{it.score.toFixed(1)} / 5</span></div><div className="h-2 rounded-full bg-emerald-900/10"><div style={{width:it.score/5*100+"%"}} className="h-full rounded-full bg-emerald-700"/></div></div>)}</div></section>
     <section className={cardBase}><h2 className="text-xl font-black">我們各自想留下哪幾條路？</h2><p className="my-3 text-sm text-slate-600">請各自選擇 2～3 條想進一步討論的路線。這是最後共同拍板的起點。</p>
      <div className="grid gap-2 sm:grid-cols-2">{ROUTE_KEYS.map(id=><button key={id} type="button" onClick={()=>setChoice(old=>old.includes(id)?old.filter(x=>x!==id):old.length<3?[...old,id]:old)} className={"rounded-xl border p-3 text-left text-sm transition "+(choice.includes(id)?"border-emerald-800 bg-emerald-900 text-white":"border-emerald-900/10 bg-emerald-50 hover:bg-emerald-100")}>{choice.includes(id)?"✓ ":""}{id} · {ROUTES[id].name}</button>)}</div>

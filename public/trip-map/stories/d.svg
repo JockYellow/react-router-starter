@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title">
+ <title id="title">D 旅卷 · 新埔老街・柿染工藝・關西茶香</title>
+ <defs><pattern id="paper" width="43" height="39" patternUnits="userSpaceOnUse"><path d="M3 14h11m8 18h16m-14-25h7" stroke="#765c46" stroke-width=".7" opacity=".22"/><circle cx="6" cy="5" r="1" fill="#765c46" opacity=".17"/></pattern></defs>
+ <rect width="1200" height="630" fill="#eedfc4"/>
+ <g transform="translate(0 0)">
+ <rect width="400" height="630" fill="#e6d1b3"/>
+ <g opacity=".30" stroke="#fbf0dc" stroke-width="5" fill="none"><path d="M-36 136q55-36 118 0t130 0q61-31 115-6m-360 37q87 28 157-2t191-10"/></g>
+ <circle cx="285" cy="142" r="85" fill="#b84b3b" opacity=".87"/>
+ <g opacity=".30" stroke="#f8e5ca" stroke-width="4"><path d="M192 80h180m-170 18h140m-230 56h74"/></g>
+ <path d="M-20 365q84-94 155-54t136 0q70-42 153 3v250H-20Z" fill="#b0b39b" stroke="#456274" stroke-width="5"/>
+ <path d="M-10 407q106-84 203-27t220-4" fill="none" stroke="#f3e7ce" stroke-width="5" opacity=".6"/>
+ <path d="M27 363l173-113 173 113-26 18-147-97-147 97Z" fill="#30475d" stroke="#243a50" stroke-width="6"/><path d="M56 368h288v167H56Z" fill="#dfc5a0" stroke="#34475a" stroke-width="6"/><path d="M85 400h70v135H85zm166 0h66v135h-66z" fill="#a96648" stroke="#334a59" stroke-width="6"/><path d="M197 386v148m-32-66h66" stroke="#354c5e" stroke-width="5"/>
+ <path d="M0 553q109-22 201 8t200-15v84H0Z" fill="#253f56"/>
+ <path d="M0 558q109-22 201 8t200-15" stroke="#eedfc9" stroke-width="6" fill="none"/>
+ <rect x="16" y="575" width="368" height="36" fill="#f2e5cb" opacity=".9"/>
+ <text x="200" y="600" text-anchor="middle" fill="#213b51" font-size="19" letter-spacing="5" font-family="serif" font-weight="700">新埔老街</text>
+ <rect x="10" y="10" width="380" height="610" fill="none" stroke="#917b61" stroke-width="2" opacity=".5"/>
+ </g><g transform="translate(400 0)">
+ <rect width="400" height="630" fill="#e7c8aa"/>
+ <g opacity=".30" stroke="#fbf0dc" stroke-width="5" fill="none"><path d="M-36 136q55-36 118 0t130 0q61-31 115-6m-360 37q87 28 157-2t191-10"/></g>
+ <circle cx="95" cy="152" r="81" fill="#b84b3b" opacity=".87"/>
+ <g opacity=".30" stroke="#f8e5ca" stroke-width="4"><path d="M192 80h180m-170 18h140m-230 56h74"/></g>
+ <path d="M-20 365q84-94 155-54t136 0q70-42 153 3v250H-20Z" fill="#b0b39b" stroke="#456274" stroke-width="5"/>
+ <path d="M-10 407q106-84 203-27t220-4" fill="none" stroke="#f3e7ce" stroke-width="5" opacity=".6"/>
+ <path d="M80 230v315m240-315v315M77 240h246" stroke="#544c40" stroke-width="11" stroke-linecap="round"/><path d="M125 265h155v202q-78-28-155 0Z" fill="#e5b58d" stroke="#a34a37" stroke-width="7"/><circle cx="202" cy="357" r="55" fill="#b84f34"/><path d="M170 345q29-28 62 2m-65 29q30 30 64 0" stroke="#e7cb9b" stroke-width="10" fill="none"/><circle cx="115" cy="525" r="30" fill="#c17749"/><circle cx="280" cy="527" r="29" fill="#c17749"/>
+ <path d="M0 553q109-22 201 8t200-15v84H0Z" fill="#253f56"/>
+ <path d="M0 558q109-22 201 8t200-15" stroke="#eedfc9" stroke-width="6" fill="none"/>
+ <rect x="16" y="575" width="368" height="36" fill="#f2e5cb" opacity=".9"/>
+ <text x="200" y="600" text-anchor="middle" fill="#213b51" font-size="19" letter-spacing="5" font-family="serif" font-weight="700">柿染工藝</text>
+ <rect x="10" y="10" width="380" height="610" fill="none" stroke="#917b61" stroke-width="2" opacity=".5"/>
+ </g><g transform="translate(800 0)">
+ <rect width="400" height="630" fill="#d4d2b1"/>
+ <g opacity=".30" stroke="#fbf0dc" stroke-width="5" fill="none"><path d="M-36 136q55-36 118 0t130 0q61-31 115-6m-360 37q87 28 157-2t191-10"/></g>
+ <circle cx="285" cy="162" r="77" fill="#b84b3b" opacity=".87"/>
+ <g opacity=".30" stroke="#f8e5ca" stroke-width="4"><path d="M192 80h180m-170 18h140m-230 56h74"/></g>
+ <path d="M-20 365q84-94 155-54t136 0q70-42 153 3v250H-20Z" fill="#b0b39b" stroke="#456274" stroke-width="5"/>
+ <path d="M-10 407q106-84 203-27t220-4" fill="none" stroke="#f3e7ce" stroke-width="5" opacity=".6"/>
+ <path d="M0 424q83-110 186-38t214-14v180H0Z" fill="#6c8a70"/><path d="M0 457q151-50 400-12m-400 45q155-35 400-13m-400 47q150-23 400-4" fill="none" stroke="#2b5e59" stroke-width="14"/><path d="M120 336l75-69 84 69-11 11H132Z" fill="#345365"/><path d="M137 344h124v95H137Z" fill="#e2c9a5" stroke="#2e4557" stroke-width="6"/><rect x="172" y="360" width="47" height="79" fill="#9c563b"/>
+ <path d="M0 553q109-22 201 8t200-15v84H0Z" fill="#253f56"/>
+ <path d="M0 558q109-22 201 8t200-15" stroke="#eedfc9" stroke-width="6" fill="none"/>
+ <rect x="16" y="575" width="368" height="36" fill="#f2e5cb" opacity=".9"/>
+ <text x="200" y="600" text-anchor="middle" fill="#213b51" font-size="19" letter-spacing="5" font-family="serif" font-weight="700">關西茶香</text>
+ <rect x="10" y="10" width="380" height="610" fill="none" stroke="#917b61" stroke-width="2" opacity=".5"/>
+ </g>
+ <rect width="1200" height="630" fill="url(#paper)" pointer-events="none"/>
+ <path d="M400 0v630M800 0v630" stroke="#f9ecd5" stroke-width="15" opacity=".8"/>
+ <path d="M400 0v630M800 0v630" stroke="#30495d" stroke-width="3" opacity=".6"/>
+ <rect x="8" y="8" width="1184" height="614" fill="none" stroke="#264258" stroke-width="5" opacity=".7"/>
+ </svg>
