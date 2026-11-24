@@ -59,10 +59,10 @@ function Compare({step,answers}:{step:number;answers:Record<Role,Value>}){
    <div className="mb-2 text-sm">{t}</div><div className="grid grid-cols-2 gap-3 text-center font-bold"><div>{a[k]??0} 枚</div><div>{b[k]??0} 枚</div></div>
   </div>)}
   {q.kind==="postcard" && <div className="grid grid-cols-2 gap-3 text-sm">
-   {ROLES.map(r=><div key={r} className="rounded-2xl bg-emerald-50 p-3"><div className="mb-2 font-bold">最想收藏</div>{(answers[r]?.keep||[]).map((k:string)=><p key={k} className="mb-2">{labelFor(step,k)}</p>)}<div className="mt-3 border-t border-emerald-900/10 pt-2 text-slate-500">不留：{labelFor(step,answers[r]?.drop)}</div></div>)}
+   {ROLES.map(r=><div key={r} className="rounded-2xl bg-emerald-50 p-3"><div className="mb-2 font-bold">最捨不得刪掉</div>{(answers[r]?.keep||[]).map((k:string)=><p key={k} className="mb-2">{labelFor(step,k)}</p>)}<div className="mt-3 border-t border-emerald-900/10 pt-2 text-slate-500">這張先放下：{labelFor(step,answers[r]?.drop)}</div></div>)}
   </div>}
   {q.kind==="reality" && <div className="grid grid-cols-2 gap-3 text-sm">{ROLES.map(r=><div key={r} className="space-y-2 rounded-2xl bg-emerald-50 p-3"><p>舒服花費：<b>{toAmount(answers[r]?.preferred)}</b></p><p>絕對上限：<b>{toAmount(answers[r]?.cap)}</b></p><p>寒冷接受度：{answers[r]?.cold}/5</p><p>步行接受度：{answers[r]?.effort}/5</p></div>)}</div>}
-  {q.kind==="note" && <div className="grid grid-cols-2 gap-3">{ROLES.map(r=><div key={r} className="min-h-28 rounded-2xl bg-emerald-50 p-4 whitespace-pre-wrap text-sm">{answers[r]?.message||"留白，也是選擇。"}</div>)}</div>}
+  {q.kind==="note" && <div className="grid grid-cols-2 gap-3">{ROLES.map(r=><div key={r} className="min-h-28 rounded-2xl bg-emerald-50 p-4 whitespace-pre-wrap text-sm">{answers[r]?.message||"沒有寫也沒關係，想說的話還有好多時間可以慢慢說。"}</div>)}</div>}
  </div>;
 }
 function Form({step,value,onChange}:{step:number;value:Value;onChange:(v:Value)=>void}){
@@ -75,17 +75,17 @@ function Form({step,value,onChange}:{step:number;value:Value;onChange:(v:Value)=
   const setDrop=()=>onChange({...value,drop:drop===k?"":k,keep:keep.filter(x=>x!==k)});
   return <div key={k} className="rounded-2xl border border-emerald-900/10 bg-emerald-50/45 p-4"><p className="mb-3 text-sm">{t}</p><div className="flex flex-wrap gap-2"><button onClick={setKeep} type="button" className={"rounded-xl px-4 py-2 text-sm font-bold "+(keep.includes(k)?"bg-emerald-900 text-white":"bg-white text-emerald-900 border border-emerald-800/20")}>收藏 {keep.includes(k)?"✓":""}</button><button onClick={setDrop} type="button" className={"rounded-xl px-4 py-2 text-sm font-semibold "+(drop===k?"bg-amber-200 text-amber-900":"bg-white border border-amber-800/20 text-amber-900")}>沒拍到也沒關係 {drop===k?"✓":""}</button></div></div>;
  })}
- {q.kind==="postcard"&&<p className="text-sm text-slate-500">已收藏 {(value.keep||[]).length} / 2 張；另選一張最不在意的。</p>}
- {q.kind==="coins"&&<div className="rounded-2xl bg-amber-50 p-4 text-amber-950"><b>還有 {8-(q.items||[]).reduce((s,[k])=>s+Number(value[k]||0),0)} 枚金幣</b> 可以分配</div>}
+ {q.kind==="postcard"&&<p className="text-sm text-slate-500">目前留下 {(value.keep||[]).length} / 2 張；還要選一張可以放下的喔。</p>}
+ {q.kind==="coins"&&<div className="rounded-2xl bg-amber-50 p-4 text-amber-950"><b>口袋裡還有 {8-(q.items||[]).reduce((s,[k])=>s+Number(value[k]||0),0)} 枚金幣</b>，快看看要花在哪裡</div>}
  {q.kind==="coins"&&q.items?.map(([k,t])=><div key={k} className="flex items-center gap-3 rounded-2xl bg-emerald-50/65 p-4"><div className="flex-1 text-sm">{t}</div><button aria-label={"減少"+t} className="h-10 w-10 rounded-xl border border-emerald-900/20 bg-white text-xl" disabled={!value[k]} onClick={()=>assign(k,Number(value[k]||0)-1)}>−</button><span className="w-7 text-center font-bold">{value[k]||0}</span><button aria-label={"增加"+t} className="h-10 w-10 rounded-xl border border-emerald-900/20 bg-white text-xl" disabled={(q.items||[]).reduce((s,[n])=>s+Number(value[n]||0),0)>=8} onClick={()=>assign(k,Number(value[k]||0)+1)}>＋</button></div>)}
  {q.kind==="reality"&&<div className="space-y-5">
-  <label className="block text-sm font-semibold">每人一天，花起來舒服的金額（NT$）<input className={inputBase+" mt-2"} type="number" min="0" max="10000" step="100" value={value.preferred??""} onChange={e=>assign("preferred",Number(e.target.value))}/></label>
-  <label className="block text-sm font-semibold">每人一天，絕對不希望超過（NT$）<input className={inputBase+" mt-2"} type="number" min="0" max="20000" step="100" value={value.cap??""} onChange={e=>assign("cap",Number(e.target.value))}/></label>
-  <div><p className="mb-3 text-sm font-semibold">冬天在戶外待久一點，你能接受多少？</p><Marks value={value.cold} onChange={v=>assign("cold",v)} low="很怕冷" high="可以保暖出遊"/></div>
-  <div><p className="mb-3 text-sm font-semibold">一天安排散步或有坡度的步道，你能接受多少？</p><Marks value={value.effort} onChange={v=>assign("effort",v)} low="輕鬆就好" high="也喜歡健行"/></div>
-  <p className="text-xs leading-6 text-slate-500">預算只作為候選路線的提醒；實際花費仍需確認當天的票價、餐飲及交通。</p>
+  <label className="block text-sm font-semibold">每人一天，花多少會覺得剛剛好？（NT$）<input className={inputBase+" mt-2"} type="number" min="0" max="10000" step="100" value={value.preferred??""} onChange={e=>assign("preferred",Number(e.target.value))}/></label>
+  <label className="block text-sm font-semibold">那真的不想超過多少？（NT$）<input className={inputBase+" mt-2"} type="number" min="0" max="20000" step="100" value={value.cap??""} onChange={e=>assign("cap",Number(e.target.value))}/></label>
+  <div><p className="mb-3 text-sm font-semibold">冬天如果要在戶外待久一點，你會怕冷嗎？</p><Marks value={value.cold} onChange={v=>assign("cold",v)} low="很怕冷" high="可以保暖出遊"/></div>
+  <div><p className="mb-3 text-sm font-semibold">如果要散步、爬一點坡，體力願意出動到哪裡？</p><Marks value={value.effort} onChange={v=>assign("effort",v)} low="輕鬆就好" high="也喜歡健行"/></div>
+  <p className="text-xs leading-6 text-slate-500">先抓個舒服的範圍就好，實際要花多少，等我們真的選好路線再慢慢算。</p>
  </div>}
- {q.kind==="note"&&<textarea rows={5} maxLength={400} placeholder="想偷偷留下的一句話或一個小驚喜……" className={inputBase} value={value.message||""} onChange={e=>assign("message",e.target.value)}/>}
+ {q.kind==="note"&&<textarea rows={5} maxLength={400} placeholder="有什麼想跟對方說的？或是想偷偷安排的一件小事……" className={inputBase} value={value.message||""} onChange={e=>assign("message",e.target.value)}/>}
  </div>;
 }
 function extract(state:State,role:Role):Answers{
@@ -176,21 +176,21 @@ export default function TripMap(){
      <p className="tm-cover__kicker">第壱章　ふたりの旅</p>
      <h1 className="tm-cover__title">我們的<br/>旅行地圖</h1>
      <span className="tm-cover__jp" lang="ja">ふたりの旅の地図</span>
-     <p className="tm-cover__lead">第一天在風城相遇，第三天從市區帶著回憶返程。中間最自由的那一天，還是一張空白地圖；用十道謎題，把它寫成兩個人都期待的故事。</p>
+     <p className="tm-cover__lead">我原本以為，三天的新竹旅行，找幾個喜歡的地方排一排就好了。結果真的開始想，才發現最難的問題是：你會想把時間留在哪裡？第一天和第三天先在市區走走。中間那個週六，就讓我們一起把地圖畫完吧。</p>
     </div>
     <span className="tm-cover__side" aria-hidden="true" lang="ja">旅のしるべ　一期一会</span>
    </div>
    <ThreeDayPrelude/>
    <div className="tm-entry__intro">
     <p className="tm-progress-kicker text-xs font-bold tracking-[.23em]">壱 · 謎解きのはじまり</p>
-    <h2 className="mt-2">請領取你的旅人身分</h2>
-    <p>一人一個入口，各自解開同一題。兩人都送出答案，才會一起翻開謎底。</p>
+    <h2 className="mt-2">好了，這次換你來選</h2>
+    <p>先選自己的名字，兩個人各自在手機上回答同一題。等答案都送出，才一起揭曉。先不要偷看對方喔！</p>
    </div>
    <div className="tm-role-grid">
     {ROLES.map(role=><button key={role} disabled={loading} onClick={()=>enter(role)} className="tm-role-card disabled:opacity-40">
      <div className="tm-role-card__seal" aria-hidden="true">{PEOPLE[role][0]}</div>
      <div className="tm-role-card__name">{PEOPLE[role]}</div>
-     <div className="tm-role-card__hint">選擇此身分，展開手札 <ArrowRight size={15}/></div>
+     <div className="tm-role-card__hint">從這裡開始答題 <ArrowRight size={15}/></div>
     </button>)}
    </div>
    <div className="tm-creator-entry"><button type="button" onClick={startTour}><span aria-hidden="true">試</span><span>製作者遊覽</span><small>查看作答、等待、揭曉與結算頁</small></button></div>
@@ -232,21 +232,21 @@ export default function TripMap(){
    {state.finished ? <>
     <TripFinale matches={fits}>
     <RouteGallery selected={choice} onToggle={(id)=>setChoice(old=>old.includes(id)?old.filter(x=>x!==id):old.length<3?[...old,id]:old)}/>
-    <section className={cardBase}><h2 className="text-xl font-black">我們各自想留下哪幾條路？</h2><p className="my-3 text-sm text-slate-600">請各自選擇 2～3 條想進一步討論的路線。這是最後共同拍板的起點。</p>
+    <section className={cardBase}><h2 className="text-xl font-black">最後，我們各自最捨不得哪幾條？</h2><p className="my-3 text-sm text-slate-600">看完六條路，先各自留下兩三條吧。總會有些地方讓人忍不住想去，說不定我們想的是同一個地方。</p>
      <div className="grid gap-2 sm:grid-cols-2">{ROUTE_KEYS.map(id=><button key={id} type="button" onClick={()=>setChoice(old=>old.includes(id)?old.filter(x=>x!==id):old.length<3?[...old,id]:old)} className={"rounded-xl border p-3 text-left text-sm transition "+(choice.includes(id)?"border-emerald-800 bg-emerald-900 text-white":"border-emerald-900/10 bg-emerald-50 hover:bg-emerald-100")}>{choice.includes(id)?"✓ ":""}{id} · {ROUTES[id].name}</button>)}</div>
-     <button disabled={busy||choice.length<2||choice.length>3} onClick={()=>invoke("finalists",{choices:choice})} className={buttonBase+" mt-4 w-full bg-emerald-900 text-white"}>保存我的候選 ({choice.length}/3)</button>
-     <div className="mt-5 grid grid-cols-2 gap-3 text-sm">{ROLES.map(r=><div key={r} className="rounded-xl bg-emerald-50 p-3"><b>{PEOPLE[r]}</b><p className="mt-2">{finalNames(r).length?finalNames(r).join("、"):"尚未選定"}</p></div>)}</div>
-     {bothFinal&&<div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm"><b>兩人都選好了。</b>共同選中的有：{finalNames("yanzhen").filter(x=>finalNames("hanyu").includes(x)).join("、")||"目前沒有重複選項，可互相說說原因。"}。接下來就能從這些候選一起拍板。</div>}
+     <button disabled={busy||choice.length<2||choice.length>3} onClick={()=>invoke("finalists",{choices:choice})} className={buttonBase+" mt-4 w-full bg-emerald-900 text-white"}>先把這幾條留下來 ({choice.length}/3)</button>
+     <div className="mt-5 grid grid-cols-2 gap-3 text-sm">{ROLES.map(r=><div key={r} className="rounded-xl bg-emerald-50 p-3"><b>{PEOPLE[r]}</b><p className="mt-2">{finalNames(r).length?finalNames(r).join("、"):"還在想，還在想"}</p></div>)}</div>
+     {bothFinal&&<div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm"><b>兩個人都選好啦。</b>我們剛好都留下了：{finalNames("yanzhen").filter(x=>finalNames("hanyu").includes(x)).join("、")||"竟然沒有重複的！那就更值得聽聽彼此想去哪裡。"}。接下來再一起決定吧，畢竟時間只有一天。</div>}
     </section>
-    <section className={cardBase}><h2 className="mb-3 text-xl font-black">給彼此的秘密註記</h2><Compare step={QUESTIONS.length-1} answers={{yanzhen:state.answers.yanzhen?.[String(QUESTIONS.length-1)]||{},hanyu:state.answers.hanyu?.[String(QUESTIONS.length-1)]||{}}}/></section>
+    <section className={cardBase}><h2 className="mb-3 text-xl font-black">留在地圖上的最後幾句話</h2><Compare step={QUESTIONS.length-1} answers={{yanzhen:state.answers.yanzhen?.[String(QUESTIONS.length-1)]||{},hanyu:state.answers.hanyu?.[String(QUESTIONS.length-1)]||{}}}/></section>
     </TripFinale>
    </> : <>
     <section className={cardBase}><div className="tm-question-stamp"><span aria-hidden="true">{reveal?"解":"問"}</span>{reveal?"答え合わせ · 謎底揭曉":"旅の謎 · "+String(state.step+1).padStart(2,"0")}</div><h1 className="mt-5 text-2xl font-black leading-snug md:text-3xl">{q.title}</h1><div className="tm-question-rule" aria-hidden="true"/><p className="mt-5 leading-7 text-slate-600">{q.desc}</p></section>
     {!reveal ? <section className={cardBase}>
-     {answered?<div className="py-10 text-center"><LockKeyhole className="mx-auto mb-4 text-emerald-800" size={36}/><h2 className="text-xl font-bold">你的答案已封存</h2><p className="mt-3 text-slate-600">{theAnswered?"你們已經答完，正在準備揭曉……":"正在等 "+PEOPLE[them]+" 完成這一題"}</p><p className="mt-3 text-xs text-slate-500">另一位完成後會自動揭曉，不必重新整理。</p></div>:
-     <><Form step={state.step} value={form} onChange={setForm}/><button disabled={busy||!validAnswer(state.step,form)} onClick={()=>invoke("answer",{step:state.step,answer:form})} className={buttonBase+" mt-6 w-full bg-emerald-900 text-white"}>送出這一題 <ArrowRight className="ml-2 inline-block" size={16}/></button><p className="mt-3 text-center text-xs text-slate-500">兩人都送出後，答案會同時解鎖。</p></>}
-    </section>:<section className={cardBase}><div className="mb-5 tm-reveal-tag"><Heart size={18}/>答え合わせ · 雙人答案揭曉</div><Compare step={state.step} answers={answers}/><div className="tm-response-box mt-6 bg-amber-50 p-4"><p className="mb-2 text-xs font-bold tracking-wider text-amber-800">ひとこと · 聊聊這題</p><p className="leading-7 text-amber-950">{q.talk}</p></div><button disabled={busy} onClick={()=>invoke("advance",{step:state.step})} className={buttonBase+" mt-6 flex w-full items-center justify-center gap-2 bg-emerald-900 text-white"}>{state.step===QUESTIONS.length-1?"展開我們的旅行報告":"一起前往下一題"} <ChevronRight size={17}/></button><p className="mt-3 text-center text-xs text-slate-500">任一人按下，兩台裝置都會一起前進。</p></section>}
-    <div className="grid grid-cols-2 gap-3 text-center text-xs"><div className={"rounded-xl p-3 "+(state.submitted.includes("yanzhen")?"bg-emerald-200 text-emerald-900":"bg-white text-slate-500")}>{state.submitted.includes("yanzhen")?<Check size={15} className="mr-1 inline"/>:null}彥禎 {state.submitted.includes("yanzhen")?"已完成":"作答中"}</div><div className={"rounded-xl p-3 "+(state.submitted.includes("hanyu")?"bg-emerald-200 text-emerald-900":"bg-white text-slate-500")}>{state.submitted.includes("hanyu")?<Check size={15} className="mr-1 inline"/>:null}涵郁 {state.submitted.includes("hanyu")?"已完成":"作答中"}</div></div>
+     {answered?<div className="py-10 text-center"><LockKeyhole className="mx-auto mb-4 text-emerald-800" size={36}/><h2 className="text-xl font-bold">你的答案先收起來了</h2><p className="mt-3 text-slate-600">{theAnswered?"兩份答案都到了，準備翻開看看……":"接下來等 "+PEOPLE[them]+" 把這題答完"}</p><p className="mt-3 text-xs text-slate-500">等另一位也交卷，就會自己揭曉。先猜猜對方選了什麼？</p></div>:
+     <><Form step={state.step} value={form} onChange={setForm}/><button disabled={busy||!validAnswer(state.step,form)} onClick={()=>invoke("answer",{step:state.step,answer:form})} className={buttonBase+" mt-6 w-full bg-emerald-900 text-white"}>好，這題就這樣決定了 <ArrowRight className="ml-2 inline-block" size={16}/></button><p className="mt-3 text-center text-xs text-slate-500">兩個人都按下送出，答案才會一起打開。</p></>}
+    </section>:<section className={cardBase}><div className="mb-5 tm-reveal-tag"><Heart size={18}/>答え合わせ · 雙人答案揭曉</div><Compare step={state.step} answers={answers}/><div className="tm-response-box mt-6 bg-amber-50 p-4"><p className="mb-2 text-xs font-bold tracking-wider text-amber-800">ひとこと · 看看我們想到哪裡去了</p><p className="leading-7 text-amber-950">{q.talk}</p></div><button disabled={busy} onClick={()=>invoke("advance",{step:state.step})} className={buttonBase+" mt-6 flex w-full items-center justify-center gap-2 bg-emerald-900 text-white"}>{state.step===QUESTIONS.length-1?"終於要揭曉結果了":"再往前走一題"} <ChevronRight size={17}/></button><p className="mt-3 text-center text-xs text-slate-500">其中一個人按下就好，兩邊會一起前進。</p></section>}
+    <div className="grid grid-cols-2 gap-3 text-center text-xs"><div className={"rounded-xl p-3 "+(state.submitted.includes("yanzhen")?"bg-emerald-200 text-emerald-900":"bg-white text-slate-500")}>{state.submitted.includes("yanzhen")?<Check size={15} className="mr-1 inline"/>:null}彥禎 {state.submitted.includes("yanzhen")?"交卷啦":"還在想"}</div><div className={"rounded-xl p-3 "+(state.submitted.includes("hanyu")?"bg-emerald-200 text-emerald-900":"bg-white text-slate-500")}>{state.submitted.includes("hanyu")?<Check size={15} className="mr-1 inline"/>:null}涵郁 {state.submitted.includes("hanyu")?"已完成":"作答中"}</div></div>
    </>}
    {!!error&&<div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}<button className="ml-3 underline" onClick={()=>setError("")}>關閉</button></div>}
    <footer className="pt-5 text-center text-xs leading-6 text-slate-500">旅の謎 · 2027 / 01 / 02 · 新竹旅行<br/>{creatorTour?"這些遊覽資料只在本頁，不會影響正式紀錄":"本頁每 2.5 秒同步一次 · 你們的回答保存在專案 D1 資料庫"}</footer>
