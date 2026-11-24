@@ -6,15 +6,15 @@ import { REAL_PHOTOS, commonsImage, commonsOriginal, commonsSource, type Photo }
 
 export function ThreeDayPrelude(){
  const days=[
-  {day:"D1",date:"1/1 · 五",jp:"序ノ巻",title:"在風城打開故事",desc:"抵達新竹、入住火車站附近的旅宿。從東門城、護城河、老街與市區美食開始，讓夜晚先有一點旅行的味道。",tags:["市區漫遊","入住・晚餐","輕鬆相處"]},
-  {day:"D2",date:"1/2 · 六",jp:"本ノ巻",title:"把一整天交給我們的選擇",desc:"三日旅途最自由的一天。六條路線、六種心動；這場雙人解謎，就是要找出你們願意一起走進的兩三段旅卷。",tags:["六條候選","完整一日遊","今天的謎底"]},
-  {day:"D3",date:"1/3 · 日",jp:"結ノ巻",title:"替故事留下溫柔收尾",desc:"上午參加主日聚會。中午後仍留在新竹市區，可以從新竹公園、玻璃工藝與咖啡散步中挑一段，然後帶著回憶返程。",tags:["主日聚會","市區短行程","悠閒返程"]}
+  {day:"D1",date:"1/1 · 五",jp:"序ノ巻",title:"第一天，先跟新竹打聲招呼",desc:"第一天抵達新竹，先把行李放好。東門城、護城河、舊城的小吃，都還在市區等著。今天不用跑太遠，我想先習慣身旁多了一個人一起走路的感覺。",tags:["市區漫遊","入住・晚餐","輕鬆相處"]},
+  {day:"D2",date:"1/2 · 六",jp:"本ノ巻",title:"第二天，地圖還缺了最重要的一塊",desc:"今天最自由，也最令人猶豫。想往山裡走？想看海？還是乾脆找間老店待久一點？六條路攤開了，我有好多想去的地方，但更想知道你會把手指停在哪裡。",tags:["六條候選","完整一日遊","今天的謎底"]},
+  {day:"D3",date:"1/3 · 日",jp:"結ノ巻",title:"第三天，讓旅程慢慢落地",desc:"上午先參加主日聚會，午後留在新竹市區。公園、玻璃工藝、咖啡店，想逛哪裡就逛哪裡。旅行總得結束，但我想留一點時間，讓這兩天的事情慢慢沉下來。",tags:["主日聚會","市區短行程","悠閒返程"]}
  ];
  return <section className="tm-three-days" aria-label="新竹三天兩夜旅行架構">
   <div className="tm-three-days__intro">
    <span className="tm-three-days__eyebrow" lang="ja">三日旅帖 · 旅のはじまり</span>
-   <h2>這趟旅行，有三個篇章。</h2>
-   <p>元旦連假的三天兩夜，新竹市區是故事的起點與終點；最精彩的第二天，還是一張等待你們親自填上的空白地圖。</p>
+   <h2>一張地圖，先寫好了開頭和結尾。</h2>
+   <p>元旦的三天兩夜，第一天與第三天大致留給新竹市區。真正懸而未決的是中間那個週六。路很多，時間只有一天——光靠我一個人的期待，好像還不太夠。</p>
   </div>
   <div className="tm-three-days__timeline">
    {days.map((d,i)=><article className={"tm-day-slip "+(i===1?"tm-day-slip--main":"")} key={d.day}>
@@ -26,7 +26,7 @@ export function ThreeDayPrelude(){
     {i===1&&<div className="tm-day-slip__seal" aria-hidden="true">謎</div>}
    </article>)}
   </div>
-  <div className="tm-three-days__footnote"><span lang="ja">旅の道しるべ</span> · 同一間住宿連住兩晚，選定 D2 後，再把三天的細節慢慢補上。</div>
+  <div className="tm-three-days__footnote"><span lang="ja">旅の道しるべ</span> · 兩晚先留在同一間住宿。至於中間那天要往哪裡走，就讓接下來的答案慢慢說話。</div>
  </section>;
 }
 
@@ -115,21 +115,21 @@ function RouteDetail({story,onClose,selected,onToggle,canAdd}:{story:RouteStory;
     <div className="tm-story-chips" aria-label="代表性景點">{story.highlight.map(x=><span key={x}><MapPin size={12} aria-hidden="true"/>{x}</span>)}</div>
     <div className="tm-story-section-head">
      <span lang="ja">旅の記録 · 真實景色</span>
-     <h3>看看這一天，實際會遇見的風景</h3>
-     <p>從早晨到午後，把不同的景色與體驗串成一段完整的旅行。</p>
+     <h3>如果真的出發，我們會看見什麼？</h3>
+     <p>照片先偷看一點。真正的風、聲音與那些意外，還是要等我們走進去才知道。</p>
     </div>
     <div className="tm-story-beats">{[0,1,2].map(i=><ScrollVignette key={i} story={story} index={i}/>)}</div>
     <div className="tm-story-section-head tm-story-section-head--small">
      <span lang="ja">寄り道 · 隱藏支線</span>
-     <h3>還有這些可以慢慢發現</h3>
+     <h3>如果還有時間，就再貪心一點</h3>
     </div>
     <div className="tm-story-sidequests">{story.optional.map((x,i)=><div className="tm-story-sidequest" key={x.title}><b>{String(i+1).padStart(2,"0")}</b><div><h4>{x.title}</h4><p>{x.detail}</p></div></div>)}</div>
     <div className="tm-story-ending"><span lang="ja">旅の余韻</span><p>{story.closing}</p></div>
     <div className="tm-story-question"><span lang="ja">ふたりの会話 · 聊聊這段旅程</span><p>{story.discussion}</p></div>
     <div className="tm-story-modal__actions">
-     <button type="button" className={"tm-story-pick "+(selected?"tm-story-pick--selected":"")} onClick={choose}>{selected?<Check size={18}/>:<Sparkles size={18}/>} {selected?"已加入我們的候選":"把這條旅卷收進候選"}</button>
-     <button type="button" className="tm-story-dismiss" onClick={onClose}>回到六條旅卷 <ArrowLeft size={16}/></button>
-     {warning&&<p className="tm-story-warning" role="status">候選最多保留三條，先在頁面下方移除其中一條就能替換。</p>}
+     <button type="button" className={"tm-story-pick "+(selected?"tm-story-pick--selected":"")} onClick={choose}>{selected?<Check size={18}/>:<Sparkles size={18}/>} {selected?"已偷偷收進候選":"這條我想去，先收起來"}</button>
+     <button type="button" className="tm-story-dismiss" onClick={onClose}>再去翻翻其他路線 <ArrowLeft size={16}/></button>
+     {warning&&<p className="tm-story-warning" role="status">最多先收三條啦。想換的話，去下面把其中一條放回地圖。</p>}
     </div>
    </div>
   </div>
@@ -142,8 +142,8 @@ export function RouteGallery({selected,onToggle}:{selected:string[];onToggle:(id
   <div className="tm-story-gallery__intro">
    <div className="tm-story-gallery__seal" aria-hidden="true">六</div>
    <span lang="ja">六つの旅の扉 · 六扇旅行之門</span>
-   <h2>答案揭曉了，旅卷才真正展開。</h2>
-   <p>這個週六，你們想一起過什麼樣的一天？每張旅卷裡都藏著三段景色、三段故事，還有能自由延伸的支線。點開看看，再把喜歡的兩三條留下。</p>
+   <h2>終於可以看看，我們會往哪裡走了。</h2>
+   <p>六條路都在這裡。有山、有海、有老街，還有一些我本來根本沒想到的地方。先別急著選，點開看看真正的景色；說不定最後讓你捨不得放下的，會是最意外的那一條。</p>
   </div>
   <div className="tm-story-grid">
    {ROUTE_STORIES.map(story=><button type="button" className="tm-story-card" key={story.id} onClick={()=>setOpened(story.id)} aria-label={"展開 "+story.title+" 旅卷"}>
@@ -157,11 +157,11 @@ export function RouteGallery({selected,onToggle}:{selected:string[];onToggle:(id
      <h3>{story.title}</h3>
      <p className="tm-story-card__tagline">{story.tagline}</p>
      <p className="tm-story-card__summary">{story.activity}</p>
-     <div className="tm-story-card__footer"><span><Footprints size={13}/> {story.pace}</span><strong>揭開旅卷 <ArrowRight size={16}/></strong></div>
+     <div className="tm-story-card__footer"><span><Footprints size={13}/> {story.pace}</span><strong>翻開看看 <ArrowRight size={16}/></strong></div>
     </div>
    </button>)}
   </div>
-  <p className="tm-story-gallery__caption"><Compass size={16}/> 這六條都是一日旅遊提案，等你們挑出共同心動的選項，再把真正的行程寫進旅行地圖。</p>
+  <p className="tm-story-gallery__caption"><Compass size={16}/> 六條都只是一天的可能。先各自挑出喜歡的，然後一起看看，哪一段路值得真的走上一回。</p>
   {openStory&&<RouteDetail key={openStory.id} story={openStory} onClose={()=>setOpened(null)} selected={selected.includes(openStory.id)} onToggle={onToggle} canAdd={selected.length<3}/>}
  </section>;
 }
