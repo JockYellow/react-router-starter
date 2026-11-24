@@ -44,7 +44,7 @@ export function validAnswer(index: number, answer: unknown): boolean {
  if(q.kind==="rating") return !!q.items && q.items.every(([k])=>Number.isInteger(a[k])&&a[k]>=1&&a[k]<=5);
  if(q.kind==="coins") return !!q.items && q.items.every(([k])=>Number.isInteger(a[k])&&a[k]>=0&&a[k]<=8) && q.items.reduce((s,[k])=>s+a[k],0)===8;
  if(q.kind==="postcard"){const keys=(q.items||[]).map(x=>x[0]);return Array.isArray(a.keep)&&a.keep.length===2&&new Set(a.keep).size===2&&a.keep.every((k:string)=>keys.includes(k))&&keys.includes(a.drop)&&!a.keep.includes(a.drop);}
- if(q.kind==="reality") return Number.isInteger(a.preferred)&&a.preferred>=0&&a.preferred<=10000 && Number.isInteger(a.cap)&&a.cap>=a.preferred&&a.cap<=20000 && typeof a.moto==="boolean" && Number.isInteger(a.cold)&&a.cold>=1&&a.cold<=5 && Number.isInteger(a.effort)&&a.effort>=1&&a.effort<=5;
+ if(q.kind==="reality") return Number.isInteger(a.preferred)&&a.preferred>=0&&a.preferred<=10000 && Number.isInteger(a.cap)&&a.cap>=a.preferred&&a.cap<=20000 && Number.isInteger(a.cold)&&a.cold>=1&&a.cold<=5 && Number.isInteger(a.effort)&&a.effort>=1&&a.effort<=5;
  if(q.kind==="note") return typeof a.message==="string"&&a.message.length<=400;
  return false;
 }
@@ -71,7 +71,7 @@ export function individualFit(ans:Answers) {
   const alerts:string[]=[];
   if(typeof reality.cap==="number" && Number.isFinite(reality.cap) && reality.cap<route.price[0]) alerts.push("估計低消超過預算上限");
   else if(Number(reality.preferred||0)>0 && reality.preferred<route.price[1]) alerts.push("部分玩法可能超出舒服預算");
-  if(reality.moto===false && ["A","C","D","G","H"].includes(id)) alerts.push("需要重新安排大眾運輸或接駁");
+
   if(id==="F" && reality.cold<=2) alerts.push("對海風耐受度低");
   if(id==="H" && reality.effort<=2) alerts.push("需要輕量步道版本");
   if(id==="C" && Number(trade.book||3)<=2) alerts.push("泡湯須配合預約");
