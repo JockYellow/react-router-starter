@@ -31,7 +31,7 @@ export function ThreeDayPrelude(){
 
 function RealityPhoto({photo,priority=false,routeId}:{photo:Photo;priority?:boolean;routeId:string}){
  const [attempt,setAttempt]=useState(0);
- const imgSource=attempt===0?commonsImage(photo.file,800):commonsOriginal(photo.file);
+ const imgSource=attempt===0?commonsImage(photo.file,960):commonsOriginal(photo.file);
  return <div className="tm-reality-photo">
   {attempt>=2?
    <div className="tm-reality-photo__fallback">
