@@ -211,14 +211,27 @@ export default function TripMap(){
   <div className="tm-kana-watermark tm-kana-watermark--right" lang="ja" aria-hidden="true">一期一会</div>
   <header className="tm-topbar"><div className="tm-topbar__inner">
    <div className="tm-topbar__brand"><span className="tm-topbar__crest" aria-hidden="true">旅</span><span>我們的旅行地圖<small className="tm-topbar__sub ml-2" lang="ja">ふたりの旅</small></span></div>
-   <div className="tm-topbar__state">{PEOPLE[me]} <span className="tm-online" lang="ja">謎解き中 · 同步</span></div>
+   <div className="tm-topbar__state">{PEOPLE[me]} <span className="tm-online" lang="ja">{creatorTour?"試作巡覽":"謎解き中 · 同步"}</span></div>
   </div></header>
   <div className="tm-scene-banner" aria-hidden="true"><img src="/trip-map/ukiyo-fuji.svg" alt=""/><span className="tm-scene-banner__label" lang="ja">旅の途中 · 道しるべ</span></div>
+  {creatorTour&&<div className="tm-tour-console" role="region" aria-label="製作者遊覽操作台">
+    <div className="tm-tour-console__label"><b>試</b> 製作者遊覽 <small>原版畫面 · 虛構資料 · 不寫入 D1</small></div>
+    <div className="tm-tour-console__buttons">
+     <button type="button" onClick={()=>tourJump(state.step-1,"answer")} disabled={state.step<=0}>上一題</button>
+     <button type="button" onClick={()=>tourJump(state.finished?0:state.step,"answer")}>作答頁</button>
+     <button type="button" onClick={()=>tourJump(state.finished?0:state.step,"waiting")}>等待頁</button>
+     <button type="button" onClick={()=>tourJump(state.finished?0:state.step,"reveal")}>對答案</button>
+     <button type="button" onClick={()=>tourJump(state.step+1,"answer")} disabled={state.step>=QUESTIONS.length-1}>下一題</button>
+     <button type="button" onClick={()=>tourJump(QUESTIONS.length,"result")}>結算頁</button>
+     <button type="button" className="tm-tour-console__exit" onClick={()=>{setCreatorTour(false);setSession(null);setState(null);lastRef.current="";}}>離開遊覽</button>
+    </div>
+   </div>}
   <div className="tm-board relative z-10 mx-auto max-w-3xl space-y-5 px-4 py-6 md:px-6 md:py-10">
    {!state.finished&&<div className="tm-progress-kicker flex items-center justify-between text-xs font-bold"><span>{q.chapter}</span><span>第 {state.step+1} / {QUESTIONS.length} 題</span></div>}
    {!state.finished&&<div className="tm-progress-bar h-2 overflow-hidden rounded-full bg-emerald-900/10"><div className="h-full rounded-full bg-emerald-700 transition-all" style={{width:((state.step+1)/QUESTIONS.length*100)+"%"}}/></div>}
    {state.finished ? <>
     <section className={cardBase}><div className="tm-question-stamp"><span aria-hidden="true">終</span> 最終章 · 答え合わせ</div><p className="mt-5 text-sm font-bold text-emerald-700">兩張地圖已經完成</p><h1 className="mt-2 text-3xl font-black">你們的旅行交集</h1><p className="mt-4 leading-7 text-slate-600">這裡同時參考兩人的直覺心動程度與各項偏好。分數是選路線的參考，不代表誰比較適合誰。</p></section>
+    <JourneyLedger/>
     <RouteGallery selected={choice} onToggle={(id)=>setChoice(old=>old.includes(id)?old.filter(x=>x!==id):old.length<3?[...old,id]:old)}/>
     <section className={cardBase}><h2 className="mb-5 text-xl font-black">值得一起討論的三條路</h2><div className="space-y-3">{fits.slice(0,3).map((it,i)=><div key={it.id} className="rounded-2xl bg-emerald-50 p-4"><div className="flex items-start justify-between gap-2"><div><span className="text-xs font-semibold text-emerald-700">候選 {i+1} · {it.id}</span><h3 className="mt-1 text-lg font-bold">{ROUTES[it.id].name}</h3><p className="mt-1 text-sm text-slate-600">{ROUTES[it.id].desc}</p></div><span className="shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-bold">{it.score.toFixed(1)}/5</span></div><div className="mt-3 flex flex-wrap gap-3 text-xs"><span>彥禎直覺 {it.people.yanzhen.direct}/5</span><span>涵郁直覺 {it.people.hanyu.direct}/5</span></div></div>)}</div><p className="mt-4 text-xs leading-6 text-slate-500">排名基於啟發式權重，未經心理計量校驗；你們可以從全部六條自由挑選。</p></section>
     <section className={cardBase}><h2 className="mb-5 text-xl font-black">六條路線的不同吸引力</h2><div className="space-y-4">{fits.map(it=><div key={it.id}><div className="mb-2 flex items-center justify-between gap-2 text-sm"><b>{it.id} · {ROUTES[it.id].name}</b><span>{it.score.toFixed(1)} / 5</span></div><div className="h-2 rounded-full bg-emerald-900/10"><div style={{width:it.score/5*100+"%"}} className="h-full rounded-full bg-emerald-700"/></div></div>)}</div></section>
@@ -238,7 +251,7 @@ export default function TripMap(){
     <div className="grid grid-cols-2 gap-3 text-center text-xs"><div className={"rounded-xl p-3 "+(state.submitted.includes("yanzhen")?"bg-emerald-200 text-emerald-900":"bg-white text-slate-500")}>{state.submitted.includes("yanzhen")?<Check size={15} className="mr-1 inline"/>:null}彥禎 {state.submitted.includes("yanzhen")?"已完成":"作答中"}</div><div className={"rounded-xl p-3 "+(state.submitted.includes("hanyu")?"bg-emerald-200 text-emerald-900":"bg-white text-slate-500")}>{state.submitted.includes("hanyu")?<Check size={15} className="mr-1 inline"/>:null}涵郁 {state.submitted.includes("hanyu")?"已完成":"作答中"}</div></div>
    </>}
    {!!error&&<div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}<button className="ml-3 underline" onClick={()=>setError("")}>關閉</button></div>}
-   <footer className="pt-5 text-center text-xs leading-6 text-slate-500">旅の謎 · 2027 / 01 / 02 · 新竹旅行<br/>本頁每 2.5 秒同步一次 · 你們的回答保存在專案 D1 資料庫</footer>
+   <footer className="pt-5 text-center text-xs leading-6 text-slate-500">旅の謎 · 2027 / 01 / 02 · 新竹旅行<br/>{creatorTour?"這些遊覽資料只在本頁，不會影響正式紀錄":"本頁每 2.5 秒同步一次 · 你們的回答保存在專案 D1 資料庫"}</footer>
   </div>
  </div>;
 }
