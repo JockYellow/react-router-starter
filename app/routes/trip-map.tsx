@@ -28,7 +28,7 @@ function defaultValue(step:number):Value{
  if(q.kind==="rating")return {};
  if(q.kind==="postcard")return {keep:[],drop:""};
  if(q.kind==="coins")return Object.fromEntries((q.items||[]).map(([k])=>[k,0]));
- if(q.kind==="reality")return {preferred:1000,cap:1800,moto:true,cold:3,effort:3};
+ if(q.kind==="reality")return {preferred:1000,cap:1800,cold:3,effort:3};
  if(q.kind==="note")return {message:""};
  return {};
 }
@@ -60,7 +60,7 @@ function Compare({step,answers}:{step:number;answers:Record<Role,Value>}){
   {q.kind==="postcard" && <div className="grid grid-cols-2 gap-3 text-sm">
    {ROLES.map(r=><div key={r} className="rounded-2xl bg-emerald-50 p-3"><div className="mb-2 font-bold">最想收藏</div>{(answers[r]?.keep||[]).map((k:string)=><p key={k} className="mb-2">{labelFor(step,k)}</p>)}<div className="mt-3 border-t border-emerald-900/10 pt-2 text-slate-500">不留：{labelFor(step,answers[r]?.drop)}</div></div>)}
   </div>}
-  {q.kind==="reality" && <div className="grid grid-cols-2 gap-3 text-sm">{ROLES.map(r=><div key={r} className="space-y-2 rounded-2xl bg-emerald-50 p-3"><p>舒服花費：<b>{toAmount(answers[r]?.preferred)}</b></p><p>絕對上限：<b>{toAmount(answers[r]?.cap)}</b></p><p>機車共乘：{answers[r]?.moto?"可以":"不希望"}</p><p>寒冷接受度：{answers[r]?.cold}/5</p><p>步行接受度：{answers[r]?.effort}/5</p></div>)}</div>}
+  {q.kind==="reality" && <div className="grid grid-cols-2 gap-3 text-sm">{ROLES.map(r=><div key={r} className="space-y-2 rounded-2xl bg-emerald-50 p-3"><p>舒服花費：<b>{toAmount(answers[r]?.preferred)}</b></p><p>絕對上限：<b>{toAmount(answers[r]?.cap)}</b></p><p>寒冷接受度：{answers[r]?.cold}/5</p><p>步行接受度：{answers[r]?.effort}/5</p></div>)}</div>}
   {q.kind==="note" && <div className="grid grid-cols-2 gap-3">{ROLES.map(r=><div key={r} className="min-h-28 rounded-2xl bg-emerald-50 p-4 whitespace-pre-wrap text-sm">{answers[r]?.message||"留白，也是選擇。"}</div>)}</div>}
  </div>;
 }
@@ -80,7 +80,6 @@ function Form({step,value,onChange}:{step:number;value:Value;onChange:(v:Value)=
  {q.kind==="reality"&&<div className="space-y-5">
   <label className="block text-sm font-semibold">每人一天，花起來舒服的金額（NT$）<input className={inputBase+" mt-2"} type="number" min="0" max="10000" step="100" value={value.preferred??""} onChange={e=>assign("preferred",Number(e.target.value))}/></label>
   <label className="block text-sm font-semibold">每人一天，絕對不希望超過（NT$）<input className={inputBase+" mt-2"} type="number" min="0" max="20000" step="100" value={value.cap??""} onChange={e=>assign("cap",Number(e.target.value))}/></label>
-  <fieldset><legend className="mb-2 text-sm font-semibold">可以接受機車共乘作為主要交通？</legend><div className="flex gap-2">{[{v:true,t:"可以"},{v:false,t:"希望不要"}].map(o=><button type="button" key={o.t} className={buttonBase+" flex-1 "+(value.moto===o.v?"bg-emerald-900 text-white":"bg-emerald-50 text-emerald-900")} onClick={()=>assign("moto",o.v)}>{o.t}</button>)}</div></fieldset>
   <div><p className="mb-3 text-sm font-semibold">冬天在戶外待久一點，你能接受多少？</p><Marks value={value.cold} onChange={v=>assign("cold",v)} low="很怕冷" high="可以保暖出遊"/></div>
   <div><p className="mb-3 text-sm font-semibold">一天安排散步或有坡度的步道，你能接受多少？</p><Marks value={value.effort} onChange={v=>assign("effort",v)} low="輕鬆就好" high="也喜歡健行"/></div>
   <p className="text-xs leading-6 text-slate-500">預算只作為候選路線的提醒；實際花費仍需確認當天的票價、餐飲及交通。</p>
