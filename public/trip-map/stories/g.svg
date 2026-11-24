@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title">
+ <title id="title">G 旅卷 · 湖口紅磚・陶藝手作・新豐紅樹</title>
+ <defs><pattern id="paper" width="43" height="39" patternUnits="userSpaceOnUse"><path d="M3 14h11m8 18h16m-14-25h7" stroke="#765c46" stroke-width=".7" opacity=".22"/><circle cx="6" cy="5" r="1" fill="#765c46" opacity=".17"/></pattern></defs>
+ <rect width="1200" height="630" fill="#eedfc4"/>
+ <g transform="translate(0 0)">
+ <rect width="400" height="630" fill="#e1c5aa"/>
+ <g opacity=".30" stroke="#fbf0dc" stroke-width="5" fill="none"><path d="M-36 136q55-36 118 0t130 0q61-31 115-6m-360 37q87 28 157-2t191-10"/></g>
+ <circle cx="285" cy="142" r="85" fill="#b84b3b" opacity=".87"/>
+ <g opacity=".30" stroke="#f8e5ca" stroke-width="4"><path d="M192 80h180m-170 18h140m-230 56h74"/></g>
+ <path d="M-20 365q84-94 155-54t136 0q70-42 153 3v250H-20Z" fill="#b0b39b" stroke="#456274" stroke-width="5"/>
+ <path d="M-10 407q106-84 203-27t220-4" fill="none" stroke="#f3e7ce" stroke-width="5" opacity=".6"/>
+ <path d="M38 320h324v226H38Z" fill="#ad5c45" stroke="#32465a" stroke-width="7"/><path d="M27 310h346" stroke="#dfc69b" stroke-width="16"/><path d="M66 368q50-54 98 0v148H66Zm169 0q50-54 98 0v148h-98Z" fill="#e5c8a7" stroke="#314759" stroke-width="8"/><path d="M66 412h98m71 0h98" stroke="#314759" stroke-width="5"/><path d="M38 352h324m-324 72h28m98 0h71m98 0h29" stroke="#d28a63" stroke-width="5"/>
+ <path d="M0 553q109-22 201 8t200-15v84H0Z" fill="#253f56"/>
+ <path d="M0 558q109-22 201 8t200-15" stroke="#eedfc9" stroke-width="6" fill="none"/>
+ <rect x="16" y="575" width="368" height="36" fill="#f2e5cb" opacity=".9"/>
+ <text x="200" y="600" text-anchor="middle" fill="#213b51" font-size="19" letter-spacing="5" font-family="serif" font-weight="700">湖口紅磚</text>
+ <rect x="10" y="10" width="380" height="610" fill="none" stroke="#917b61" stroke-width="2" opacity=".5"/>
+ </g><g transform="translate(400 0)">
+ <rect width="400" height="630" fill="#e4cfb2"/>
+ <g opacity=".30" stroke="#fbf0dc" stroke-width="5" fill="none"><path d="M-36 136q55-36 118 0t130 0q61-31 115-6m-360 37q87 28 157-2t191-10"/></g>
+ <circle cx="95" cy="152" r="81" fill="#b84b3b" opacity=".87"/>
+ <g opacity=".30" stroke="#f8e5ca" stroke-width="4"><path d="M192 80h180m-170 18h140m-230 56h74"/></g>
+ <path d="M-20 365q84-94 155-54t136 0q70-42 153 3v250H-20Z" fill="#b0b39b" stroke="#456274" stroke-width="5"/>
+ <path d="M-10 407q106-84 203-27t220-4" fill="none" stroke="#f3e7ce" stroke-width="5" opacity=".6"/>
+ <ellipse cx="202" cy="495" rx="152" ry="35" fill="#9f7d65" stroke="#30465a" stroke-width="7"/><path d="M111 275q3 50 36 65l-29 120q87 47 170 0l-29-120q31-28 33-65Z" fill="#a9553f" stroke="#31485b" stroke-width="9"/><ellipse cx="202" cy="274" rx="90" ry="25" fill="#ddaa83" stroke="#31485b" stroke-width="8"/><ellipse cx="202" cy="274" rx="55" ry="12" fill="#6f453b"/><path d="M132 388q72 41 139 0m-130 39q67 32 118-1" stroke="#f0c296" stroke-width="10" fill="none"/><path d="M102 491v42m199-42v42" stroke="#31485b" stroke-width="8"/>
+ <path d="M0 553q109-22 201 8t200-15v84H0Z" fill="#253f56"/>
+ <path d="M0 558q109-22 201 8t200-15" stroke="#eedfc9" stroke-width="6" fill="none"/>
+ <rect x="16" y="575" width="368" height="36" fill="#f2e5cb" opacity=".9"/>
+ <text x="200" y="600" text-anchor="middle" fill="#213b51" font-size="19" letter-spacing="5" font-family="serif" font-weight="700">陶藝手作</text>
+ <rect x="10" y="10" width="380" height="610" fill="none" stroke="#917b61" stroke-width="2" opacity=".5"/>
+ </g><g transform="translate(800 0)">
+ <rect width="400" height="630" fill="#becdbb"/>
+ <g opacity=".30" stroke="#fbf0dc" stroke-width="5" fill="none"><path d="M-36 136q55-36 118 0t130 0q61-31 115-6m-360 37q87 28 157-2t191-10"/></g>
+ <circle cx="285" cy="162" r="77" fill="#b84b3b" opacity=".87"/>
+ <g opacity=".30" stroke="#f8e5ca" stroke-width="4"><path d="M192 80h180m-170 18h140m-230 56h74"/></g>
+ <path d="M-20 365q84-94 155-54t136 0q70-42 153 3v250H-20Z" fill="#b0b39b" stroke="#456274" stroke-width="5"/>
+ <path d="M-10 407q106-84 203-27t220-4" fill="none" stroke="#f3e7ce" stroke-width="5" opacity=".6"/>
+ <path d="M0 477q161-53 400-11v99H0Z" fill="#5b8086"/><path d="M98 376v101m140-114v120m100-101v94" stroke="#4c5145" stroke-width="20" stroke-linecap="round"/><path d="M99 425l-50 85m50-72 52 74m87-88-50 98m51-91 48 84m50-89-45 96m45-88 47 84" stroke="#4c5145" stroke-width="11"/><ellipse cx="98" cy="341" rx="100" ry="85" fill="#4e7765" stroke="#315d57" stroke-width="5"/><ellipse cx="238" cy="336" rx="100" ry="98" fill="#5a8065" stroke="#315d57" stroke-width="5"/><ellipse cx="340" cy="349" rx="82" ry="74" fill="#4e7262"/><path d="M26 525q140-21 245 5" fill="none" stroke="#e3d5b5" stroke-width="6"/>
+ <path d="M0 553q109-22 201 8t200-15v84H0Z" fill="#253f56"/>
+ <path d="M0 558q109-22 201 8t200-15" stroke="#eedfc9" stroke-width="6" fill="none"/>
+ <rect x="16" y="575" width="368" height="36" fill="#f2e5cb" opacity=".9"/>
+ <text x="200" y="600" text-anchor="middle" fill="#213b51" font-size="19" letter-spacing="5" font-family="serif" font-weight="700">新豐紅樹</text>
+ <rect x="10" y="10" width="380" height="610" fill="none" stroke="#917b61" stroke-width="2" opacity=".5"/>
+ </g>
+ <rect width="1200" height="630" fill="url(#paper)" pointer-events="none"/>
+ <path d="M400 0v630M800 0v630" stroke="#f9ecd5" stroke-width="15" opacity=".8"/>
+ <path d="M400 0v630M800 0v630" stroke="#30495d" stroke-width="3" opacity=".6"/>
+ <rect x="8" y="8" width="1184" height="614" fill="none" stroke="#264258" stroke-width="5" opacity=".7"/>
+ </svg>
