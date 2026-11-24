@@ -55,6 +55,6 @@ export function JourneyLedger({animated=false}:{animated?:boolean}){
     <span className="tm-ledger__number">{animated?<CountRise to={account.n} delay={550+i*500}/>:account.n}<span aria-hidden="true"> ×</span></span>
    </div>)}
   </div>
-  <p className="tm-ledger__footer">此帳單不收現金。請於旅途之中，慢慢結清。</p>
+  <p className="tm-ledger__footer">這帳到底怎麼算的啦……算了，先欠著。等見面的時候再慢慢還。</p>
  </section>;
 }
