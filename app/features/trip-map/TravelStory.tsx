@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { ArrowLeft, ArrowRight, Check, Compass, Footprints, MapPin, Sparkles, X } from "lucide-react";
 import { ROUTE_STORIES, type RouteStory, type StoryId } from "./stories";
 import { REAL_PHOTOS, commonsImage, commonsOriginal, commonsSource, type Photo } from "./photos";
+import { ScrollUnfurl } from "./ScrollUnfurl";
 
 export function ThreeDayPrelude(){
  const days=[
@@ -133,6 +134,7 @@ function RouteDetail({story,onClose,selected,onToggle,canAdd}:{story:RouteStory;
     </div>
    </div>
   </div>
+  <ScrollUnfurl title={story.title+" · 旅卷展開"} subtitle={story.jp}/>
  </div>,document.body);
 }
 export function RouteGallery({selected,onToggle}:{selected:string[];onToggle:(id:StoryId)=>void}){
