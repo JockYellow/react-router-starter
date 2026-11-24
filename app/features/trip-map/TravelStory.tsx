@@ -17,8 +17,8 @@ export function ThreeDayPrelude(){
  const turnRef=useRef(false);
  const timers=useRef<ReturnType<typeof setTimeout>[]>([]);
  const touchX=useRef<number|null>(null);
- const move=(direction:"next"|"prev")=>{
-  const target=page+(direction==="next"?1:-1);
+ const move=(direction:"next"|"prev",destination?:number)=>{
+  const target=destination??page+(direction==="next"?1:-1);
   if(turnRef.current||target<0||target>=days.length)return;
   const reduced=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
   if(reduced){setPage(target);return;}
@@ -74,7 +74,7 @@ export function ThreeDayPrelude(){
   <div className="tm-flipbook__controls">
    <button type="button" onClick={()=>move("prev")} disabled={page===0||!!turn} aria-label="翻回前一天"><ChevronLeft size={19}/>上一頁</button>
    <div className="tm-flipbook__dots" aria-label="旅行日期">
-    {days.map((d,i)=><button type="button" key={d.day} onClick={()=>{if(i===page)return;move(i>page?"next":"prev");}} disabled={!!turn||i===page} aria-label={"翻到第 "+(i+1)+" 天"} aria-current={page===i?"step":undefined} className={i===page?"is-active":""}>{String(i+1).padStart(2,"0")}</button>)}
+    {days.map((d,i)=><button type="button" key={d.day} onClick={()=>{if(i===page)return;move(i>page?"next":"prev",i);}} disabled={!!turn||i===page} aria-label={"翻到第 "+(i+1)+" 天"} aria-current={page===i?"step":undefined} className={i===page?"is-active":""}>{String(i+1).padStart(2,"0")}</button>)}
    </div>
    <button type="button" onClick={()=>move("next")} disabled={page===days.length-1||!!turn}>下一頁<ChevronRight size={19}/></button>
   </div>
