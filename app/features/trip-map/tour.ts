@@ -3,7 +3,7 @@
  * 這些資料只在前端記憶體中，不呼叫真實 API、不寫入 D1。
  * 頁面沿用同一個 Form / Compare / RouteGallery / 結算頁。
  */
-import { QUESTIONS, ROLES, ROUTE_KEYS, type Role } from "./questions";
+import { QUESTIONS, ROLES, type Role } from "./questions";
 export type TourPhase="answer"|"waiting"|"reveal"|"result";
 type Answer=Record<string,any>;
 type TourFinalists=Partial<Record<Role,string[]>>;
