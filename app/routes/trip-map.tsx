@@ -9,7 +9,7 @@ import "../styles/trip-map-scroll.css";
 import "../styles/trip-map-finale.css";
 import { makeTourState, type TourPhase } from "../features/trip-map/tour";
 import "../styles/trip-map-creator.css";
-import { ArrowRight, Check, ChevronRight, Heart, LockKeyhole } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronRight, Heart, LockKeyhole } from "lucide-react";
 import { PEOPLE, QUESTIONS, ROUTES, ROUTE_KEYS, ROLES, pairFit, validAnswer, type Answers, type Role } from "../features/trip-map/questions";
 
 export const meta:MetaFunction=()=>[{title:"旅の謎｜我們的旅行地圖 · 彥禎 × 涵郁"},{name:"description",content:"三天兩夜的一張旅行地圖，讓我們一起選出最想去的地方"}];
@@ -105,6 +105,31 @@ export default function TripMap(){
  const [busy,setBusy]=useState(false);
  const [loading,setLoading]=useState(false);
  const [creatorTour,setCreatorTour]=useState(false);
+ const [landingPage,setLandingPage]=useState(0);
+ const [landingTurn,setLandingTurn]=useState<"next"|"prev"|null>(null);
+ const [landingIncoming,setLandingIncoming]=useState(false);
+ const landingLock=useRef(false);
+ const landingTimers=useRef<ReturnType<typeof setTimeout>[]>([]);
+ const landingTouch=useRef<number|null>(null);
+ const goLanding=(target:number)=>{
+  if(landingLock.current||target<0||target>2||target===landingPage)return;
+  const book=document.getElementById("tm-landing-book");
+  const reduce=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  if(reduce){setLandingPage(target);book?.scrollIntoView({behavior:"instant",block:"start"});return;}
+  landingLock.current=true;
+  setLandingIncoming(false);
+  setLandingTurn(target>landingPage?"next":"prev");
+  landingTimers.current.push(setTimeout(()=>{
+   setLandingPage(target);
+   setLandingIncoming(true);
+   book?.scrollIntoView({behavior:"smooth",block:"start"});
+  },320));
+  landingTimers.current.push(setTimeout(()=>{
+   setLandingTurn(null);setLandingIncoming(false);landingLock.current=false;
+  },680));
+ };
+ useEffect(()=>()=>{landingTimers.current.forEach(clearTimeout);},[]);
+
  const tourOverrides=useRef<Record<number,Value>>({});
  const tourFinalists=useRef<Partial<Record<Role,string[]>>>({});
  const lastRef=useRef<string>("");
@@ -168,35 +193,53 @@ export default function TripMap(){
   window.scrollTo({top:0,behavior:"smooth"});
  },[state?.step,session?.role]);
  if(!session)return <div className="tm-ukiyo min-h-screen">
-  <main className="tm-entry">
+  <main className="tm-entry tm-entry-book" id="tm-landing-book">
    <div className="tm-entry__eyebrow"><span>旅の謎解き · 2027 / 01 / 02</span></div>
-   <div className="tm-cover">
-    <img className="tm-cover__art" src="/trip-map/ukiyo-fuji.svg" alt="朱紅日輪、富士山與層層海浪構成的浮世繪風格旅行圖景" />
-    <div className="tm-cover__wash" aria-hidden="true"/>
-    <div className="tm-cover__copy">
-     <div className="tm-stamp" aria-hidden="true">謎</div>
-     <p className="tm-cover__kicker">第壱章　ふたりの旅</p>
-     <h1 className="tm-cover__title">我們的<br/>旅行地圖</h1>
-     <span className="tm-cover__jp" lang="ja">ふたりの旅の地図</span>
-     <p className="tm-cover__lead">我原本以為，三天的新竹旅行，找幾個喜歡的地方排一排就好了。結果真的開始想，才發現最難的問題是：你會想把時間留在哪裡？第一天和第三天先在市區走走。中間那個週六，就讓我們一起把地圖畫完吧。</p>
+   <div className="tm-entry-book__chapter" aria-hidden="true"><span>旅</span><span>日</span><span>記</span></div>
+   <div className="tm-entry-book__stage" tabIndex={0} aria-label="旅行手札三頁導覽" aria-roledescription="可以翻頁的故事書"
+    onKeyDown={e=>{if(e.target!==e.currentTarget)return;if(e.key==="ArrowRight"){e.preventDefault();goLanding(landingPage+1);}else if(e.key==="ArrowLeft"){e.preventDefault();goLanding(landingPage-1);}}}
+    onTouchStart={e=>{landingTouch.current=e.touches[0]?.clientX??null;}}
+    onTouchEnd={e=>{if(landingTouch.current===null)return;const x=e.changedTouches[0]?.clientX??landingTouch.current;const dx=x-landingTouch.current;landingTouch.current=null;if(Math.abs(dx)>75)goLanding(landingPage+(dx<0?1:-1));}}>
+    <div className={"tm-entry-book__paper "+(landingTurn?"tm-entry-book__paper--"+landingTurn+(landingIncoming?" tm-entry-book__paper--incoming":""):"")} aria-live="polite">
+     {landingPage===0&&<div className="tm-cover">
+      <img className="tm-cover__art" src="/trip-map/ukiyo-fuji.svg" alt="朱紅日輪、富士山與層層海浪構成的浮世繪風格旅行圖景"/>
+      <div className="tm-cover__wash" aria-hidden="true"/>
+      <div className="tm-cover__copy">
+       <div className="tm-stamp" aria-hidden="true">謎</div>
+       <p className="tm-cover__kicker">第壱章　ふたりの旅</p>
+       <h1 className="tm-cover__title">我們的<br/>旅行地圖</h1>
+       <span className="tm-cover__jp" lang="ja">ふたりの旅の地図</span>
+       <p className="tm-cover__lead">我原本以為，三天的新竹旅行，找幾個喜歡的地方排一排就好了。結果真的開始想，才發現最難的問題是：你會想把時間留在哪裡？第一天和第三天先在市區走走。中間那個週六，就讓我們一起把地圖畫完吧。</p>
+      </div>
+      <span className="tm-cover__side" aria-hidden="true" lang="ja">旅のしるべ　一期一会</span>
+     </div>}
+     {landingPage===1&&<div className="tm-entry-book__inside"><ThreeDayPrelude/></div>}
+     {landingPage===2&&<div className="tm-entry-book__inside tm-entry-book__inside--roles">
+      <div className="tm-entry__intro">
+       <p className="tm-progress-kicker text-xs font-bold tracking-[.23em]">壱 · 謎解きのはじまり</p>
+       <h2 className="mt-2">好了，這次換你來選</h2>
+       <p>先選自己的名字，兩個人各自在手機上回答同一題。等答案都送出，才一起揭曉。先不要偷看對方喔！</p>
+      </div>
+      <div className="tm-role-grid">
+       {ROLES.map(role=><button key={role} disabled={loading} onClick={()=>enter(role)} className="tm-role-card disabled:opacity-40">
+        <div className="tm-role-card__seal" aria-hidden="true">{PEOPLE[role][0]}</div>
+        <div className="tm-role-card__name">{PEOPLE[role]}</div>
+        <div className="tm-role-card__hint">從這裡開始答題 <ArrowRight size={15}/></div>
+       </button>)}
+      </div>
+      <div className="tm-creator-entry"><button type="button" onClick={startTour}><span aria-hidden="true">試</span><span>製作者遊覽</span><small>想偷看後面的劇情？從這裡進去</small></button></div>
+      <div className="tm-entry__note"><span className="tm-serif font-bold" lang="ja">旅の心得 · </span>小小提醒：我們要用各自的手機答題。第一次選好名字後，這台裝置會記住你的身分；目前還不能自己換機，所以先別手滑選錯喔。</div>
+     </div>}
     </div>
-    <span className="tm-cover__side" aria-hidden="true" lang="ja">旅のしるべ　一期一会</span>
    </div>
-   <ThreeDayPrelude/>
-   <div className="tm-entry__intro">
-    <p className="tm-progress-kicker text-xs font-bold tracking-[.23em]">壱 · 謎解きのはじまり</p>
-    <h2 className="mt-2">好了，這次換你來選</h2>
-    <p>先選自己的名字，兩個人各自在手機上回答同一題。等答案都送出，才一起揭曉。先不要偷看對方喔！</p>
-   </div>
-   <div className="tm-role-grid">
-    {ROLES.map(role=><button key={role} disabled={loading} onClick={()=>enter(role)} className="tm-role-card disabled:opacity-40">
-     <div className="tm-role-card__seal" aria-hidden="true">{PEOPLE[role][0]}</div>
-     <div className="tm-role-card__name">{PEOPLE[role]}</div>
-     <div className="tm-role-card__hint">從這裡開始答題 <ArrowRight size={15}/></div>
-    </button>)}
-   </div>
-   <div className="tm-creator-entry"><button type="button" onClick={startTour}><span aria-hidden="true">試</span><span>製作者遊覽</span><small>想偷看後面的劇情？從這裡進去</small></button></div>
-   <div className="tm-entry__note"><span className="tm-serif font-bold" lang="ja">旅の心得 · </span>小小提醒：我們要用各自的手機答題。第一次選好名字後，這台裝置會記住你的身分；目前還不能自己換機，所以先別手滑選錯喔。</div>
+   <nav className="tm-entry-book__controls" aria-label="翻閱首頁的三頁">
+    <button type="button" onClick={()=>goLanding(landingPage-1)} disabled={landingPage===0||!!landingTurn}><ArrowLeft size={17}/>上一頁</button>
+    <div className="tm-entry-book__index" aria-label="目前頁數">
+     {[0,1,2].map(n=><button type="button" key={n} aria-label={["封面","三日行程","選擇旅人"][n]} aria-current={landingPage===n?"page":undefined} disabled={!!landingTurn||landingPage===n} onClick={()=>goLanding(n)} className={landingPage===n?"is-active":""}>{String(n+1).padStart(2,"0")}</button>)}
+    </div>
+    <button type="button" onClick={()=>goLanding(landingPage+1)} disabled={landingPage===2||!!landingTurn}>下一頁<ChevronRight size={17}/></button>
+   </nav>
+   <p className="tm-entry-book__hint">{["翻到下一頁，看看這趟旅行的安排。","三天的行程先看到這裡。再翻一頁，就輪到你選擇了。","第三頁，選擇旅人身分後，正式開啟卷軸式問卷。"][landingPage]}</p>
    {!!error&&<p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
    <p className="tm-scroll-note">— 旅の謎 · ふたりで解く小さな物語 —</p>
   </main>
