@@ -6,9 +6,9 @@ import { REAL_PHOTOS, commonsImage, commonsOriginal, commonsSource, type Photo }
 
 export function ThreeDayPrelude(){
  const days=[
-  {day:"D1",date:"1/1 · 五",jp:"序ノ巻",title:"第一天，先跟新竹打聲招呼",desc:"第一天抵達新竹，先把行李放好。東門城、護城河、舊城的小吃，都還在市區等著。今天不用跑太遠，我想先習慣身旁多了一個人一起走路的感覺。",tags:["市區漫遊","入住・晚餐","輕鬆相處"]},
-  {day:"D2",date:"1/2 · 六",jp:"本ノ巻",title:"第二天，地圖還缺了最重要的一塊",desc:"今天最自由，也最令人猶豫。想往山裡走？想看海？還是乾脆找間老店待久一點？六條路攤開了，我有好多想去的地方，但更想知道你會把手指停在哪裡。",tags:["六條候選","完整一日遊","今天的謎底"]},
-  {day:"D3",date:"1/3 · 日",jp:"結ノ巻",title:"第三天，讓旅程慢慢落地",desc:"上午先參加主日聚會，午後留在新竹市區。公園、玻璃工藝、咖啡店，想逛哪裡就逛哪裡。旅行總得結束，但我想留一點時間，讓這兩天的事情慢慢沉下來。",tags:["主日聚會","市區短行程","悠閒返程"]}
+  {day:"D1",date:"1/1 · 五",jp:"序ノ巻",title:"第一天，先跟新竹打聲招呼",desc:"第一天抵達新竹，先把行李放好。東門城、護城河、舊城的小吃，都還在市區等著。今天不用跑太遠，我想先習慣身旁多了一個人一起走路的感覺。",tags:["舊城隨意走走","先安頓，再吃飯","慢慢走、慢慢聊"]},
+  {day:"D2",date:"1/2 · 六",jp:"本ノ巻",title:"第二天，地圖還缺了最重要的一塊",desc:"今天最自由，也最令人猶豫。想往山裡走？想看海？還是乾脆找間老店待久一點？六條路攤開了，我有好多想去的地方，但更想知道你會把手指停在哪裡。",tags:["六條有趣的岔路","把整天交給它","一起選出答案"]},
+  {day:"D3",date:"1/3 · 日",jp:"結ノ巻",title:"第三天，讓旅程慢慢落地",desc:"上午先參加上午主日聚會，午後留在新竹市區。公園、玻璃工藝、咖啡店，想逛哪裡就逛哪裡。旅行總得結束，但我想留一點時間，讓這兩天的事情慢慢沉下來。",tags:["上午主日聚會","午後留在市區","別急著說再見"]}
  ];
  return <section className="tm-three-days" aria-label="新竹三天兩夜旅行架構">
   <div className="tm-three-days__intro">
@@ -37,12 +37,12 @@ function RealityPhoto({photo,priority=false,routeId}:{photo:Photo;priority?:bool
   {attempt>=2?
    <div className="tm-reality-photo__fallback">
     <img src={"/trip-map/stories/"+routeId.toLowerCase()+".svg"} alt="插畫備援：原始實景照片暫時無法載入" loading="lazy"/>
-    <a href={commonsSource(photo.file)} target="_blank" rel="noopener noreferrer">暫時無法載入實景，查看原始圖片</a>
+    <a href={commonsSource(photo.file)} target="_blank" rel="noopener noreferrer">這張照片沒跑出來，點這裡看看原圖</a>
    </div>:
    <img src={imgSource} alt={photo.label} loading={priority?"eager":"lazy"} referrerPolicy="no-referrer" onError={()=>setAttempt(a=>Math.min(a+1,2))}/>}
   <div className="tm-reality-photo__credit">
    <span>{photo.label}</span>
-   <a href={commonsSource(photo.file)} target="_blank" rel="noopener noreferrer" aria-label={"查看"+photo.label+"的照片作者與授權"}>實景來源及授權</a>
+   <a href={commonsSource(photo.file)} target="_blank" rel="noopener noreferrer" aria-label={"查看"+photo.label+"的照片作者與授權"}>看看這張照片從哪裡來</a>
   </div>
  </div>;
 }
@@ -94,7 +94,7 @@ function RouteDetail({story,onClose,selected,onToggle,canAdd}:{story:RouteStory;
  };
  return createPortal(<div ref={overlayRef} className="tm-story-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
   <div className="tm-story-modal" role="dialog" aria-modal="true" aria-label={story.title+" 旅卷"}>
-   <button ref={closeRef} type="button" className="tm-story-close" onClick={onClose} aria-label="關閉旅卷"><X size={19}/><span>收起旅卷</span></button>
+   <button ref={closeRef} type="button" className="tm-story-close" onClick={onClose} aria-label="把旅卷收起來"><X size={19}/><span>先把這一卷收好</span></button>
    <div className="tm-story-modal__hero">
     <RealityPhoto photo={REAL_PHOTOS[story.id][0]} routeId={story.id} priority/>
     <div className="tm-story-modal__hero-shade"/>
@@ -107,29 +107,29 @@ function RouteDetail({story,onClose,selected,onToggle,canAdd}:{story:RouteStory;
    <div className="tm-story-modal__inside">
     <div className="tm-story-modal__opening"><p>{story.overture}</p><span className="tm-story-calligraphy" aria-hidden="true" lang="ja">旅</span></div>
     <div className="tm-story-meta" aria-label="行程基本資訊">
-     <div><span>旅の気分</span><strong>{story.dayFeel}</strong></div>
-     <div><span>主要體驗</span><strong>{story.activity}</strong></div>
-     <div><span>旅途步調</span><strong>{story.pace}</strong></div>
-     <div><span>交通方式</span><strong>{story.transport}</strong></div>
+     <div><span>今天的感覺</span><strong>{story.dayFeel}</strong></div>
+     <div><span>想玩的事情</span><strong>{story.activity}</strong></div>
+     <div><span>走起來有多累</span><strong>{story.pace}</strong></div>
+     <div><span>這天怎麼移動</span><strong>{story.transport}</strong></div>
     </div>
     <div className="tm-story-chips" aria-label="代表性景點">{story.highlight.map(x=><span key={x}><MapPin size={12} aria-hidden="true"/>{x}</span>)}</div>
     <div className="tm-story-section-head">
-     <span lang="ja">旅の記録 · 真實景色</span>
+     <span lang="ja">旅の記録 · 先看看真正的景色</span>
      <h3>如果真的出發，我們會看見什麼？</h3>
      <p>照片先偷看一點。真正的風、聲音與那些意外，還是要等我們走進去才知道。</p>
     </div>
     <div className="tm-story-beats">{[0,1,2].map(i=><ScrollVignette key={i} story={story} index={i}/>)}</div>
     <div className="tm-story-section-head tm-story-section-head--small">
-     <span lang="ja">寄り道 · 隱藏支線</span>
+     <span lang="ja">寄り道 · 還能多走的岔路</span>
      <h3>如果還有時間，就再貪心一點</h3>
     </div>
     <div className="tm-story-sidequests">{story.optional.map((x,i)=><div className="tm-story-sidequest" key={x.title}><b>{String(i+1).padStart(2,"0")}</b><div><h4>{x.title}</h4><p>{x.detail}</p></div></div>)}</div>
-    <div className="tm-story-ending"><span lang="ja">旅の余韻</span><p>{story.closing}</p></div>
-    <div className="tm-story-question"><span lang="ja">ふたりの会話 · 聊聊這段旅程</span><p>{story.discussion}</p></div>
+    <div className="tm-story-ending"><span lang="ja">旅の余韻 · 回程時會想起什麼</span><p>{story.closing}</p></div>
+    <div className="tm-story-question"><span lang="ja">ふたりの会話 · 這題想聽你說</span><p>{story.discussion}</p></div>
     <div className="tm-story-modal__actions">
-     <button type="button" className={"tm-story-pick "+(selected?"tm-story-pick--selected":"")} onClick={choose}>{selected?<Check size={18}/>:<Sparkles size={18}/>} {selected?"已偷偷收進候選":"這條我想去，先收起來"}</button>
-     <button type="button" className="tm-story-dismiss" onClick={onClose}>再去翻翻其他路線 <ArrowLeft size={16}/></button>
-     {warning&&<p className="tm-story-warning" role="status">最多先收三條啦。想換的話，去下面把其中一條放回地圖。</p>}
+     <button type="button" className={"tm-story-pick "+(selected?"tm-story-pick--selected":"")} onClick={choose}>{selected?<Check size={18}/>:<Sparkles size={18}/>} {selected?"這條已經收好了":"欸，這條我想去！先收起來"}</button>
+     <button type="button" className="tm-story-dismiss" onClick={onClose}>換下一條看看 <ArrowLeft size={16}/></button>
+     {warning&&<p className="tm-story-warning" role="status">欸欸，先別貪心！最多留三條，想換就先把其中一條放回去。</p>}
     </div>
    </div>
   </div>
@@ -138,10 +138,10 @@ function RouteDetail({story,onClose,selected,onToggle,canAdd}:{story:RouteStory;
 export function RouteGallery({selected,onToggle}:{selected:string[];onToggle:(id:StoryId)=>void}){
  const [opened,setOpened]=useState<StoryId|null>(null);
  const openStory=ROUTE_STORIES.find(s=>s.id===opened);
- return <section className="tm-story-gallery" aria-label="D2 六大旅行方案">
+ return <section className="tm-story-gallery" aria-label="週六的六種旅行可能">
   <div className="tm-story-gallery__intro">
    <div className="tm-story-gallery__seal" aria-hidden="true">六</div>
-   <span lang="ja">六つの旅の扉 · 六扇旅行之門</span>
+   <span lang="ja">六つの旅の扉 · 六條岔路在等我們</span>
    <h2>終於可以看看，我們會往哪裡走了。</h2>
    <p>六條路都在這裡。有山、有海、有老街，還有一些我本來根本沒想到的地方。先別急著選，點開看看真正的景色；說不定最後讓你捨不得放下的，會是最意外的那一條。</p>
   </div>
@@ -157,7 +157,7 @@ export function RouteGallery({selected,onToggle}:{selected:string[];onToggle:(id
      <h3>{story.title}</h3>
      <p className="tm-story-card__tagline">{story.tagline}</p>
      <p className="tm-story-card__summary">{story.activity}</p>
-     <div className="tm-story-card__footer"><span><Footprints size={13}/> {story.pace}</span><strong>翻開看看 <ArrowRight size={16}/></strong></div>
+     <div className="tm-story-card__footer"><span><Footprints size={13}/> {story.pace}</span><strong>看看裡面有什麼 <ArrowRight size={16}/></strong></div>
     </div>
    </button>)}
   </div>

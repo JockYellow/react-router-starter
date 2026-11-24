@@ -80,40 +80,40 @@ async function state(db:Db,role:Role){
 }
 
 export async function handleTripMap({request,context}:ActionFunctionArgs){
- if(request.method!=="POST") return denied("只接受 POST",405);
- const size=Number(request.headers.get("content-length")||0); if(size>12000) return denied("資料過大",413);
- let body:any; try{body=await request.json();}catch{return denied("資料格式錯誤");}
+ if(request.method!=="POST") return denied("這個入口目前無法用這種方式開啟。",405);
+ const size=Number(request.headers.get("content-length")||0); if(size>12000) return denied("一次送來的內容太多了，請稍微縮短再試。",413);
+ let body:any; try{body=await request.json();}catch{return denied("資料沒能好好送到，請再試一次。");}
  const op=body?.op; const role=roleOf(body?.role); const token=body?.token;
- if(!role || !tokenOkay(token))return denied("無效的身分或識別碼");
+ if(!role || !tokenOkay(token))return denied("好像沒認出你的身分，請回到旅人入口再試。");
  const db=requireBlogDb(context); await init(db); await runOneTimeRequestedReset(db);
  if(op==="claim"){
   const hash=await digest(token);
   await db.prepare("INSERT OR IGNORE INTO trip_duo_players (role,token_hash) VALUES (?,?)").bind(role,hash).run();
-  if(!await authenticated(db,role,token))return denied(PEOPLE[role]+"已由另一台裝置認領。請改用原裝置；目前沒有自助重設功能。",409);
+  if(!await authenticated(db,role,token))return denied(PEOPLE[role]+"的旅人身分已經留在另一台裝置上。目前還不能自行換機，請回到最初選擇的那台。",409);
   return Response.json({ok:true,state:await state(db,role)},{headers:{"Cache-Control":"no-store"}});
  }
- if(!await authenticated(db,role,token))return denied("此裝置沒有這個角色的權限。請回到原本認領的裝置。",403);
+ if(!await authenticated(db,role,token))return denied("這台裝置還沒有這位旅人的通行證，請回到原本認領的那台。",403);
  if(op==="state")return Response.json({ok:true,state:await state(db,role)},{headers:{"Cache-Control":"no-store"}});
  if(op==="answer"){
   const step=body.step; const current=await getProgress(db);
-  if(!Number.isInteger(step)||step!==current.step || step>=QUESTIONS.length || current.revealed)return denied("這一題已結束，請更新頁面後再試",409);
-  if(!validAnswer(step,body.answer))return denied("答案尚未完成或格式不正確");
+  if(!Number.isInteger(step)||step!==current.step || step>=QUESTIONS.length || current.revealed)return denied("這一題已經翻頁了，重新整理後就能接上進度。",409);
+  if(!validAnswer(step,body.answer))return denied("這題好像還漏了一點什麼，確認每個選項都答完再送出吧。");
   await db.prepare("INSERT INTO trip_duo_answers (role,step,payload) VALUES (?,?,?) ON CONFLICT(role,step) DO UPDATE SET payload=excluded.payload,updated_at=CURRENT_TIMESTAMP").bind(role,step,JSON.stringify(body.answer)).run();
   return Response.json({ok:true,state:await state(db,role)},{headers:{"Cache-Control":"no-store"}});
  }
  if(op==="advance"){
   const step=body.step;
-  if(!Number.isInteger(step))return denied("無效題號");
+  if(!Number.isInteger(step))return denied("好像走錯題目了，請重新整理看看。");
   await db.prepare("UPDATE trip_duo_progress SET step=step+1,revealed=0,updated_at=CURRENT_TIMESTAMP WHERE id=1 AND step=? AND revealed=1 AND step<?").bind(step,QUESTIONS.length).run();
   return Response.json({ok:true,state:await state(db,role)},{headers:{"Cache-Control":"no-store"}});
  }
  if(op==="finalists"){
   const progress=await getProgress(db);
-  if(progress.step<QUESTIONS.length) return denied("尚未完成全部題目",409);
+  if(progress.step<QUESTIONS.length) return denied("還有幾道題目沒揭曉，先把故事走完吧。",409);
   const cs=body.choices;
-  if(!Array.isArray(cs)||cs.length<2||cs.length>3||new Set(cs).size!==cs.length||!cs.every((x:unknown)=>typeof x==="string"&&ROUTE_KEYS.includes(x)))return denied("請挑選 2～3 條不重複的路線");
+  if(!Array.isArray(cs)||cs.length<2||cs.length>3||new Set(cs).size!==cs.length||!cs.every((x:unknown)=>typeof x==="string"&&ROUTE_KEYS.includes(x)))return denied("最後只能留兩到三條不同的路線，再挑一下吧。");
   await db.prepare("INSERT INTO trip_duo_finalists (role,choices) VALUES (?,?) ON CONFLICT(role) DO UPDATE SET choices=excluded.choices,updated_at=CURRENT_TIMESTAMP").bind(role,JSON.stringify(cs)).run();
   return Response.json({ok:true,state:await state(db,role)},{headers:{"Cache-Control":"no-store"}});
  }
- return denied("不支援此操作");
+ return denied("這個操作目前走不通，回到剛才的頁面再試試。");
 }
