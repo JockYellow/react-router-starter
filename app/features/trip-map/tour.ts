@@ -18,7 +18,7 @@ export function tourFixture(step:number,role:Role):Answer {
  }
  if(question.kind==="postcard")return role==="yanzhen"?{keep:["created","surprise"],drop:"challenge"}:{keep:["comfort","view"],drop:"challenge"};
  if(question.kind==="coins")return role==="yanzhen"?{food:2,scenery:2,craft:2,active:1,rest:1}:{food:1,scenery:2,craft:1,active:1,rest:3};
- if(question.kind==="reality")return role==="yanzhen"?{preferred:1100,cap:1900,moto:true,cold:3,effort:4}:{preferred:900,cap:1700,moto:true,cold:2,effort:3};
+ if(question.kind==="reality")return role==="yanzhen"?{preferred:1100,cap:1900,cold:3,effort:4}:{preferred:900,cap:1700,cold:2,effort:3};
  if(question.kind==="note")return {message:role==="yanzhen"?"如果找到一個讓你很喜歡的地方，希望可以一起多停一下。":"希望我們總能在旅行裡，找到屬於自己的小驚喜。"};
  return {};
 }

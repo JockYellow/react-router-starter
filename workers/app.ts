@@ -48,7 +48,7 @@ export default {
         "default-src 'self'",
         `script-src 'self' 'unsafe-inline'${telegramScriptSrc}`,
         "style-src 'self' 'unsafe-inline'",
-        `img-src 'self' data:${mediaSrc} ${BANGUMI_IMAGE_ORIGIN}`,
+        `img-src 'self' data: https://commons.wikimedia.org https://upload.wikimedia.org${mediaSrc} ${BANGUMI_IMAGE_ORIGIN}`,
         `media-src 'self' blob:${mediaSrc}`,
         "font-src 'self' data:",
         `connect-src 'self'${toolbeltSrc}${telegramConnectSrc}`,
