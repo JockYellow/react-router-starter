@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 /** 結算頁趣味彩蛋：只使用圖像與數字，不直接顯示文字解釋。 */
 function EmbraceGlyph(){
@@ -29,13 +29,30 @@ const accounts:{n:number;icon:ReactNode;hint:string}[]=[
  {n:19,icon:<KissGlyph/>,hint:"親吻"},
  {n:5,icon:<MidnightGlyph/>,hint:"兩人的秘密時光"}
 ];
-export function JourneyLedger(){
+function CountRise({to,delay}:{to:number;delay:number}){
+ const [value,setValue]=useState(0);
+ useEffect(()=>{
+  if(typeof window==="undefined")return;
+  if(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches){setValue(to);return;}
+  let frame=0,start=0,timeout=0;
+  const tick=(now:number)=>{
+   if(!start)start=now;
+   const t=Math.min(1,(now-start)/1100);
+   setValue(Math.round(to*(1-Math.pow(1-t,3))));
+   if(t<1)frame=window.requestAnimationFrame(tick);
+  };
+  timeout=window.setTimeout(()=>{frame=window.requestAnimationFrame(tick);},delay);
+  return ()=>{window.clearTimeout(timeout);window.cancelAnimationFrame(frame);};
+ },[to,delay]);
+ return <>{value}</>;
+}
+export function JourneyLedger({animated=false}:{animated?:boolean}){
  return <section className="tm-paper-card tm-ledger" aria-label="旅途花費趣味帳本">
   <div className="tm-ledger__header"><div><p lang="ja">旅の勘定 · ふたりの秘密帳</p><h2>旅途花費</h2></div><span className="tm-ledger__seal" aria-hidden="true">秘</span></div>
   <div className="tm-ledger__row">
-   {accounts.map((account,i)=><div className="tm-ledger__item" key={i} aria-label={account.hint+" "+account.n+" 次"}>
+   {accounts.map((account,i)=><div className={"tm-ledger__item "+(animated?"tm-ledger__item--animated":"")} key={i} style={animated?{animationDelay:(i*.55)+"s"}:undefined} aria-label={account.hint+" "+account.n+" 次"}>
     <span className="tm-ledger__icon">{account.icon}</span>
-    <span className="tm-ledger__number">{account.n}<span aria-hidden="true"> ×</span></span>
+    <span className="tm-ledger__number">{animated?<CountRise to={account.n} delay={550+i*500}/>:account.n}<span aria-hidden="true"> ×</span></span>
    </div>)}
   </div>
   <p className="tm-ledger__footer">此帳單不收現金。請於旅途之中，慢慢結清。</p>
