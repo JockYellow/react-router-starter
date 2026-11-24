@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Compass, Footprints, MapPin, Sparkles, X } from "lucide-react";
 import { ROUTE_STORIES, type RouteStory, type StoryId } from "./stories";
-import { REAL_PHOTOS, commonsImage, commonsSource, type Photo } from "./photos";
+import { REAL_PHOTOS, commonsImage, commonsOriginal, commonsSource, type Photo } from "./photos";
 
 export function ThreeDayPrelude(){
  const days=[
@@ -29,15 +29,19 @@ export function ThreeDayPrelude(){
  </section>;
 }
 
-function RealityPhoto({photo,priority=false}:{photo:Photo;priority?:boolean}){
- const [failed,setFailed]=useState(false);
+function RealityPhoto({photo,priority=false,routeId}:{photo:Photo;priority?:boolean;routeId:string}){
+ const [attempt,setAttempt]=useState(0);
+ const imgSource=attempt===0?commonsImage(photo.file,800):commonsOriginal(photo.file);
  return <div className="tm-reality-photo">
-  {failed?
-   <div className="tm-reality-photo__unavailable">照片目前無法載入，<a href={commonsSource(photo.file)} target="_blank" rel="noopener noreferrer">開啟原始圖片</a></div>:
-   <img src={commonsImage(photo.file)} alt={photo.label} loading={priority?"eager":"lazy"} referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>}
+  {attempt>=2?
+   <div className="tm-reality-photo__fallback">
+    <img src={"/trip-map/stories/"+routeId.toLowerCase()+".svg"} alt="插畫備援：原始實景照片暫時無法載入" loading="lazy"/>
+    <a href={commonsSource(photo.file)} target="_blank" rel="noopener noreferrer">暫時無法載入實景，查看原始圖片</a>
+   </div>:
+   <img src={imgSource} alt={photo.label} loading={priority?"eager":"lazy"} referrerPolicy="no-referrer" onError={()=>setAttempt(a=>Math.min(a+1,2))}/>}
   <div className="tm-reality-photo__credit">
    <span>{photo.label}</span>
-   <a href={commonsSource(photo.file)} target="_blank" rel="noopener noreferrer" aria-label={"查看"+photo.label+"的照片作者與授權"}>實景照片 · 作者及授權</a>
+   <a href={commonsSource(photo.file)} target="_blank" rel="noopener noreferrer" aria-label={"查看"+photo.label+"的照片作者與授權"}>實景來源及授權</a>
   </div>
  </div>;
 }
@@ -45,7 +49,7 @@ function ScrollVignette({story,index}:{story:RouteStory;index:number}){
  const beat=story.journey[index];
  return <div className="tm-story-beat" key={beat.part}>
   <div className="tm-story-beat__image">
-   <RealityPhoto photo={REAL_PHOTOS[story.id][index]}/>
+   <RealityPhoto photo={REAL_PHOTOS[story.id][index]} routeId={story.id}/>
    <div className="tm-story-beat__scene">{beat.scene}</div>
   </div>
   <div className="tm-story-beat__body">
@@ -74,7 +78,7 @@ function RouteDetail({story,onClose,selected,onToggle,canAdd}:{story:RouteStory;
   <div className="tm-story-modal" role="dialog" aria-modal="true" aria-label={story.title+" 旅卷"}>
    <button type="button" className="tm-story-close" onClick={onClose} aria-label="關閉旅卷"><X size={19}/><span>收起旅卷</span></button>
    <div className="tm-story-modal__hero">
-    <RealityPhoto photo={REAL_PHOTOS[story.id][0]} priority/>
+    <RealityPhoto photo={REAL_PHOTOS[story.id][0]} routeId={story.id} priority/>
     <div className="tm-story-modal__hero-shade"/>
     <div className="tm-story-modal__hero-caption">
      <p lang="ja">旅の謎 · {story.jp}</p>
