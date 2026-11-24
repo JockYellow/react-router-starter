@@ -37,4 +37,37 @@ export const REAL_PHOTOS:Record<string,[Photo,Photo,Photo]>={
  ]
 };
 export function commonsSource(file:string){return "https://commons.wikimedia.org/wiki/File:"+encodeURIComponent(file).replace(/%20/g,"_");}
-export function commonsImage(file:string,width=960){return "https://commons.wikimedia.org/wiki/Special:FilePath/"+encodeURIComponent(file)+"?width="+width;}
+// 直接使用 Wikimedia 的實際縮圖主機，避免 Special:FilePath 重新導向被 CSP 阻擋。
+// Hash 為 Commons 以檔名（空格正規化為底線）計算的 MD5 前兩碼。
+const COMMONS_HASH:Record<string,string> = {
+ "Beipu Taiwan Street-vendor-01.jpg":"f1",
+ "Lei cha at Beipu, Taiwan 2023-04-09.jpg":"c3",
+ "Emei Township Wikivoyage Banner.jpg":"3c",
+ "Neiwan Station 2024-01-06.jpg":"d3",
+ "Old Street Neiwan.jpg":"83",
+ "2022 Neiwan Suspension Bridge.jpg":"7e",
+ "新埔劉氏雙堂屋 (1).jpg":"0b",
+ "202510 藍染方巾與柿染方巾.jpg":"00",
+ "關西仙草加工廠 Guanxi Mesona Processing Plant - panoramio.jpg":"1e",
+ "新竹漁港之一景.jpg":"6a",
+ "十七公里海岸線林道.JPG":"70",
+ "退潮時的香山濕地.jpg":"37",
+ "新竹縣古蹟-湖口老街.jpg":"4b",
+ "湖口老街街屋門面近景.jpg":"2f",
+ "紅毛港紅樹林橋.jpg":"64",
+ "竹東週六夜市.jpg":"4e",
+ "蕭如松藝術園區日式建築.jpg":"f9",
+ "大山背樂善堂 主廟正面 20200211.jpg":"80"
+};
+export function commonsImage(file:string,width=800){
+ const hash=COMMONS_HASH[file];
+ if(!hash)return "https://commons.wikimedia.org/wiki/Special:FilePath/"+encodeURIComponent(file)+"?width="+width;
+ const filename=encodeURIComponent(file.replace(/ /g,"_"));
+ return "https://thumb.wikimedia.org/wikipedia/commons/thumb/"+hash[0]+"/"+hash+"/"+filename+"/"+width+"px-"+filename;
+}
+export function commonsOriginal(file:string){
+ const hash=COMMONS_HASH[file];
+ if(!hash)return commonsImage(file);
+ return "https://upload.wikimedia.org/wikipedia/commons/"+hash[0]+"/"+hash+"/"+encodeURIComponent(file.replace(/ /g,"_"));
+}
+
