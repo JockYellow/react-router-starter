@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowRight, BookOpenText, Check, ChevronRight, LockKeyhole, ScrollText, Sparkles } from "lucide-react";
+import { ArrowRight, BookOpenText, ChevronRight, LockKeyhole, ScrollText, Sparkles } from "lucide-react";
 import { ROUTES, type pairFit } from "./questions";
 import { JourneyLedger } from "./JourneyLedger";
 
@@ -61,6 +61,13 @@ export function TripFinale({matches,children}:{matches:Matches;children:ReactNod
   {scene===4&&<section className="tm-finale-scene--routes" key="routes">
    <div className="tm-finale-routes__heading"><p className="tm-finale__eyebrow" lang="ja">最終篇 · 六つの旅の扉</p><h1>目的地，現在由你們決定。</h1><p>六條旅行提案已全部解鎖。點開旅卷，看見真正的景色，再把心動的兩三條收藏起來。</p></div>
    {children}
+   <details className="tm-finale__scores-all">
+    <summary>展開六條路線的完整得分</summary>
+    <div className="tm-finale__scores-all-grid">{matches.map(m=><div className="tm-finale__scores-all-row" key={m.id}>
+      <div><span>{m.id} · {ROUTES[m.id].name}</span><b>{m.score.toFixed(1)} / 5</b></div>
+      <div className="tm-finale__scores-all-bar"><span style={{width:(m.score/5*100)+"%"}}/></div>
+    </div>)}</div>
+   </details>
    <button type="button" className="tm-finale__restart" onClick={()=>next(0)}><Sparkles size={15}/>重新播放結算故事</button>
   </section>}
  </div>;
