@@ -146,3 +146,32 @@
  .tm-story-meta {grid-template-columns:1fr;}
 }
 @media (prefers-reduced-motion:reduce) {.tm-story-card {transition:none;}}
+
+
+/* 實際旅程照片：開卷後改用實景，保持日式排版的紙質框架。 */
+.tm-reality-photo {position:absolute;inset:0;overflow:hidden;background:#e6dfd0;color:#263d50;}
+.tm-reality-photo>img {display:block;width:100%;height:100%;object-fit:cover;object-position:center;}
+.tm-reality-photo__credit {position:absolute;top:9px;right:9px;left:9px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px;font-size:10px;line-height:1.55;color:#203a50;text-shadow:none;pointer-events:none;}
+.tm-reality-photo__credit span,
+.tm-reality-photo__credit a {background:rgba(253,247,232,.94);border:1px solid rgba(93,84,69,.33);padding:4px 7px;pointer-events:auto;}
+.tm-reality-photo__credit a {color:#8f4634;text-decoration:underline;text-underline-offset:2px;}
+.tm-reality-photo__unavailable {display:flex;height:100%;width:100%;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:25px;background:#d4c7ac;color:#4b4b45;text-align:center;font-size:12px;}
+.tm-reality-photo__unavailable a {text-decoration:underline;color:#8e4034;}
+.tm-reality-photo__note {margin:0 0 12px!important;padding:8px 10px;border-left:2px solid #a94838;background:#f1e6d2;font-size:11px!important;color:#686257!important;line-height:1.6!important;}
+.tm-story-modal__hero>.tm-reality-photo {position:absolute;inset:0;}
+.tm-story-modal__hero>.tm-reality-photo img {height:100%;width:100%;object-fit:cover;object-position:center 45%;}
+.tm-story-modal__hero>.tm-reality-photo .tm-reality-photo__credit {top:12px;left:14px;right:14px;z-index:3;}
+.tm-story-modal__hero>.tm-reality-photo .tm-reality-photo__credit span,
+.tm-story-modal__hero>.tm-reality-photo .tm-reality-photo__credit a {background:rgba(248,236,211,.92);}
+.tm-story-beat__image>.tm-reality-photo {position:absolute;inset:0;}
+.tm-story-beat__image .tm-reality-photo__credit {top:auto;bottom:7px;left:7px;right:7px;}
+.tm-story-beat__image .tm-reality-photo__credit span,
+.tm-story-beat__image .tm-reality-photo__credit a {font-size:10px;}
+.tm-story-beat__scene {display:none;} /* 實景拍攝地點已於照片本身明確標示 */
+.tm-story-modal__hero-caption {z-index:2;pointer-events:none;}
+@media(max-width:700px){
+ .tm-reality-photo__credit {gap:3px;font-size:10px;}
+ .tm-story-modal__hero>.tm-reality-photo .tm-reality-photo__credit span {max-width:54%;}
+ .tm-story-modal__hero>.tm-reality-photo .tm-reality-photo__credit a {max-width:46%;}
+ .tm-story-beat__image {min-height:210px;}
+}
