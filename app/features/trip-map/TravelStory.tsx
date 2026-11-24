@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ArrowLeft, ArrowRight, Check, Compass, Footprints, MapPin, Sparkles, X } from "lucide-react";
 import { ROUTE_STORIES, type RouteStory, type StoryId } from "./stories";
 import { REAL_PHOTOS, commonsImage, commonsOriginal, commonsSource, type Photo } from "./photos";
@@ -62,21 +63,38 @@ function ScrollVignette({story,index}:{story:RouteStory;index:number}){
 }
 function RouteDetail({story,onClose,selected,onToggle,canAdd}:{story:RouteStory;onClose:()=>void;selected:boolean;onToggle:(id:StoryId)=>void;canAdd:boolean}){
  const [warning,setWarning]=useState(false);
+ const overlayRef=useRef<HTMLDivElement>(null);
+ const closeRef=useRef<HTMLButtonElement>(null);
  useEffect(()=>{
-  const old=document.body.style.overflow;
+  // 保留開卷前的捲動位置：手機上鎖住背景，僅讓旅卷在獨立容器內捲動。
+  const oldOverflow=document.body.style.overflow;
+  const oldHtmlOverflow=document.documentElement.style.overflow;
+  const restoreFocus=document.activeElement instanceof HTMLElement?document.activeElement:null;
   document.body.style.overflow="hidden";
-  const keydown=(e:KeyboardEvent)=>{if(e.key==="Escape")onClose();};
+  document.documentElement.style.overflow="hidden";
+  overlayRef.current?.scrollTo({top:0,behavior:"instant"});
+  closeRef.current?.focus({preventScroll:true});
+  const keydown=(e:KeyboardEvent)=>{
+   if(e.key==="Escape"){e.preventDefault();onClose();}
+  };
   window.addEventListener("keydown",keydown);
-  return ()=>{document.body.style.overflow=old;window.removeEventListener("keydown",keydown);};
- },[onClose]);
+  return ()=>{
+   document.body.style.overflow=oldOverflow;
+   document.documentElement.style.overflow=oldHtmlOverflow;
+   window.removeEventListener("keydown",keydown);
+   restoreFocus?.focus({preventScroll:true});
+  };
+ // 開關視窗才執行；避免收藏時父元件重繪造成捲動鎖定反覆解除。
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[]);
  const choose=()=>{
   if(!selected&&!canAdd){setWarning(true);return;}
   onToggle(story.id);
   setWarning(false);
  };
- return <div className="tm-story-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+ return createPortal(<div ref={overlayRef} className="tm-story-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
   <div className="tm-story-modal" role="dialog" aria-modal="true" aria-label={story.title+" 旅卷"}>
-   <button type="button" className="tm-story-close" onClick={onClose} aria-label="關閉旅卷"><X size={19}/><span>收起旅卷</span></button>
+   <button ref={closeRef} type="button" className="tm-story-close" onClick={onClose} aria-label="關閉旅卷"><X size={19}/><span>收起旅卷</span></button>
    <div className="tm-story-modal__hero">
     <RealityPhoto photo={REAL_PHOTOS[story.id][0]} routeId={story.id} priority/>
     <div className="tm-story-modal__hero-shade"/>
@@ -115,7 +133,7 @@ function RouteDetail({story,onClose,selected,onToggle,canAdd}:{story:RouteStory;
     </div>
    </div>
   </div>
- </div>;
+ </div>,document.body);
 }
 export function RouteGallery({selected,onToggle}:{selected:string[];onToggle:(id:StoryId)=>void}){
  const [opened,setOpened]=useState<StoryId|null>(null);
