@@ -23,15 +23,15 @@ export function TripFinale({matches,children}:{matches:Matches;children:ReactNod
   {scene===0&&<section className="tm-finale-scene tm-finale-scene--intro" key="intro">
    <div className="tm-finale-scene__crest" aria-hidden="true"><span>解</span></div>
    <p className="tm-finale__eyebrow" lang="ja">終ノ章 · ふたりの地図</p>
-   <h1>兩張旅行地圖，<br/>終於重疊在一起。</h1>
+   <h1>我們各自出發，<br/>地圖卻慢慢畫向同一個地方。</h1>
    <div className="tm-finale-scene__line" aria-hidden="true"><span/><span/><span/></div>
-   <p>走過十道問題，現在可以打開彼此心裡的風景了。<br/>你們的答案裡，藏著一張共同的旅行地圖。</p>
-   <button className="tm-finale__action" onClick={()=>next(1)}><ScrollText size={20}/>揭開我們的旅行答案<ArrowRight size={18}/></button>
+   <p>十道問題，答的時候好像也沒想那麼多。<br/>但把它們放在一起，才發現原來每個選擇，都悄悄說了一點關於我們的事。</p>
+   <button className="tm-finale__action" onClick={()=>next(1)}><ScrollText size={20}/>看看兩張地圖畫出了什麼<ArrowRight size={18}/></button>
   </section>}
   {scene===1&&<section className="tm-finale-scene tm-finale-scene--scores" key="scores">
    <p className="tm-finale__eyebrow" lang="ja">第一封密函 · 旅の相性</p>
-   <h1>最適合一起出發的<br/>三段旅程</h1>
-   <p className="tm-finale__sub">依照你們的個別心動評分與旅行偏好，尋找兩人都願意走進的路線。</p>
+   <h1>原來這三條路，<br/>我們都悄悄望了一眼。</h1>
+   <p className="tm-finale__sub">把兩個人的期待攤開，竟然真的能找出一些相似的地方。當然啦，還有一點彼此想不到的小意外。</p>
    <div className="tm-finale__rankings">
     {top.map((m,i)=><div className={"tm-finale-rank "+(unlocked>=i+1?"is-revealed":"")} key={m.id} style={{transitionDelay:(i*75)+"ms"}}>
       <div className="tm-finale-rank__index"><span>{i+1}</span><small>{i===0?"最心動":"候選"}</small></div>
@@ -39,27 +39,27 @@ export function TripFinale({matches,children}:{matches:Matches;children:ReactNod
       <div className="tm-finale-rank__score"><strong>{unlocked>=i+1?m.score.toFixed(1):"？"}</strong><small>/ 5</small></div>
     </div>)}
    </div>
-   <p className="tm-finale__sub tm-finale__sub--small">這些是旅行偏好的參考分數，最後由你們一起挑選；沒有心理測驗式的「相容率」。</p>
-   <button className="tm-finale__action" onClick={()=>next(2)} disabled={unlocked<3}>收下這份答案，看看下一封密函<ChevronRight size={18}/></button>
+   <p className="tm-finale__sub tm-finale__sub--small">分數只是小小的路標，別太認真地把它當命運宣告。最後的目的地，還是要我們一起決定。</p>
+   <button className="tm-finale__action" onClick={()=>next(2)} disabled={unlocked<3}>分數先收好，後面還有東西<ChevronRight size={18}/></button>
   </section>}
   {scene===2&&<section className="tm-finale-scene tm-finale-scene--bill" key="bill">
    <div className="tm-finale-bill__rays" aria-hidden="true"/>
    <div className="tm-finale-bill__envelope" aria-hidden="true"><span>秘</span></div>
    <p className="tm-finale__eyebrow" lang="ja">第二封密函 · 旅の勘定</p>
-   <h1>等等，<br/>還有一筆帳。</h1>
+   <h1>等等。<br/>旅行怎麼會沒有代價？</h1>
    <div className="tm-finale-bill__ellipsis">本次花費<span>.</span><span>.</span><span>.</span></div>
-   <p>這份帳單沒有標明幣別，<br/>也沒有任何收據。<br/>只有三個需要一起清算的數字。</p>
-   <button className="tm-finale__action" onClick={()=>next(3)}><LockKeyhole size={20}/>拆開神秘帳單<ChevronRight size={18}/></button>
+   <p>翻遍口袋，竟然找不到這筆消費的收據。<br/>它甚至沒有標幣別。<br/>……我開始覺得事情不太單純了。</p>
+   <button className="tm-finale__action" onClick={()=>next(3)}><LockKeyhole size={20}/>都到這裡了，拆開看看<ChevronRight size={18}/></button>
   </section>}
   {scene===3&&<section className="tm-finale-scene tm-finale-scene--cost" key="cost">
    <p className="tm-finale__eyebrow" lang="ja">秘密帳本 · 代金は想い出</p>
-   <h1>本次花費<br/>結算完成</h1>
+   <h1>原來這筆帳，<br/>要這樣還啊。</h1>
    <div className="tm-finale-cost__ledger"><JourneyLedger animated/></div>
-   <p className="tm-finale__sub">這份帳單不能刷卡、也無法轉帳。<br/>只能等旅行開始，再一筆一筆兌現。</p>
-   <button className="tm-finale__action" onClick={()=>next(4)}><BookOpenText size={20}/>繼續開啟六條旅行繪卷<ChevronRight size={18}/></button>
+   <p className="tm-finale__sub">糟糕，看來信用卡幫不上忙。<br/>只能等真正見面的時候，一筆一筆慢慢還了。</p>
+   <button className="tm-finale__action" onClick={()=>next(4)}><BookOpenText size={20}/>好了好了，回來選旅行啦<ChevronRight size={18}/></button>
   </section>}
   {scene===4&&<section className="tm-finale-scene--routes" key="routes">
-   <div className="tm-finale-routes__heading"><p className="tm-finale__eyebrow" lang="ja">最終篇 · 六つの旅の扉</p><h1>目的地，現在由你們決定。</h1><p>六條旅行提案已全部解鎖。點開旅卷，看見真正的景色，再把心動的兩三條收藏起來。</p></div>
+   <div className="tm-finale-routes__heading"><p className="tm-finale__eyebrow" lang="ja">最終篇 · 六つの旅の扉</p><h1>山海都在遠方，<br/>我們還有一天可以一起去。</h1><p>山、海、老街、溫泉，六條路在眼前慢慢展開。我想我們一定沒辦法把所有地方都走完，但總會有一段，是兩個人都不想錯過的。</p></div>
    {children}
    <details className="tm-finale__scores-all">
     <summary>展開六條路線的完整得分</summary>
@@ -68,7 +68,7 @@ export function TripFinale({matches,children}:{matches:Matches;children:ReactNod
       <div className="tm-finale__scores-all-bar"><span style={{width:(m.score/5*100)+"%"}}/></div>
     </div>)}</div>
    </details>
-   <button type="button" className="tm-finale__restart" onClick={()=>next(0)}><Sparkles size={15}/>重新播放結算故事</button>
+   <button type="button" className="tm-finale__restart" onClick={()=>next(0)}><Sparkles size={15}/>我還想再看一次揭曉</button>
   </section>}
  </div>;
 }
