@@ -211,6 +211,7 @@
  position:relative;
  isolation:isolate;
  perspective:1500px;
+ touch-action:pan-y; /* 直向仍能捲動，橫向拖動則由頁面控制 */
  background:#d5bea0;
  border:1px solid #af9472;
  padding:0 0 9px 7px;
@@ -235,6 +236,13 @@
  box-shadow:inset 8px 0 14px -9px #7d6046;
  will-change:transform;
 }
+.tm-entry-book__paper--dragging {
+ animation:none!important;
+ transition:none!important;
+ cursor:grabbing;
+}
+.tm-entry-book__stage {cursor:grab;}
+.tm-entry-book__stage button {cursor:pointer;}
 .tm-entry-book__paper::after {
  content:"";
  position:absolute;
