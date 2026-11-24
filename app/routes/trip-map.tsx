@@ -137,10 +137,10 @@ export default function TripMap(){
    setLandingTurn(direction);
   }
   landingTimers.current.push(setTimeout(()=>{
-   clearLandingDrag();
    setLandingPage(target);
    setLandingTurn(direction);
    setLandingIncoming(true);
+   requestAnimationFrame(clearLandingDrag);
    book?.scrollIntoView({behavior:"smooth",block:"start"});
   },320));
   landingTimers.current.push(setTimeout(()=>{
@@ -186,6 +186,8 @@ export default function TripMap(){
   landingGesture.current=null;
   if(!g.active)return;
   landingSuppressClick.current=true;
+  // 部分手機手勢結束後不會送出 click；若沒送出，短暫後解除阻擋，避免下一次真正點擊被吃掉。
+  landingTimers.current.push(setTimeout(()=>{landingSuppressClick.current=false;},120));
   if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);
   const target=landingPage+(g.angle<0?1:-1);
   if(!cancel&&Math.abs(g.angle)>=30)goLanding(target,g.angle);
