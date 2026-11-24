@@ -1,0 +1,147 @@
+/* 江戶手卷式換頁：和紙從中央向兩側鋪開，木軸隨之展開。 */
+.tm-unfurl{
+ position:fixed;
+ inset:0;
+ z-index:12000;
+ display:grid;
+ place-items:center;
+ overflow:hidden;
+ isolation:isolate;
+ pointer-events:auto;
+ animation:tm-unfurl-clear 1s ease-in-out both;
+}
+.tm-unfurl__shade{
+ position:absolute;
+ inset:0;
+ background:radial-gradient(circle at 50% 50%,#496077 0%,#1d354c 58%,#102437 100%);
+}
+.tm-unfurl__shade::before{
+ content:"";
+ position:absolute;
+ inset:0;
+ opacity:.17;
+ background-image:repeating-linear-gradient(90deg,transparent 0 33px,rgba(238,214,176,.12) 34px 35px);
+}
+.tm-unfurl__paper{
+ position:relative;
+ z-index:2;
+ width:min(92vw,900px);
+ height:min(76dvh,600px);
+ max-height:660px;
+ overflow:hidden;
+ display:flex;
+ justify-content:center;
+ align-items:center;
+ background:
+  radial-gradient(circle at 15% 22%,rgba(128,91,52,.11) 0,transparent 24%),
+  radial-gradient(circle at 74% 73%,rgba(151,116,69,.12) 0,transparent 29%),
+  repeating-linear-gradient(16deg,transparent 0 8px,rgba(91,72,45,.02) 8px 9px),
+  #f1e4ca;
+ border-block:8px solid #c5a274;
+ box-shadow:inset 0 0 0 8px rgba(135,100,58,.13),0 20px 55px rgba(12,25,39,.25);
+ clip-path:inset(0 50% 0 50%);
+ animation:tm-unfurl-paper 710ms cubic-bezier(.22,.79,.25,1) forwards;
+}
+.tm-unfurl__paper::before{
+ content:"";
+ position:absolute;
+ inset:18px;
+ border:1px solid rgba(158,111,64,.39);
+ pointer-events:none;
+}
+.tm-unfurl__inner{
+ min-width:300px;
+ display:flex;
+ flex-direction:column;
+ align-items:center;
+ gap:8px;
+ color:#233c51;
+ text-align:center;
+ padding:20px;
+ font-family:"Noto Serif TC","Yu Mincho",serif;
+ max-width:calc(100% - 24px);
+ white-space:normal;
+ text-wrap:balance;
+ animation:tm-unfurl-content 760ms ease both;
+}
+.tm-unfurl__stamp{
+ width:47px;
+ height:47px;
+ display:grid;
+ place-items:center;
+ background:#a74738;
+ color:#fff3db;
+ font-size:25px;
+ font-weight:900;
+ transform:rotate(-8deg);
+ border:3px double #e9c6a1;
+ margin-bottom:16px;
+}
+.tm-unfurl__inner p{font-size:12px;letter-spacing:.19em;color:#a54b39;font-weight:700;}
+.tm-unfurl__inner strong{font-size:clamp(19px,5vw,33px);letter-spacing:.08em;font-weight:900;}
+.tm-unfurl__brush{height:2px;width:86px;margin-top:17px;background:linear-gradient(90deg,transparent,#af5a42,transparent);}
+.tm-unfurl__rod{
+ position:absolute;
+ top:50%;
+ z-index:4;
+ width:21px;
+ height:min(82dvh,650px);
+ transform:translate(-50%,-50%);
+ border-radius:9px;
+ background:linear-gradient(90deg,#392f28,#b38a54 18%,#e8c78d 40%,#89643f 67%,#463324 100%);
+ border-inline:2px solid #513d2d;
+ box-shadow:2px 4px 10px rgba(0,0,0,.35);
+}
+.tm-unfurl__rod::before,.tm-unfurl__rod::after{
+ content:"";
+ position:absolute;
+ left:-5px;
+ width:27px;
+ height:16px;
+ border-radius:4px;
+ background:linear-gradient(90deg,#ad804a,#ebd2a0,#8d5a34);
+ box-shadow:0 2px 4px rgba(10,26,36,.3);
+}
+.tm-unfurl__rod::before{top:-8px;}
+.tm-unfurl__rod::after{bottom:-8px;}
+.tm-unfurl__rod span{
+ position:absolute;
+ inset:28px 6px;
+ border-left:1px solid rgba(255,240,201,.48);
+}
+.tm-unfurl__rod--left{animation:tm-unfurl-left 710ms cubic-bezier(.22,.79,.25,1) both;}
+.tm-unfurl__rod--right{animation:tm-unfurl-right 710ms cubic-bezier(.22,.79,.25,1) both;}
+@keyframes tm-unfurl-paper{
+ 0%{clip-path:inset(0 50% 0 50%);}
+ 16%{clip-path:inset(0 48% 0 48%);}
+ 100%{clip-path:inset(0 0 0 0);}
+}
+@keyframes tm-unfurl-left{
+ from{left:50%;}
+ to{left:calc(50% - min(46vw,450px));}
+}
+@keyframes tm-unfurl-right{
+ from{left:50%;}
+ to{left:calc(50% + min(46vw,450px));}
+}
+@keyframes tm-unfurl-content{
+ 0%,27%{opacity:0;transform:scale(.94);}
+ 65%,100%{opacity:1;transform:scale(1);}
+}
+@keyframes tm-unfurl-clear{
+ 0%,75%{opacity:1;visibility:visible;}
+ 100%{opacity:0;visibility:hidden;}
+}
+@media(max-width:550px){
+ .tm-unfurl__paper{width:94vw;height:67dvh;}
+ .tm-unfurl__rod{height:72dvh;width:15px;}
+ .tm-unfurl__rod::before,.tm-unfurl__rod::after{left:-5px;width:21px;}
+ .tm-unfurl__rod--left{animation-name:tm-unfurl-left-mobile;}
+ .tm-unfurl__rod--right{animation-name:tm-unfurl-right-mobile;}
+ .tm-unfurl__inner{min-width:250px;}
+ @keyframes tm-unfurl-left-mobile{from{left:50%;}to{left:3vw;}}
+ @keyframes tm-unfurl-right-mobile{from{left:50%;}to{left:97vw;}}
+}
+@media(prefers-reduced-motion:reduce){
+ .tm-unfurl{display:none!important;}
+}
