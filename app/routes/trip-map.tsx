@@ -199,6 +199,14 @@ export default function TripMap(){
  const tourFinalists=useRef<Partial<Record<Role,string[]>>>({});
  const lastRef=useRef<string>("");
  const sessionRef=useRef(session); sessionRef.current=session;
+ useEffect(()=>{
+  // 搭配 D1 的一次性完整重置，讓本裝置也不再沿用誤選角色的舊通行證。
+  const key="trip-map-full-restart-2026-11-24-v2";
+  if(localStorage.getItem(key))return;
+  localStorage.removeItem("trip-map-2027-yanzhen");
+  localStorage.removeItem("trip-map-2027-hanyu");
+  localStorage.setItem(key,"applied");
+ },[]);
  function startTour(){
   setError("");setCreatorTour(true);tourOverrides.current={};tourFinalists.current={};lastRef.current="";
   const role:Role="yanzhen";setSession({role,token:"creator-tour-only"});
