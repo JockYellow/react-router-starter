@@ -51,39 +51,53 @@ export function validAnswer(index: number, answer: unknown): boolean {
 
 export type Answers = Record<string,Record<string,any>>;
 function clamp(n:number){return Math.max(1,Math.min(5,n));}
+const round=(n:number)=>Number(n.toFixed(2));
+/**
+ * 「直選」與「偏好推算」是兩份獨立測驗。
+ * 直選只看第 9 題 routes；偏好只看前面的興趣、時間分配、線索與步調。
+ * 預算、氣候、預約和體力另外列為行程提醒，不暗中扣分。
+ */
 export function individualFit(ans:Answers) {
  const radar=ans.radar||{}, mystery=ans.mystery||{}, coins=ans.coins||{}, trade=ans.trade||{}, fork=ans.fork||{}, routeStars=ans.routes||{};
  const traits:Record<string,number>={
- food: Number(radar.food||3), scenery:Number(radar.scenery||3),
- culture:(Number(radar.culture||3)*.7 + Number(mystery.old||3)*.3),
- craft:(Number(radar.craft||3)*.65+Number(mystery.artisan||3)*.35),
- discover:(Number(radar.discover||3)*.6+Number(fork.spontaneous||3)*.4),
- active:Number(radar.active||3),
- rest:(Number(fork.slow||3)*.65+Number(coins.rest||0)*.35*1.6),
- nature:(Number(mystery.ecology||3)+Number(mystery.forest||3))/2
+  food:Number(radar.food||3), scenery:Number(radar.scenery||3),
+  culture:Number(radar.culture||3)*.7+Number(mystery.old||3)*.3,
+  craft:Number(radar.craft||3)*.65+Number(mystery.artisan||3)*.35,
+  discover:Number(radar.discover||3)*.6+Number(fork.spontaneous||3)*.4,
+  active:Number(radar.active||3),
+  rest:Number(fork.slow||3)*.65+Number(coins.rest||0)*.35*1.6,
+  nature:(Number(mystery.ecology||3)+Number(mystery.forest||3))/2
  };
- const tally=Object.values(coins).reduce((s,x)=>s+Number(x||0),0);
- if(tally===8){ for(const k of ["food","scenery","craft","active","rest"]) traits[k]=clamp(traits[k]*.8+clamp(1+Number(coins[k]||0))* .2); }
+ const tally=Object.values(coins).reduce((sum,value)=>sum+Number(value||0),0);
+ if(tally===8)for(const key of ["food","scenery","craft","active","rest"])
+  traits[key]=clamp(traits[key]*.8+clamp(1+Number(coins[key]||0))*.2);
  const reality=ans.reality||{};
  return ROUTE_KEYS.map(id=>{
-  const route=ROUTES[id]; const projected=Object.entries(route.traits).reduce((s,[k,w])=>s+clamp(traits[k]??3)*w,0);
-  let fit=clamp((Number(routeStars[id]||3)*.58)+(projected*.42));
+  const route=ROUTES[id];
+  const preference=round(clamp(Object.entries(route.traits).reduce((sum,[trait,weight])=>sum+clamp(traits[trait]??3)*weight,0)));
+  const direct=Number(routeStars[id]||3);
   const alerts:string[]=[];
-  if(typeof reality.cap==="number" && Number.isFinite(reality.cap) && reality.cap<route.price[0]) alerts.push("估計低消超過預算上限");
-  else if(Number(reality.preferred||0)>0 && reality.preferred<route.price[1]) alerts.push("部分玩法可能超出舒服預算");
-
-  if(id==="F" && reality.cold<=2) alerts.push("對海風耐受度低");
-  if(id==="H" && reality.effort<=2) alerts.push("需要輕量步道版本");
-  if(id==="C" && Number(trade.book||3)<=2) alerts.push("泡湯須配合預約");
-  if(id==="D" && Number(trade.book||3)<=2) alerts.push("手作導覽須配合預約");
-  return {id,score:Number(fit.toFixed(2)),direct:Number(routeStars[id]||3),alerts};
+  if(typeof reality.cap==="number"&&Number.isFinite(reality.cap)&&reality.cap<route.price[0]) alerts.push("估計低消超過預算上限");
+  else if(Number(reality.preferred||0)>0&&reality.preferred<route.price[1]) alerts.push("部分玩法可能超出舒服預算");
+  if(id==="F"&&reality.cold<=2)alerts.push("對海風耐受度低");
+  if(id==="H"&&reality.effort<=2)alerts.push("需要輕量步道版本");
+  if(id==="C"&&Number(trade.book||3)<=2)alerts.push("泡湯須配合預約");
+  if(id==="D"&&Number(trade.book||3)<=2)alerts.push("手作導覽須配合預約");
+  return {id,direct,preference,alerts};
  });
 }
+function commonOf(a:number,b:number){return round(Math.min(a,b)*.6+(a+b)/2*.4);}
 export function pairFit(both:Record<Role,Answers>){
  const a=individualFit(both.yanzhen),b=individualFit(both.hanyu);
+ // 不再產生混合總分；兩個獨立事件各自有排名。
  return ROUTE_KEYS.map((id,i)=>{
   const x=a[i],y=b[i];
-  const common=Number((Math.min(x.score,y.score)*.6+(x.score+y.score)/2*.4).toFixed(2));
-  return {id,score:common, people:{yanzhen:x,hanyu:y},alerts:Array.from(new Set([...x.alerts,...y.alerts]))};
- }).sort((x,y)=>y.score-x.score);
+  return {
+   id,
+   directScore:commonOf(x.direct,y.direct),
+   preferenceScore:commonOf(x.preference,y.preference),
+   people:{yanzhen:x,hanyu:y},
+   alerts:Array.from(new Set([...x.alerts,...y.alerts]))
+  };
+ }).sort((x,y)=>y.preferenceScore-x.preferenceScore||y.directScore-x.directScore);
 }
