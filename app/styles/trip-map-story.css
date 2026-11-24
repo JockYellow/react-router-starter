@@ -175,3 +175,5 @@
  .tm-story-modal__hero>.tm-reality-photo .tm-reality-photo__credit a {max-width:46%;}
  .tm-story-beat__image {min-height:210px;}
 }
+
+.tm-story-modal__hero-shade { pointer-events:none; }
