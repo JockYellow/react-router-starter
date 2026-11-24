@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, BookOpenText, ChevronRight, LockKeyhole, ScrollText, Sparkles } from "lucide-react";
 import { ROUTES, type pairFit } from "./questions";
 import { JourneyLedger } from "./JourneyLedger";
+import { ScrollUnfurl } from "./ScrollUnfurl";
 
 type Matches=ReturnType<typeof pairFit>;
 type Scene=0|1|2|3|4;
@@ -9,16 +10,19 @@ type Scene=0|1|2|3|4;
 /** 所有模式共用同一份結算劇場；孩子就是正式結算頁的既有路線與收藏元件。 */
 export function TripFinale({matches,children}:{matches:Matches;children:ReactNode}){
  const [scene,setScene]=useState<Scene>(0);
+ const [hasTurned,setHasTurned]=useState(false);
  const [unlocked,setUnlocked]=useState(0);
  const top=matches.slice(0,3);
  const root=useRef<HTMLDivElement>(null);
- const next=(value:Scene)=>{setScene(value);root.current?.scrollIntoView({block:"start",behavior:"smooth"});};
+ const next=(value:Scene)=>{setHasTurned(true);setScene(value);root.current?.scrollIntoView({block:"start",behavior:"smooth"});};
  useEffect(()=>{
   if(scene!==1){setUnlocked(0);return;}
   const timers=[window.setTimeout(()=>setUnlocked(1),420),window.setTimeout(()=>setUnlocked(2),1150),window.setTimeout(()=>setUnlocked(3),1900)];
   return ()=>timers.forEach(window.clearTimeout);
  },[scene]);
+ const titles=["兩張地圖，重新攤開","第一封密函 · 看看分數","第二封密函 · 那張帳單","帳單揭曉 · 我們的秘密","六條岔路 · 最後一卷"];
  return <div className="tm-finale" ref={root}>
+  {hasTurned&&<ScrollUnfurl key={"finale:"+scene} title={titles[scene]} subtitle={"旅の謎 · 第 "+(scene+1)+" 幕"}/>}
   <div className="tm-finale__progress" aria-label="結算揭曉進度"><span className={scene>=0?"is-active":""}/><span className={scene>=1?"is-active":""}/><span className={scene>=2?"is-active":""}/><span className={scene>=3?"is-active":""}/><span className={scene>=4?"is-active":""}/></div>
   {scene===0&&<section className="tm-finale-scene tm-finale-scene--intro" key="intro">
    <div className="tm-finale-scene__crest" aria-hidden="true"><span>解</span></div>
