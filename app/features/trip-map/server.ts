@@ -38,6 +38,27 @@ async function runOneTimeRequestedReset(db:Db){
  initialResetComplete=true;
 }
 
+/**
+ * 2026-11-24 使用者要求再次完整重啟雙人解謎。
+ * 只執行一次，清除角色裝置認領、答案、路線候選與共同進度。
+ * 透過 D1 maintenance 標記避免多次請求或 Worker 冷啟動重複刪除。
+ */
+const FULL_RESTART_KEY="trip-map-full-restart-2026-11-24-v2";
+let fullRestartComplete=false;
+async function runRequestedFullRestart(db:Db){
+ if(fullRestartComplete)return;
+ await db.prepare("CREATE TABLE IF NOT EXISTS trip_duo_maintenance (key TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+ const first="NOT EXISTS (SELECT 1 FROM trip_duo_maintenance WHERE key=?)";
+ await db.batch([
+  db.prepare("DELETE FROM trip_duo_answers WHERE "+first).bind(FULL_RESTART_KEY),
+  db.prepare("DELETE FROM trip_duo_finalists WHERE "+first).bind(FULL_RESTART_KEY),
+  db.prepare("DELETE FROM trip_duo_players WHERE "+first).bind(FULL_RESTART_KEY),
+  db.prepare("UPDATE trip_duo_progress SET step=0,revealed=0,updated_at=CURRENT_TIMESTAMP WHERE id=1 AND "+first).bind(FULL_RESTART_KEY),
+  db.prepare("INSERT OR IGNORE INTO trip_duo_maintenance(key) VALUES (?)").bind(FULL_RESTART_KEY)
+ ]);
+ fullRestartComplete=true;
+}
+
 const denied=(message:string,status=400)=>Response.json({error:message},{status,headers:{"Cache-Control":"no-store"}});
 function roleOf(input:unknown):Role|null{return typeof input==="string"&&ROLES.includes(input as Role)? input as Role:null;}
 function tokenOkay(t:unknown){return typeof t==="string"&&t.length>=30&&t.length<=256&&/^[a-zA-Z0-9_-]+$/.test(t);}
@@ -85,7 +106,7 @@ export async function handleTripMap({request,context}:ActionFunctionArgs){
  let body:any; try{body=await request.json();}catch{return denied("資料沒能好好送到，請再試一次。");}
  const op=body?.op; const role=roleOf(body?.role); const token=body?.token;
  if(!role || !tokenOkay(token))return denied("好像沒認出你的身分，請回到旅人入口再試。");
- const db=requireBlogDb(context); await init(db); await runOneTimeRequestedReset(db);
+ const db=requireBlogDb(context); await init(db); await runOneTimeRequestedReset(db); await runRequestedFullRestart(db);
  if(op==="claim"){
   const hash=await digest(token);
   await db.prepare("INSERT OR IGNORE INTO trip_duo_players (role,token_hash) VALUES (?,?)").bind(role,hash).run();
